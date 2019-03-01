@@ -81,6 +81,7 @@ impl Browser {
 
         // so we get events like 'targetCreated' and 'targetDestroyed'
         trace!("Calling set discover");
+       // assume the first tab didn't open at this point yet. 
         browser.call_method(SetDiscoverTargets { discover: true })?;
 
         browser.wait_for_initial_tab()?;

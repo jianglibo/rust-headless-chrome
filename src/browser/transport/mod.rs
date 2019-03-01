@@ -117,6 +117,7 @@ impl Transport {
 
         let message_text = serde_json::to_string(&call)?;
 
+        // at some time later, transport should write data to other end of channel. So we just do block receiving.
         let response_rx = self.waiting_call_registry.register_call(call.id);
 
         match destination {

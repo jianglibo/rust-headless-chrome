@@ -1,0 +1,150 @@
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.setDiscoverTargets","id":0,"params":{"discover":true}}
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 0
+// When I recieve TargetCreatedEvent and target_type is Page, we will call server method: Target.attachToTarget
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(TargetCreated(TargetCreatedEvent { params: TargetCreatedParams { target_info: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "", url: "about:blank", attached: false, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") } } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser] Target created: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "", url: "about:blank", attached: false, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") }
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(TargetCreated(TargetCreatedEvent { params: TargetCreatedParams { target_info: TargetInfo { target_id: "64cad7b6-5dbe-4460-8955-292588090662", target_type: Browser, title: "", url: "", attached: true, opener_id: None, browser_context_id:
+None } } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.attachToTarget","id":1,"params":{"targetId":"1DE57E8CC5D4FA20E0132A59CFF023A9"}}
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(TargetCreated(TargetCreatedEvent { params: TargetCreatedParams { target_info: TargetInfo { target_id: "c7b06563-ca78-4e52-a425-8386fc90276c", target_type: Browser, title: "", url: "", attached: false, opener_id: None, browser_context_id: None } } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 1
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 0, result: Some(Object({})), error: None })
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { target_info: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") } } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(AttachedToTarget(AttachedToTargetEvent { params: AttachedToTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_info: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") }, waiting_for_debugger: false } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 1, result: Some(Object({"sessionId": String("99B8D9423AFDCDB6FA2DE18A73055B74")})), error: None })
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:04:20Z DEBUG headless_chrome::browser::tab] New tab attached with session ID: SessionId("99B8D9423AFDCDB6FA2DE18A73055B74")
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Page.enable","id":2,"params":{}}
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 2
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.sendMessageToTarget","id":3,"params":{"sessionId":"99B8D9423AFDCDB6FA2DE18A73055B74","message":"{\"method\":\"Page.enable\",\"id\":2,\"params\":{}}"}}
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 3
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 3, result: Some(Object({})), error: None })
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { target_info: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") } } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"id\":2,\"result\":{}}" } }))[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Page.setLifecycleEventsEnabled","id":4,"params":{"enabled":true}}
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 4
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.sendMessageToTarget","id":5,"params":{"sessionId":"99B8D9423AFDCDB6FA2DE18A73055B74","message":"{\"method\":\"Page.setLifecycleEventsEnabled\",\"id\":4,\"params\":{\"enabled\":true}}"}}
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 5
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 5, result: Some(Object({})), error: None })
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"commit\",\"timestamp\":480280.259752}}" } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"DOMContentLoaded\",\"timestamp\":480280.260541}}" } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"load\",\"timestamp\":480280.260646}}" } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"networkAlmostIdle\",\"timestamp\":480280.261025}}" } }))
+[2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"networkIdle\",\"timestamp\":480280.261025}}" } }))
+[2019-03-02T00:04:21Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"id\":4,\"result\":{}}" } }))[2019-03-02T00:04:21Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:04:21Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:04:21Z TRACE headless_chrome::browser] Target created: TargetInfo { target_id: "64cad7b6-5dbe-4460-8955-292588090662", target_type: Browser, title: "", url: "", attached: true, opener_id: None, browser_context_id: None }
+[2019-03-02T00:04:21Z TRACE headless_chrome::browser] Target created: TargetInfo { target_id: "c7b06563-ca78-4e52-a425-8386fc90276c", target_type: Browser, title: "", url: "", attached: false, opener_id: None, browser_context_id: None }
+[2019-03-02T00:04:21Z TRACE headless_chrome::browser] Target info changed: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") }
+[2019-03-02T00:04:21Z TRACE headless_chrome::browser] Target info changed: TargetInfo { target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("58984999AA73CBDB6FC258F4D79AC8D3") }
+[2019-03-02T00:04:22Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"networkAlmostIdle\",\"timestamp\":480280.261025}}" } }))
+[2019-03-02T00:04:22Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "99B8D9423AFDCDB6FA2DE18A73055B74", target_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"1DE57E8CC5D4FA20E0132A59CFF023A9\",\"loaderId\":\"61CF5CFF7A9227F807D4A2CB81026818\",\"name\":\"networkIdle\",\"timestamp\":480280.261025}}" } }))
+[2019-03-02T00:04:22Z TRACE headless_chrome::browser::tab] Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", loader_id: "61CF5CFF7A9227F807D4A2CB81026818", name: "networkAlmostIdle", timestamp: 480280.25 } })
+[2019-03-02T00:04:22Z TRACE headless_chrome::browser::tab] Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "1DE57E8CC5D4FA20E0132A59CFF023A9", loader_id: "61CF5CFF7A9227F807D4A2CB81026818", name: "networkIdle", timestamp: 480280.25 } })
+[2019-03-02T00:04:41Z INFO  headless_chrome::browser::process] Killing Chrome. PID: 14100
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser] Finished browser's event handling loop
+[2019-03-02T00:04:41Z WARN  headless_chrome::browser::transport::web_socket_connection] 远程主机强迫关闭了一个现有的连接。 (os error 10054)
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport::web_socket_connection] Sending shutdown message to message handling loop
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport] ConnectionShutdown
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport::web_socket_connection] Quit loop msg dispatching loop
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport] Received shutdown message
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport] Shutting down message handling loop
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport::web_socket_connection] Shutting down WebSocket connection
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport::waiting_call_registry] Cancelling outstanding method calls
+[2019-03-02T00:04:41Z TRACE headless_chrome::browser::transport] cleared listeners, I think
+test browse_wikipedia ... ok
+
+
+[2019-03-02T00:25:54Z INFO  headless_chrome::browser::process] Trying to start Chrome
+[2019-03-02T00:25:54Z TRACE headless_chrome::browser::process] Chrome will have profile: --user-data-dir=C:\Users\ADMINI~1\AppData\Local\Temp\rust-headless-chrome-profile7CUr6b
+[2019-03-02T00:25:54Z INFO  headless_chrome::browser::process] Started Chrome. PID: 18356
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::process] Chrome output:
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::process] Chrome output: DevTools listening on ws://127.0.0.1:8929/devtools/browser/38bc94f6-6fa7-4159-9da2-4f322a6bf281
+[2019-03-02T00:25:55Z DEBUG headless_chrome::browser::transport::web_socket_connection] Successfully connected to WebSocket: ws://127.0.0.1:8929/devtools/browser/38bc94f6-6fa7-4159-9da2-4f322a6bf281
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Starting handle_incoming_messages
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::web_socket_connection] Starting msg dispatching loop
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] created transport
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Inside handle_incoming_messages thread
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] created browser event listener
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] Starting browser's event handling loop
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.setDiscoverTargets","id":0,"params":{"discover":true}}
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 0
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(TargetCreated(TargetCreatedEvent { params: TargetCreatedParams { target_info: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "", url: "about:blank", attached: false, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") } } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(TargetCreated(TargetCreatedEvent { params: TargetCreatedParams { target_info: TargetInfo { target_id: "17f28b7e-fd14-4f03-8bae-bd144cfe7b7b", target_type: Browser, title: "", url: "", attached: false, opener_id: None, browser_context_id: None } } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] Target created: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "", url: "about:blank", attached: false, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") }
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(TargetCreated(TargetCreatedEvent { params: TargetCreatedParams { target_info: TargetInfo { target_id: "fc1429b7-4082-49c9-9066-dd614c4bad3c", target_type: Browser, title: "", url: "", attached: true, opener_id: None, browser_context_id:
+None } } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.attachToTarget","id":1,"params":{"targetId":"08FD76E1C3E5D6561562E75E1D200809"}}
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 0, result: Some(Object({})), error: None })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 1
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { target_info: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") } } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(AttachedToTarget(AttachedToTargetEvent { params: AttachedToTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_info: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") }, waiting_for_debugger: false } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 1, result: Some(Object({"sessionId": String("DFACCD67C2C5FF53DF7FD2B9360A7B4F")})), error: None })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:25:55Z DEBUG headless_chrome::browser::tab] New tab attached with session ID: SessionId("DFACCD67C2C5FF53DF7FD2B9360A7B4F")
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] send method: {"method":"Page.enable","id":2,"params":{}}
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 2
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.sendMessageToTarget","id":3,"params":{"sessionId":"DFACCD67C2C5FF53DF7FD2B9360A7B4F","message":"{\"method\":\"Page.enable\",\"id\":2,\"params\":{}}"}}
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 3
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 3, result: Some(Object({})), error: None })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { target_info: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") } } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"id\":2,\"result\":{}}" } }))[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] send method: {"method":"Page.setLifecycleEventsEnabled","id":4,"params":{"enabled":true}}
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 4
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.sendMessageToTarget","id":5,"params":{"sessionId":"DFACCD67C2C5FF53DF7FD2B9360A7B4F","message":"{\"method\":\"Page.setLifecycleEventsEnabled\",\"id\":4,\"params\":{\"enabled\":true}}"}}
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 5
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] sent method call to browser via websocket
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Response(Response { call_id: 5, result: Some(Object({})), error: None })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"commit\",\"timestamp\":481574.676938}}" } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] discard target_event Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "commit", timestamp: 481574.7 } })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"DOMContentLoaded\",\"timestamp\":481574.677632}}" } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] discard target_event Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "DOMContentLoaded", timestamp: 481574.7 } })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"load\",\"timestamp\":481574.67775}}" } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] discard target_event Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "load", timestamp: 481574.7 } })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"networkAlmostIdle\",\"timestamp\":481574.67815}}" } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] discard target_event Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "networkAlmostIdle", timestamp: 481574.7 } })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"networkIdle\",\"timestamp\":481574.67815}}" } }))
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] discard target_event Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "networkIdle", timestamp: 481574.7 } })
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"id\":4,\"result\":{}}" } }))[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport::waiting_call_registry] Resolving call
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser::transport] waiting for response from call registry
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] Target created: TargetInfo { target_id: "17f28b7e-fd14-4f03-8bae-bd144cfe7b7b", target_type: Browser, title: "", url: "", attached: false, opener_id: None, browser_context_id: None }
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] Target created: TargetInfo { target_id: "fc1429b7-4082-49c9-9066-dd614c4bad3c", target_type: Browser, title: "", url: "", attached: true, opener_id: None, browser_context_id: None }
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] Target info changed: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") }
+[2019-03-02T00:25:55Z TRACE headless_chrome::browser] Target info changed: TargetInfo { target_id: "08FD76E1C3E5D6561562E75E1D200809", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("25623FE3C2AF2EF638CD1D71EDDF4FFA") }
+[2019-03-02T00:25:57Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"networkAlmostIdle\",\"timestamp\":481574.67815}}" } }))
+[2019-03-02T00:25:57Z TRACE headless_chrome::browser::tab] Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "networkAlmostIdle", timestamp: 481574.7 } })
+[2019-03-02T00:25:57Z TRACE headless_chrome::browser::transport] Event(ReceivedMessageFromTarget(ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "DFACCD67C2C5FF53DF7FD2B9360A7B4F", target_id: "08FD76E1C3E5D6561562E75E1D200809", message: "{\"method\":\"Page.lifecycleEvent\",\"params\":{\"frameId\":\"08FD76E1C3E5D6561562E75E1D200809\",\"loaderId\":\"EBE5CDE429198D6293BFD73371D2B53F\",\"name\":\"networkIdle\",\"timestamp\":481574.67815}}" } }))
+[2019-03-02T00:25:57Z TRACE headless_chrome::browser::tab] Lifecycle(LifecycleEvent { params: LifecycleParams { frame_id: "08FD76E1C3E5D6561562E75E1D200809", loader_id: "EBE5CDE429198D6293BFD73371D2B53F", name: "networkIdle", timestamp: 481574.7 } })
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser] Finished browser's event handling loop
+[2019-03-02T00:26:15Z INFO  headless_chrome::browser::process] Killing Chrome. PID: 18356
+[2019-03-02T00:26:15Z WARN  headless_chrome::browser::transport::web_socket_connection] 远程主机强迫关闭了一个现有的连接。 (os error 10054)
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport::web_socket_connection] Sending shutdown message to message handling loop
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport::web_socket_connection] Quit loop msg dispatching loop
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport] ConnectionShutdown
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport] Received shutdown message
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport] Shutting down message handling loop
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport::web_socket_connection] Shutting down WebSocket connection
+[2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport::waiting_call_registry] Cancelling outstanding method calls
+test browse_wikipedia ... [2019-03-02T00:26:15Z TRACE headless_chrome::browser::transport] cleared listeners, I think
+ok

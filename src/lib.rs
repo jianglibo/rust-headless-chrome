@@ -15,8 +15,12 @@ extern crate log;
 #[macro_use]
 extern crate derive_builder;
 
+#[macro_use]
+extern crate futures;
+
 pub mod browser;
 pub mod protocol;
+pub mod browser_async;
 
 pub use browser::{Browser, LaunchOptionsBuilder, Tab};
 

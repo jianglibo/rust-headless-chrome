@@ -19,7 +19,7 @@ pub use tab::Tab;
 use transport::Transport;
 use waiting_helpers::{wait_for, WaitOptions};
 
-mod process;
+pub mod process;
 pub mod tab;
 mod transport;
 mod waiting_helpers;
@@ -81,6 +81,35 @@ impl Browser {
 
         // so we get events like 'targetCreated' and 'targetDestroyed'
         trace!("Calling set discover");
+       // assume the first tab didn't open at this point yet. 
+        browser.call_method(SetDiscoverTargets { discover: true })?;
+
+        browser.wait_for_initial_tab()?;
+
+        Ok(browser)
+    }
+
+    pub fn new1(launch_options: LaunchOptions) -> Result<Self, Error> {
+        let process = Process::new(launch_options)?;
+
+        let transport = Arc::new(Transport::new(process.debug_ws_url.clone())?);
+
+        trace!("created transport");
+
+        let tabs = Arc::new(Mutex::new(vec![]));
+
+        let browser = Self {
+            _process: process,
+            tabs,
+            transport,
+        };
+
+        let incoming_events_rx = browser.transport.listen_to_browser_events();
+        browser.handle_browser_level_events(incoming_events_rx);
+        trace!("created browser event listener");
+
+        // so we get events like 'targetCreated' and 'targetDestroyed'
+        // trace!("Calling set discover");
        // assume the first tab didn't open at this point yet. 
         browser.call_method(SetDiscoverTargets { discover: true })?;
 

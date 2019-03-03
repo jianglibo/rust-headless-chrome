@@ -29,6 +29,7 @@ fn dumb_client(server: &server::Server) -> (Browser, Arc<Tab>) {
 
 #[test]
 fn simple() -> Result<(), failure::Error> {
+    
     logging::enable_logging();
     let (server, browser, tab) = dumb_server(include_str!("simple.html"));
     tab.wait_for_element("div#foobar")?;

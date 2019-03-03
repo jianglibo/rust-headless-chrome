@@ -194,7 +194,7 @@ pub mod methods {
         type ReturnObject = SetDiscoverTargetsReturnObject;
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct SendMessageToTarget<'a> {
         #[serde(skip_serializing_if = "Option::is_none")]

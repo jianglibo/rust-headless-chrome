@@ -25,6 +25,7 @@ use web_socket_connection::WebSocketConnection;
 
 mod waiting_call_registry;
 mod web_socket_connection;
+mod transport_async;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(String);
@@ -116,6 +117,8 @@ impl Transport {
         let call = method.to_method_call(call_id);
 
         let message_text = serde_json::to_string(&call)?;
+
+        trace!("send method: {}", message_text);
 
         // at some time later, transport should write data to other end of channel. So we just do block receiving.
         let response_rx = self.waiting_call_registry.register_call(call.id);
@@ -243,6 +246,8 @@ impl Transport {
                                                 {
                                                     tx.send(target_event)
                                                         .expect("Couldn't send event to listener");
+                                                } else {
+                                                    trace!("discard target_event {:?}", target_event);
                                                 }
                                             }
 

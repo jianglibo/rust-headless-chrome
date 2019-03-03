@@ -176,6 +176,7 @@ impl Process {
         let mut args = vec![
             port_option.as_str(),
             "--verbose",
+            //  "--disable-gpu",
             "--no-first-run",
             data_dir_option.as_str(),
             //            "--window-size=1920,1080"

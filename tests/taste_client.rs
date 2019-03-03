@@ -1,11 +1,64 @@
 use std::io::stdin;
 use std::sync::mpsc::channel;
 use std::thread;
+use std::env;
 
 use websocket::client::ClientBuilder;
 use websocket::{Message, OwnedMessage};
+use headless_chrome::{protocol::page::ScreenshotFormat, Browser, LaunchOptionsBuilder};
+use headless_chrome::browser::tab::element::BoxModel;
+use std::fs;
+extern crate env_logger;
+
+#[macro_use]
+extern crate log;
+
+mod logging;
 
 const CONNECTION: &'static str = "ws://127.0.0.1:9222";
+
+
+#[test]
+fn browse_wikipedia() -> Result<(), failure::Error> {
+	::std::env::set_var("RUST_LOG", "headless_chrome=trace,taste_client=debug");
+	// logging::enable_logging();
+	// ::std::env::set_var("RUST_LOG", "play_rs=debug");
+    env_logger::init();
+    let options = LaunchOptionsBuilder::default().build().expect("Failed to find chrome");
+    let browser = Browser::new1(options)?;
+
+	// let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+
+    let tab = browser.wait_for_initial_tab()?;
+	// tab.navigate_to(url)?
+        // .wait_until_navigated()?;
+
+	std::thread::sleep(std::time::Duration::from_secs(20));
+
+	// info!("{:?}", tab);
+	// let vp = tab.find_element("#ddlogin")?
+	// 	.get_box_model()?
+	// 	.content_viewport();
+
+	// info!("{:?}", vp);
+	
+
+	// let jpeg_data = tab.capture_screenshot(ScreenshotFormat::JPEG(Some(100)), Some(vp), true)?;
+	// let jpeg_data = tab.capture_screenshot(ScreenshotFormat::JPEG(None), Some(vp), true)?;
+	// let jpeg_data = tab.capture_screenshot(ScreenshotFormat::JPEG(None), None, false)?;
+
+	// 	    let jpeg_data = tab
+    //     .navigate_to(url)?
+    //     .wait_until_navigated()?
+    //     .capture_screenshot(ScreenshotFormat::JPEG(Some(100)), None, true)?;
+    // fs::write("screenshot.jpg", &jpeg_data)?;
+
+	// std::thread::sleep(std::time::Duration::from_secs(20));
+        
+    // fs::write("screenshot.jpg", &jpeg_data)?;
+    Ok(())
+}
+
 
 #[test]
 fn entry() {

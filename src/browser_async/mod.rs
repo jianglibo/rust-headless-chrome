@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use failure::Error;
+use failure;
 use log::*;
 
 use serde;
@@ -40,6 +40,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(String);
 
+impl SessionId {
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 pub enum MethodDestination {
     Target(SessionId),
     Browser,
@@ -60,9 +66,9 @@ pub enum BrowserFutrue {
 
 impl Future for BrowserFutrue {
     type Item = Arc<Mutex<RunningBrowser>>;
-    type Error = Error;
+    type Error = failure::Error;
 
-    fn poll(&mut self) -> Poll<Arc<Mutex<RunningBrowser>>, Error> {
+    fn poll(&mut self) -> Poll<Arc<Mutex<RunningBrowser>>, failure::Error> {
         use self::BrowserFutrue::*;
         loop {
             match self {
@@ -90,16 +96,74 @@ impl Future for BrowserFutrue {
     }
 }
 
+fn create_msg_to_send<C>(
+    method: C,
+    unique_counter: &mut NextUsize,
+    destination: MethodDestination,
+) -> String where
+    C: protocol::Method + serde::Serialize,{
+    let call_id = unique_counter.next();
+    let call = method.to_method_call(call_id);
+    let message_text = serde_json::to_string(&call).unwrap();
+
+    match destination {
+            MethodDestination::Target(session_id) => {
+                let target_method = target::methods::SendMessageToTarget {
+                    target_id: None,
+                    session_id: Some(session_id.as_str()),
+                    message: &message_text,
+                };
+                create_msg_to_send(target_method, unique_counter, MethodDestination::Browser)
+            }
+            MethodDestination::Browser => {
+                message_text
+            }
+        }
+}
+
+// struct Abc(i32);
+struct MethodReturnObject<C>(C::ReturnObject) where
+     C: protocol::Method + serde::Serialize;
+
+impl<C> Future for MethodReturnObject<C>  where
+     C: protocol::Method + serde::Serialize, {
+    type Item = C::ReturnObject;
+    type Error = failure::Error;
+
+
+    fn poll(&mut self) -> Poll<C::ReturnObject, failure::Error> {
+        Ok(Async::NotReady)
+    }
+}
+
 pub fn call_method<C>(
     method: C,
+    unique_counter: &mut NextUsize,
     destination: MethodDestination,
     ws_client: Client<TcpStream>,
-) -> futures::future::FutureResult<C::ReturnObject, Error>
+) -> futures::future::FutureResult<C::ReturnObject, failure::Error>
 where
     C: protocol::Method + serde::Serialize,
 {
-    futures::future::err(failure::err_msg(""))
+        let message_text = create_msg_to_send(method, unique_counter, destination);
+        let message = websocket::OwnedMessage::Text(message_text);
+        ws_client.send(message).map_err(|err|failure::Error::from(err)).and_then(|r| {
+            futures::future::err(failure::err_msg(""))
+        })
+        // futures::future::err(failure::err_msg(""))
+    }
+
+
+pub struct NextUsize {
+    current_value: Arc<AtomicUsize>,
 }
+
+impl NextUsize {
+    pub fn next(&mut self) -> usize {
+        self.current_value.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
 
 // pub enum MethodInvoker<C>
 // where

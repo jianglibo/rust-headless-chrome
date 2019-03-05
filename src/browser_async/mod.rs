@@ -1,6 +1,7 @@
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
 
 use failure;
 use log::*;
@@ -23,8 +24,11 @@ use websocket::message::OwnedMessage;
 use websocket::r#async::client::{Client, ClientNew};
 use websocket::r#async::TcpStream;
 use websocket::ClientBuilder;
+use std::borrow::BorrowMut;
+use tokio;
 use websocket;
 use futures::sink::Send;
+use websocket::result::WebSocketError;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crate::protocol::target;
@@ -33,8 +37,9 @@ use serde::{Deserialize, Serialize};
 /// ["Browser" domain](https://chromedevtools.github.io/devtools-protocol/tot/Browser)
 /// (such as for resizing the window in non-headless mode), we currently don't implement those.
 ///
-/// 
-///
+
+
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(String);
@@ -61,6 +66,15 @@ pub enum BrowserFutrue {
     Running(Arc<Mutex<RunningBrowser>>),
 }
 
+// futures::stream::SplitStream
+// <tokio_io::_tokio_codec::framed::Framed
+// <tokio_tcp::stream::TcpStream, websocket::codec::ws::MessageCodec<websocket::message::OwnedMessage>>>
+
+
+// futures::stream::SplitSink
+// <tokio_io::_tokio_codec::framed::Framed
+// <tokio_tcp::stream::TcpStream, websocket::codec::ws::MessageCodec<websocket::message::OwnedMessage>>>
+
 // type MethodSend = futures::sink::Send<&'a mut tokio_io::_tokio_codec::framed::Framed<tokio_tcp::stream::TcpStream, websocket::codec::ws::MessageCodec<websocket::message::OwnedMessage>>>;
 
 impl Future for BrowserFutrue {
@@ -82,6 +96,8 @@ impl Future for BrowserFutrue {
                     let (ws_client, _) = try_ready!(client_future.poll());
 
                     // futures::stream::SplitSink, futures::stream::SplitStream
+                    // let (a, b) = ws_client.split();
+                    // let c: MessageSink = a;
                     // let ((), ()) = ws_client.split();
 
                     let tabs = Arc::new(Mutex::new(vec![]));
@@ -98,30 +114,11 @@ impl Future for BrowserFutrue {
     }
 }
 
-fn create_msg_to_send<C>(
-    method: C,
-    unique_counter: &mut NextUsize,
-    destination: MethodDestination,
-) -> (usize, String) where
-    C: protocol::Method + serde::Serialize,{
-    let call_id = unique_counter.next();
-    let call = method.to_method_call(call_id);
-    let message_text = serde_json::to_string(&call).unwrap();
+type MessageSink = websocket::r#async::futures::stream::SplitSink<websocket::message::OwnedMessage>;
 
-    match destination {
-            MethodDestination::Target(session_id) => {
-                let target_method = target::methods::SendMessageToTarget {
-                    target_id: None,
-                    session_id: Some(session_id.as_str()),
-                    message: &message_text,
-                };
-                create_msg_to_send(target_method, unique_counter, MethodDestination::Browser)
-            }
-            MethodDestination::Browser => {
-                (call_id, message_text)
-            }
-        }
-}
+
+
+
 
 // struct Abc(i32);
 // struct MethodReturnObject<C> where
@@ -155,56 +152,49 @@ fn create_msg_to_send<C>(
 // }
 
 
-pub fn call_method<C>(
-    method: C,
-    unique_counter: &mut NextUsize,
-    destination: MethodDestination,
-    ws_client: Arc<Mutex<Client<TcpStream>>>,
-) -> futures::future::FutureResult<C::ReturnObject, failure::Error>
-where
-    C: protocol::Method + serde::Serialize,
-{
-        let (call_id, message_text) = create_msg_to_send(method, unique_counter, destination);
-        let message = websocket::OwnedMessage::Text(message_text);
-        let (sender, receiver)  = ws_client.lock().unwrap().split();
-        let and_then = sender.send(message).map_err(|err|failure::Error::from(err)).and_then(|r| {
-            futures::future::poll_fn(|| {
-                let owned_message = try_ready!(ws_client.lock().unwrap().poll()).unwrap();
-                if let OwnedMessage::Text(message_string) = owned_message {
-                    if let Ok(message) = protocol::parse_raw_message(&message_string) {
-                        match message {
-                            protocol::Message::Response(response) => {
-                                if response.call_id == call_id {
-                                    let return_object =  protocol::parse_response::<C::ReturnObject>(response,);
-                                    Ok(Async::Ready(return_object))
-                                } else {
-                                    Ok(Async::NotReady)
-                                }
-                            }
-                            _ => Ok(Async::NotReady),
-                        }
-                    } else {
-                        debug!("Incoming message isn't recognised as event or method response: {}", message_string);
-                        Err(failure::err_msg(""))
-                    }
-                } else {
-                    Err(failure::err_msg(""))
-                }
-        });
-        futures::future::err::<C::ReturnObject, failure::Error>(failure::err_msg(""))
-    });
-    futures::future::err(failure::err_msg(""))
-}
+// pub fn call_method<C>(
+//     method: C,
+//     unique_counter: &mut NextUsize,
+//     destination: MethodDestination,
+//     message_sink: Arc<Mutex<futures::stream::SplitSink>>,
+//     message_stream: Arc<Mutex<futures::stream::SplitStream>>,
+// ) -> futures::future::FutureResult<C::ReturnObject, failure::Error>
+// where
+//     C: protocol::Method + serde::Serialize,
+// {
+//         let (call_id, message_text) = create_msg_to_send(method, unique_counter, destination);
+//         let message = websocket::OwnedMessage::Text(message_text);
+//         let sender = message_sink.lock().unwrap();
+//         let and_then = sender.borrow_mut().send(message).map_err(|err|failure::Error::from(err)).and_then(|r| {
+//             futures::future::poll_fn(|| {
+//                 let owned_message = try_ready!(ws_client.lock().unwrap().poll()).unwrap();
+//                 if let OwnedMessage::Text(message_string) = owned_message {
+//                     if let Ok(message) = protocol::parse_raw_message(&message_string) {
+//                         match message {
+//                             protocol::Message::Response(response) => {
+//                                 if response.call_id == call_id {
+//                                     let return_object =  protocol::parse_response::<C::ReturnObject>(response,);
+//                                     Ok(Async::Ready(return_object))
+//                                 } else {
+//                                     Ok(Async::NotReady)
+//                                 }
+//                             }
+//                             _ => Ok(Async::NotReady),
+//                         }
+//                     } else {
+//                         debug!("Incoming message isn't recognised as event or method response: {}", message_string);
+//                         Err(failure::err_msg(""))
+//                     }
+//                 } else {
+//                     Err(failure::err_msg(""))
+//                 }
+//         });
+//         futures::future::err::<C::ReturnObject, failure::Error>(failure::err_msg(""))
+//     });
+//     futures::future::err(failure::err_msg(""))
+// }
 
-pub struct NextUsize {
-    current_value: Arc<AtomicUsize>,
-}
 
-impl NextUsize {
-    pub fn next(&mut self) -> usize {
-        self.current_value.fetch_add(1, Ordering::SeqCst)
-    }
-}
 
 
 // pub enum MethodInvoker<C>
@@ -300,6 +290,90 @@ impl NextUsize {
 //     }
 // }
 
+
+// pub struct NextUsize {
+//     current_value: Arc<AtomicUsize>,
+// }
+
+// impl NextUsize {
+//     pub fn next(&mut self) -> usize {
+//         self.current_value.fetch_add(1, Ordering::SeqCst)
+//     }
+// }
+
+fn create_msg_to_send<C>(
+    method: C,
+    unique_counter: Arc<AtomicUsize>,
+    destination: MethodDestination,
+) -> (usize, String) where
+    C: protocol::Method + serde::Serialize,{
+    let call_id = unique_counter.fetch_add(1, Ordering::SeqCst);
+    let call = method.to_method_call(call_id);
+    let message_text = serde_json::to_string(&call).unwrap();
+
+    match destination {
+            MethodDestination::Target(session_id) => {
+                let target_method = target::methods::SendMessageToTarget {
+                    target_id: None,
+                    session_id: Some(session_id.as_str()),
+                    message: &message_text,
+                };
+                create_msg_to_send(target_method, unique_counter, MethodDestination::Browser)
+            }
+            MethodDestination::Browser => {
+                (call_id, message_text)
+            }
+        }
+}
+
+fn runner() {
+    
+    
+    let mut runtime = tokio::runtime::Builder::new().build().unwrap();
+    let options = LaunchOptionsBuilder::default()
+            .build()
+            .expect("Failed to find chrome");
+    let chrome_process = Process::new(options).unwrap();
+    let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
+    info!("wait 1 sec.");
+    thread::sleep(std::time::Duration::from_secs(1));
+
+
+	let runner = ClientBuilder::new(&web_socket_debugger_url)
+		.unwrap()
+		.add_protocol("rust-websocket")
+		.async_connect_insecure()
+		.and_then(|(duplex, _)| {
+            let start_counter = Arc::new(AtomicUsize::new(0));
+			let (sink, stream) = duplex.split();
+            let (mid, discover) = create_msg_to_send(SetDiscoverTargets { discover: true }, start_counter, MethodDestination::Browser);
+            // sink.into_future();
+            info!("connected.");
+            sink.send(OwnedMessage::Text(discover)).and_then(|new_sink| {
+                // new_sink.send(OwnedMessage::Text(String::from("abc"))).wait().expect("hello")
+
+                            // sink.send(OwnedMessage::Text(discover)).and_then(|v| {
+                let strm = stream
+                    .filter_map(|message| {
+                        info!("Received Message: {:?}", message);
+                        match message {
+                            OwnedMessage::Close(e) => Some(OwnedMessage::Close(e)),
+                            OwnedMessage::Ping(d) => Some(OwnedMessage::Pong(d)),
+                            OwnedMessage::Text(t) => Some(OwnedMessage::Text(t)),
+                            _ => None,
+                        }
+                    });
+                    // .select(stdin_ch.map_err(|_| WebSocketError::NoDataAvailable))
+                    strm.into_future()
+                    // strm.forward(sink)
+            // })
+            }).into_future()
+
+		});
+
+        runtime.block_on(runner).unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,52 +398,9 @@ mod tests {
 
     #[test]
     fn t_listener() {
-        ::std::env::set_var("RUST_LOG", "headless_chrome=trace,transport_async=debug");
+        ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
-
-        let mut runtime = tokio::runtime::Builder::new().build().unwrap();
-
-        let options = LaunchOptionsBuilder::default()
-            .build()
-            .expect("Failed to find chrome");
-        let process = Process::new(options).unwrap();
-
-        let browser_future =
-            BrowserFutrue::Connecting(process).and_then(|bw| futures::future::ok(()));
-
-        runtime.block_on(browser_future).unwrap();
+        runner();
     }
 
-    #[test]
-    fn t_future() {
-        // fn read_line() -> Poll<String, std::io::Error> {
-        //     Ok(Async::Ready("Hello, World!".into()))
-        // }
-
-        // let () = futures::future::poll_fn(read_line);
-        // futures::future::ok()
-    // const CONNECTION: &'static str = "ws://127.0.0.1:2794";
-    // let runner = ClientBuilder::new(CONNECTION)
-	// 	.unwrap()
-	// 	.add_protocol("rust-websocket")
-	// 	.async_connect_insecure()
-	// 	.and_then(|(duplex, _)| {
-	// 		let (sink: websocket::sender:Sender, stream) = duplex.split();
-	// 		stream
-	// 			.filter_map(|message| {
-	// 				println!("Received Message: {:?}", message);
-	// 				match message {
-	// 					OwnedMessage::Close(e) => Some(OwnedMessage::Close(e)),
-	// 					OwnedMessage::Ping(d) => Some(OwnedMessage::Pong(d)),
-	// 					_ => None,
-	// 				}
-	// 			})
-	// 			.select(stdin_ch.map_err(|_| WebSocketError::NoDataAvailable))
-	// 			.forward(sink)
-	// 	});
-        // let running_browser = RunningBrowser {
-
-        // };
-        // let m = MethodInvoker::StartInvoke(Navigate {url: "http://abc"}, Arc::new(Mutex::new(running_browser)));
-    }
 }

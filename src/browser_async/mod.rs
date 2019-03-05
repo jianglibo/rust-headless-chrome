@@ -18,7 +18,6 @@ pub use crate::browser::process::LaunchOptionsBuilder;
 use crate::browser::process::{LaunchOptions, Process};
 pub use crate::browser::tab::Tab;
 use std::time::Duration;
-// use futures::{Future, Async, Poll};
 use websocket::futures::{Async, Future, Poll, Sink, Stream};
 use websocket::message::OwnedMessage;
 use websocket::r#async::client::{Client, ClientNew};
@@ -82,6 +81,9 @@ impl Future for BrowserFutrue {
 
                     let (ws_client, _) = try_ready!(client_future.poll());
 
+                    // futures::stream::SplitSink, futures::stream::SplitStream
+                    // let ((), ()) = ws_client.split();
+
                     let tabs = Arc::new(Mutex::new(vec![]));
                     let call_id_counter = Arc::new(AtomicUsize::new(0));
 
@@ -100,7 +102,7 @@ fn create_msg_to_send<C>(
     method: C,
     unique_counter: &mut NextUsize,
     destination: MethodDestination,
-) -> String where
+) -> (usize, String) where
     C: protocol::Method + serde::Serialize,{
     let call_id = unique_counter.next();
     let call = method.to_method_call(call_id);
@@ -116,43 +118,83 @@ fn create_msg_to_send<C>(
                 create_msg_to_send(target_method, unique_counter, MethodDestination::Browser)
             }
             MethodDestination::Browser => {
-                message_text
+                (call_id, message_text)
             }
         }
 }
 
 // struct Abc(i32);
-struct MethodReturnObject<C>(C::ReturnObject) where
-     C: protocol::Method + serde::Serialize;
+// struct MethodReturnObject<C> where
+//      C: protocol::Method + serde::Serialize, {
 
-impl<C> Future for MethodReturnObject<C>  where
-     C: protocol::Method + serde::Serialize, {
-    type Item = C::ReturnObject;
-    type Error = failure::Error;
+//      }
+
+// impl<C> Future for MethodReturnObject<C>  where
+//      C: protocol::Method + serde::Serialize, {
+//     type Item = C::ReturnObject;
+//     type Error = failure::Error;
 
 
-    fn poll(&mut self) -> Poll<C::ReturnObject, failure::Error> {
-        Ok(Async::NotReady)
-    }
-}
+//     fn poll(&mut self) -> Poll<C::ReturnObject, failure::Error> {
+//         Ok(Async::NotReady)
+//     }
+// }
+
+// fn to_fn<F, T>(ws_client: Arc<Mutex<Client<TcpStream>>>, call_id: usize) -> F 
+// where
+// F: FnMut() -> Poll<T::ReturnObject, failure::Error>,
+// T: protocol::Method + serde::Serialize,
+// {
+//     let f = || Ok::<Async<T::ReturnObject>, failure::Error>(Async::NotReady);
+    
+//     F::from(f)
+// } 
+
+// fn read_method_result() -> Poll<String, std::io::Error> {
+//     Ok(Async::Ready("Hello, World!".into()))
+// }
+
 
 pub fn call_method<C>(
     method: C,
     unique_counter: &mut NextUsize,
     destination: MethodDestination,
-    ws_client: Client<TcpStream>,
+    ws_client: Arc<Mutex<Client<TcpStream>>>,
 ) -> futures::future::FutureResult<C::ReturnObject, failure::Error>
 where
     C: protocol::Method + serde::Serialize,
 {
-        let message_text = create_msg_to_send(method, unique_counter, destination);
+        let (call_id, message_text) = create_msg_to_send(method, unique_counter, destination);
         let message = websocket::OwnedMessage::Text(message_text);
-        ws_client.send(message).map_err(|err|failure::Error::from(err)).and_then(|r| {
-            futures::future::err(failure::err_msg(""))
-        })
-        // futures::future::err(failure::err_msg(""))
-    }
-
+        let (sender, receiver)  = ws_client.lock().unwrap().split();
+        let and_then = sender.send(message).map_err(|err|failure::Error::from(err)).and_then(|r| {
+            futures::future::poll_fn(|| {
+                let owned_message = try_ready!(ws_client.lock().unwrap().poll()).unwrap();
+                if let OwnedMessage::Text(message_string) = owned_message {
+                    if let Ok(message) = protocol::parse_raw_message(&message_string) {
+                        match message {
+                            protocol::Message::Response(response) => {
+                                if response.call_id == call_id {
+                                    let return_object =  protocol::parse_response::<C::ReturnObject>(response,);
+                                    Ok(Async::Ready(return_object))
+                                } else {
+                                    Ok(Async::NotReady)
+                                }
+                            }
+                            _ => Ok(Async::NotReady),
+                        }
+                    } else {
+                        debug!("Incoming message isn't recognised as event or method response: {}", message_string);
+                        Err(failure::err_msg(""))
+                    }
+                } else {
+                    Err(failure::err_msg(""))
+                }
+        });
+        futures::future::err::<C::ReturnObject, failure::Error>(failure::err_msg(""))
+    });
+    futures::future::err(failure::err_msg(""))
+}
 
 pub struct NextUsize {
     current_value: Arc<AtomicUsize>,
@@ -300,7 +342,11 @@ mod tests {
 
     #[test]
     fn t_future() {
+        // fn read_line() -> Poll<String, std::io::Error> {
+        //     Ok(Async::Ready("Hello, World!".into()))
+        // }
 
+        // let () = futures::future::poll_fn(read_line);
         // futures::future::ok()
     // const CONNECTION: &'static str = "ws://127.0.0.1:2794";
     // let runner = ClientBuilder::new(CONNECTION)

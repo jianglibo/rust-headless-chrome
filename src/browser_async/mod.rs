@@ -1,3 +1,5 @@
+use tokio::prelude::IntoFuture;
+use tokio::prelude::future::loop_fn;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -10,7 +12,8 @@ use serde;
 use crate::protocol::page::methods::Navigate;
 
 use crate::protocol;
-use crate::protocol::Method;
+use crate::protocol::{Message, Event, Method};
+use crate::protocol::target::events as target_events;
 use crate::protocol::browser::methods::GetVersion;
 pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};
@@ -30,6 +33,8 @@ use websocket;
 use futures::sink::Send;
 use websocket::result::WebSocketError;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use websocket::r#async::futures::future::poll_fn;
+use futures::future::Loop;
 
 use crate::protocol::target;
 use serde::{Deserialize, Serialize};
@@ -326,49 +331,117 @@ fn create_msg_to_send<C>(
         }
 }
 
+// here I accept a future and return a future.
+fn add_10<F>(f: F) -> impl Future<Item = i32, Error = F::Error>
+    where F: Future<Item = i32>,
+{
+    f.map(|i| i + 10)
+}
+
+// enum WorkState {
+//     StartInvoke(usize),
+// }
+
+// struct MethodChainer {
+//     ws_client: Client<TcpStream>,
+//     state: WorkState,
+// }
+
+// impl Future for MethodChainer {
+//     type Item = String;
+//     type Error = failure::Error;
+
+//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+//         loop {
+//             if let Some(om) = try_ready!(self.ws_client.send(OwnedMessage::Text("abc"))) {
+//                 return Ok(Async::Ready("hello world".to_string()));
+//             }
+//         }
+//     }
+// }
+
+type HalfStream = std::sync::Arc<std::sync::Mutex<futures::stream::SplitStream<tokio_io::_tokio_codec::framed::Framed<tokio_tcp::stream::TcpStream, websocket::codec::ws::MessageCodec<websocket::message::OwnedMessage>>>>>;
+
+fn abc(arc_stream: HalfStream) -> IntoFuture<Item = Loop<Message, usize>> {
+                    match arc_stream.lock().unwrap().poll() {
+                        Ok(Async::NotReady) => Ok(Loop::Continue(1)),
+                        Ok(Async::Ready(om_op)) => {
+                            if let Some(om) = om_op {
+                                match om {
+                                    OwnedMessage::Text(msg) => {
+                                        if let Ok(m) = protocol::parse_raw_message(&msg) {
+                                            match m {
+                                                Message::Response(response_to_browser_method_call) => {
+                                                    info!("got response. {}", msg)
+                                                },
+                                                Message::ConnectionShutdown => {
+                                                    info!("got shutdown. {}", msg);
+                                                    // return Ok(Loop::Break(1));
+                                                },
+                                                Message::Event(browser_event) => match browser_event {
+                                                    Event::ReceivedMessageFromTarget(target_message_event) => {
+                                                        // let session_id = target_message_event.params.session_id.into();
+                                                        let raw_message = target_message_event.params.message;
+                                                        if let Ok(target_message) = protocol::parse_raw_message(&raw_message){
+                                                            info!("got event raw_message. {}", msg)
+                                                        } else {
+                                                            info!("got event. {}", msg)
+                                                        }
+                                                        return Ok(Loop::Break(browser_event));
+                                                    },
+                                                    Event::TargetCreated(created_event) => {
+                                                        let m: target_events::TargetCreatedParams = created_event.params;
+                                                        // let ti = m.target_info;
+                                                        info!("got target created event. {:?}", m);
+                                                        if m.target_info.target_type.is_page() {
+
+                                                        }
+                                                    },
+                                                    _ => {
+                                                        info!("got event. {}", msg)
+                                                    }
+                                                },
+                                            }
+                                        }
+                                    },
+                                    _ => ()
+                                }
+                                // let s = protocol::parse_raw_message(&)
+                            }
+                            Ok(Loop::Continue(1))
+                        },
+                        Err(e) => Err(failure::Error::from(e))
+                    }
+}
+
 fn runner() {
-    
-    
     let mut runtime = tokio::runtime::Builder::new().build().unwrap();
     let options = LaunchOptionsBuilder::default()
             .build()
             .expect("Failed to find chrome");
     let chrome_process = Process::new(options).unwrap();
     let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
-    info!("wait 1 sec.");
-    thread::sleep(std::time::Duration::from_secs(1));
+    // info!("wait 3 sec.");
+    // thread::sleep(std::time::Duration::from_secs(3));
 
 
 	let runner = ClientBuilder::new(&web_socket_debugger_url)
 		.unwrap()
 		.add_protocol("rust-websocket")
 		.async_connect_insecure()
+        .from_err()
 		.and_then(|(duplex, _)| {
             let start_counter = Arc::new(AtomicUsize::new(0));
-			let (sink, stream) = duplex.split();
+			let (sink, mut stream) = duplex.split();
             let (mid, discover) = create_msg_to_send(SetDiscoverTargets { discover: true }, start_counter, MethodDestination::Browser);
-            // sink.into_future();
+            let arc_stream = Arc::new(Mutex::new(stream));
             info!("connected.");
-            sink.send(OwnedMessage::Text(discover)).and_then(|new_sink| {
+            info!("sending: {}", discover);
+            sink.send(OwnedMessage::Text(discover)).from_err().and_then(|new_sink| {
                 // new_sink.send(OwnedMessage::Text(String::from("abc"))).wait().expect("hello")
-
-                            // sink.send(OwnedMessage::Text(discover)).and_then(|v| {
-                let strm = stream
-                    .filter_map(|message| {
-                        info!("Received Message: {:?}", message);
-                        match message {
-                            OwnedMessage::Close(e) => Some(OwnedMessage::Close(e)),
-                            OwnedMessage::Ping(d) => Some(OwnedMessage::Pong(d)),
-                            OwnedMessage::Text(t) => Some(OwnedMessage::Text(t)),
-                            _ => None,
-                        }
-                    });
-                    // .select(stdin_ch.map_err(|_| WebSocketError::NoDataAvailable))
-                    strm.into_future()
-                    // strm.forward(sink)
-            // })
-            }).into_future()
-
+                loop_fn(0_usize, move |client| {
+                })
+            })
 		});
 
         runtime.block_on(runner).unwrap();
@@ -397,7 +470,11 @@ mod tests {
     // http://localhost:9222/json/version
 
     #[test]
-    fn t_listener() {
+    fn t_loop_fn() {
+        // {"method":"Target.targetCreated","params":{"targetInfo":{"targetId":"6a26c54c-99ef-4be3-8deb-70cecb815644","type":"browser","title":"","url":"","attached":true}}}
+        // {"method":"Target.targetCreated","params":{"targetInfo":{"targetId":"72af0ed2-e53f-43c4-9322-8926704ba166","type":"browser","title":"","url":"","attached":false}}}
+        // {"method":"Target.targetCreated","params":{"targetInfo":{"targetId":"FBF32C0EFD395583EFE93477E738B4A0","type":"page","title":"about:blank","url":"about:blank","attached":false,"browserContextId":"9A76940197212C1CAF54D2BD5CC31E00"}}}
+
         ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
         runner();

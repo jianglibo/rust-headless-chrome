@@ -351,7 +351,7 @@ mod tests {
                         // Ok(Async::Ready(()))
                     }
                     Ok(Async::NotReady) => {
-                        println!("not ready");
+                        println!("not ready 111");
                     },
                     Err(e) => {
                         println!("failed to connect: {}", e);

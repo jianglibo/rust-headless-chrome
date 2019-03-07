@@ -15,6 +15,9 @@ extern crate log;
 #[macro_use]
 extern crate derive_builder;
 
+extern crate tokio_io;
+extern crate tokio_tcp;
+
 #[macro_use]
 extern crate futures;
 

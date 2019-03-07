@@ -42,6 +42,7 @@ use serde::{Deserialize, Serialize};
 /// ["Browser" domain](https://chromedevtools.github.io/devtools-protocol/tot/Browser)
 /// (such as for resizing the window in non-headless mode), we currently don't implement those.
 ///
+/// 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(String);
@@ -92,9 +93,40 @@ fn get_chrome_response(owned_message: Option<OwnedMessage>) -> Option<protocol::
     None
 }
 
+
+
 fn get_chrome_event(owned_message: Option<OwnedMessage>) -> Option<protocol::Event> {
-    if let Some(protocol::Message::Event(browser_event)) = get_chrome_message(owned_message) {
-        if let protocol::Event::ReceivedMessageFromTarget(target_message_event) = browser_event {
+    if let Some(protocol::Message::Event(browser_event)) = get_any_message_from_chrome(owned_message) {
+        match browser_event {
+            protocol::Event::TargetCreated(target_created_event) => {
+                info!("final event: {:?}", target_created_event);
+                // pub struct TargetInfo {
+                // pub target_id: TargetId,
+                // #[serde(rename = "type")]
+                // pub target_type: TargetType,
+                // pub title: String,
+                // pub url: String,
+                // pub attached: bool,
+                // pub opener_id: Option<String>,
+                // pub browser_context_id: Option<String>,
+
+                // pub enum TargetType {
+                //     Page,
+                //     BackgroundPage,
+                //     ServiceWorker,
+                //     Browser,
+                //     Other,
+
+                let target_type = &(target_created_event.params.target_info.target_type);
+                match target_type {
+                    protocol::target::TargetType::Page => {
+                        Some(protocol::Event::TargetCreated(target_created_event))
+                    },
+                    _ => None
+                }
+            },
+
+            protocol::Event::ReceivedMessageFromTarget(target_message_event) => {
             let session_id: SessionId = target_message_event.params.session_id.into();
             let raw_message = target_message_event.params.message;
 
@@ -112,8 +144,8 @@ fn get_chrome_event(owned_message: Option<OwnedMessage>) -> Option<protocol::Eve
                         //     trace!("discard target_event {:?}", target_event);
                         // }
                         info!("get event {:?}", target_event);
-                        Some(target_event)
-                    }
+                        return Some(target_event);
+                    },
 
                     protocol::Message::Response(resp) => {
                         // if waiting_call_registry.resolve_call(resp).is_err()
@@ -121,8 +153,8 @@ fn get_chrome_event(owned_message: Option<OwnedMessage>) -> Option<protocol::Eve
                         //     warn!("The browser registered a call but then closed its receiving channel");
                         //     break;
                         // }
-                        None
-                    }
+                        return None;
+                    },
                     protocol::Message::ConnectionShutdown => None,
                 }
             } else {
@@ -130,29 +162,76 @@ fn get_chrome_event(owned_message: Option<OwnedMessage>) -> Option<protocol::Eve
                     "Message from target isn't recognised: {:?}",
                     &raw_message[..30]
                 );
-                None
+                return None;
             }
-        } else {
-            trace!("Couldn't send browser an event");
-            None
+        },
+        _ => None
         }
     } else {
         None
     }
 }
 
-fn get_chrome_message(owned_message: Option<OwnedMessage>) -> Option<protocol::Message> {
+fn get_any_message_from_chrome(owned_message: Option<OwnedMessage>) -> Option<protocol::Message> {
     if let Some(om) = owned_message {
         match om {
             OwnedMessage::Text(msg) => {
                 info!("got raw message: {}", msg);
                 if let Ok(m) = protocol::parse_raw_message(&msg) {
-                    info!("parsed message {:?}", m);
                     return Some(m);
                 }
             }
             _ => (),
         }
+    }
+    None
+}
+
+type RawPollResult = std::result::Result<futures::Async<std::option::Option<websocket::message::OwnedMessage>>, websocket::result::WebSocketError>;
+
+type LoopEventResult = std::result::Result<Loop<Option<protocol::Event>, Option<protocol::Event>>, failure::Error>;
+
+fn poll_chrome_message(stream_poll_result: RawPollResult) ->  LoopEventResult {
+        match stream_poll_result {
+            Ok(Async::NotReady) => Ok(Loop::Continue(None)),
+            Ok(Async::Ready(om_op)) => {
+                if let Some(m) = get_chrome_event(om_op) {
+                    Ok(Loop::Break(Some(m)))
+                } else {
+                    Ok(Loop::Continue(None))
+                }
+            }
+            Err(e) => Err(failure::Error::from(e)),
+        }
+}
+
+
+fn poll_page_event_create(stream_poll_result: RawPollResult) ->  std::result::Result<Loop<Option<protocol::target::TargetInfo>, Option<protocol::target::TargetInfo>>, failure::Error> {
+        match stream_poll_result {
+            Ok(Async::NotReady) => Ok(Loop::Continue(None)),
+            Ok(Async::Ready(om_op)) => {
+                if let Some(m) = get_page_event_create(om_op) {
+                    Ok(Loop::Break(Some(m)))
+                } else {
+                    Ok(Loop::Continue(None))
+                }
+            }
+            Err(e) => Err(failure::Error::from(e)),
+        }
+}
+
+fn get_page_event_create(owned_message: Option<OwnedMessage>) -> Option<protocol::target::TargetInfo> {
+        if let Some(protocol::Message::Event(any_event_from_server)) = get_any_message_from_chrome(owned_message) {
+            if let protocol::Event::TargetCreated(target_created_event) = any_event_from_server {
+                let target_type = &(target_created_event.params.target_info.target_type);
+                match target_type {
+                    protocol::target::TargetType::Page => {
+                        trace!("i got it. {:?}", target_created_event.params.target_info);
+                        return Some(target_created_event.params.target_info);
+                    },
+                    _ => (),
+                }
+            }
     }
     None
 }
@@ -186,18 +265,9 @@ fn runner() {
             sink.send(OwnedMessage::Text(discover))
                 .from_err()
                 .and_then(|new_sink| {
-                    loop_fn(None, move |_: Option<protocol::Event>| {
-                        match arc_stream.lock().unwrap().poll() {
-                            Ok(Async::NotReady) => Ok(Loop::Continue(None)),
-                            Ok(Async::Ready(om_op)) => {
-                                if let Some(m) = get_chrome_event(om_op) {
-                                    Ok(Loop::Break(Some(m)))
-                                } else {
-                                    Ok(Loop::Continue(None))
-                                }
-                            }
-                            Err(e) => Err(failure::Error::from(e)),
-                        }
+                    loop_fn(None, move |_: Option<protocol::target::TargetInfo>| {
+                        let poll_result = arc_stream.lock().unwrap().poll();
+                        poll_page_event_create(poll_result)
                     })
                 })
         });

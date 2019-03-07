@@ -64,6 +64,11 @@ pub enum MethodDestination {
     Browser,
 }
 
+// target::methods::AttachToTarget {
+//                 target_id: &target_id,
+//                 flatten: None,
+//             })
+
 fn create_msg_to_send<C>(
     method: C,
     unique_counter: Arc<AtomicUsize>,
@@ -236,6 +241,8 @@ fn get_page_event_create(owned_message: Option<OwnedMessage>) -> Option<protocol
     None
 }
 
+
+
 fn runner() {
     let mut runtime = tokio::runtime::Builder::new().build().unwrap();
     let options = LaunchOptionsBuilder::default()
@@ -246,28 +253,40 @@ fn runner() {
     // info!("wait 3 sec.");
     // thread::sleep(std::time::Duration::from_secs(3));
 
+    let start_counter = Arc::new(AtomicUsize::new(0));
     let runner = ClientBuilder::new(&web_socket_debugger_url)
         .unwrap()
         .add_protocol("rust-websocket")
         .async_connect_insecure()
         .from_err()
-        .and_then(|(duplex, _)| {
-            let start_counter = Arc::new(AtomicUsize::new(0));
-            let (sink, mut stream) = duplex.split();
+        .and_then(move |(duplex, _)| {
+            let (mut sink, mut stream) = duplex.split();
             let (mid, discover) = create_msg_to_send(
                 SetDiscoverTargets { discover: true },
-                start_counter,
+                Arc::clone(&start_counter),
                 MethodDestination::Browser,
             );
             let arc_stream = Arc::new(Mutex::new(stream));
+            // let arc_sink = Arc::new(Mutex::new(sink));
             info!("connected.");
             info!("sending: {}", discover);
+            let new_counter = Arc::clone(&start_counter);
             sink.send(OwnedMessage::Text(discover))
                 .from_err()
                 .and_then(|new_sink| {
                     loop_fn(None, move |_: Option<protocol::target::TargetInfo>| {
                         let poll_result = arc_stream.lock().unwrap().poll();
                         poll_page_event_create(poll_result)
+                    })
+                    .and_then(|target_info| {
+                        let (mid, new_command) = create_msg_to_send(target::methods::AttachToTarget {
+                            target_id: &(target_info.unwrap().target_id),
+                          flatten: None,
+                        }, 
+                        new_counter,
+                        MethodDestination::Browser,
+                        );
+                        new_sink.send(OwnedMessage::Text(new_command)).from_err()
                     })
                 })
         });

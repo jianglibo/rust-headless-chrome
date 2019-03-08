@@ -5,6 +5,7 @@ use std::thread;
 use tokio::prelude::future::loop_fn;
 use tokio::prelude::IntoFuture;
 use tokio::runtime::Runtime;
+use futures::sync::mpsc as future_mpsc;
 
 use failure;
 use log::*;
@@ -276,14 +277,8 @@ fn attach_page(&self, target_info: protocol::target::TargetInfo) -> (usize, Stri
                         MethodDestination::Browser,
                         )
 }
-}
 
-
-// fn vvv(c: Arc<Mutex<Client<TcpStream>>>) {
-//     c.lock().unwrap().poll();
-// }
-
-fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
+fn runner(&'static self, rt: &mut Runtime) {
     // let mut runtime = tokio::runtime::Builder::new().build().unwrap();
     let options = LaunchOptionsBuilder::default()
         .build()
@@ -293,8 +288,12 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
     // info!("wait 3 sec.");
     // thread::sleep(std::time::Duration::from_secs(3));
 
-    let chrome_page1 = Arc::clone(&chrome_page);
-    let chrome_page2 = Arc::clone(&chrome_page);
+    // let chrome_page1 = Arc::clone(&chrome_page);
+    // let chrome_page2 = Arc::clone(&chrome_page);
+
+    let (tx, rx) = future_mpsc::channel(1_024);
+
+    
 
     let runner = ClientBuilder::new(&web_socket_debugger_url)
         .unwrap()
@@ -317,7 +316,7 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
             
             
             let (mut sink, mut stream) = duplex.split();
-            let (mid, discover) = chrome_page1.lock().unwrap().create_msg_to_send(
+            let (mid, discover) = self.create_msg_to_send(
                 SetDiscoverTargets { discover: true },
                 MethodDestination::Browser,
             );
@@ -328,8 +327,8 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
             info!("connected.");
             // let new_counter = Arc::clone(&start_counter);
 
-            let chrome_page1 = Arc::clone(&chrome_page);
-            let chrome_page2 = Arc::clone(&chrome_page);
+            // let chrome_page1 = Arc::clone(&chrome_page);
+            // let chrome_page2 = Arc::clone(&chrome_page);
 
             // let mut first_duplex = arc_duplex.lock().unwrap();
             sink.send(OwnedMessage::Text(discover))
@@ -337,17 +336,17 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
                 .and_then(move |new_sink| {
                     loop_fn(0_u8, move |_| {
                         let poll_result = arc_stream.lock().unwrap().poll();
-                        chrome_page.lock().unwrap().poll_page_event_create(poll_result)
+                        self.poll_page_event_create(poll_result)
                     })
                     .and_then(move |target_info| {
-                        let (mid, new_command) = chrome_page1.lock().unwrap().attach_page(target_info.unwrap());
+                        let (mid, new_command) = self.attach_page(target_info.unwrap());
                         new_sink.send(create_owned_message(new_command)).from_err()
                     })
                 })
-                .and_then(|new_sink| {
+                .and_then(move |new_sink| {
                     loop_fn(0_u8, move |_| {
                         let poll_result = arc_stream1.lock().unwrap().poll();
-                        chrome_page2.lock().unwrap().poll_page_event_create(poll_result)
+                        self.poll_page_event_create(poll_result)
                     })
                 })
                 // .map_err(|_|()).map(|_|())
@@ -361,6 +360,10 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
     rt.spawn(rrr);
     // rt.block_on(runner).unwrap();
 }
+}
+
+
+
 
 #[cfg(test)]
 mod tests {
@@ -390,13 +393,22 @@ mod tests {
     // Target.targetInfoChanged" -> "targetId":"52DEFEF71C5424C72D993A658B55D851"
     // Target.attachedToTarget -> "targetId":"52DEFEF71C5424C72D993A658B55D851" , "sessionId":"FCF32E9DD66C89F6246EF9D832D385D1"
 
+    // static chrome_page: ChromePage = ChromePage {
+    //             counter: Arc::new(AtomicUsize::new(0))
+    //     };
+
     #[test]
     fn t_loop_fn() {
         ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
-                let chrome_page = Arc::new(Mutex::new(ChromePage {
-                counter: Arc::new(AtomicUsize::new(0))
-            }));
+
+        // let chrome_page = ;
+        // let chrome_page = ChromePage {
+        //         counter: Arc::new(AtomicUsize::new(0))
+        // };
+        // let chrome_page_r: &'static ChromePage = &chrome_page;
+
+        // let chrome_page_r: &'static ChromePage = &'static 
 
         // tokio::run(futures::lazy(move || {
         //     runner(chrome_page);
@@ -405,7 +417,7 @@ mod tests {
 
         // runner(chrome_page);
         let mut rt = Runtime::new().unwrap();
-        runner(chrome_page, &mut rt);
+        // chrome_page.runner(&mut rt);
         // // Spawn the server task
         // rt.spawn(futures::lazy(move || {
         //     runner(chrome_page);

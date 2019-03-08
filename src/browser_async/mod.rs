@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::thread;
 use tokio::prelude::future::loop_fn;
 use tokio::prelude::IntoFuture;
+use tokio::runtime::Runtime;
 
 use failure;
 use log::*;
@@ -38,6 +39,7 @@ use websocket::ClientBuilder;
 
 use crate::protocol::target;
 use serde::{Deserialize, Serialize};
+mod tt;
 
 /// ["Browser" domain](https://chromedevtools.github.io/devtools-protocol/tot/Browser)
 /// (such as for resizing the window in non-headless mode), we currently don't implement those.
@@ -265,6 +267,15 @@ fn poll_page_event_create(&self, stream_poll_result: RawPollResult) ->  std::res
             Err(e) => Err(failure::Error::from(e)),
         }
 }
+
+fn attach_page(&self, target_info: protocol::target::TargetInfo) -> (usize, String) {
+    self.create_msg_to_send(target::methods::AttachToTarget {
+                            target_id: &(target_info.target_id),
+                            flatten: None,
+                        }, 
+                        MethodDestination::Browser,
+                        )
+}
 }
 
 
@@ -272,8 +283,8 @@ fn poll_page_event_create(&self, stream_poll_result: RawPollResult) ->  std::res
 //     c.lock().unwrap().poll();
 // }
 
-fn runner(chrome_page: Arc<Mutex<ChromePage>>) {
-    let mut runtime = tokio::runtime::Builder::new().build().unwrap();
+fn runner(chrome_page: Arc<Mutex<ChromePage>>, rt: &mut Runtime) {
+    // let mut runtime = tokio::runtime::Builder::new().build().unwrap();
     let options = LaunchOptionsBuilder::default()
         .build()
         .expect("Failed to find chrome");
@@ -282,8 +293,8 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>) {
     // info!("wait 3 sec.");
     // thread::sleep(std::time::Duration::from_secs(3));
 
-            let chrome_page1 = Arc::clone(&chrome_page);
-            let chrome_page2 = Arc::clone(&chrome_page);
+    let chrome_page1 = Arc::clone(&chrome_page);
+    let chrome_page2 = Arc::clone(&chrome_page);
 
     let runner = ClientBuilder::new(&web_socket_debugger_url)
         .unwrap()
@@ -318,6 +329,7 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>) {
             // let new_counter = Arc::clone(&start_counter);
 
             let chrome_page1 = Arc::clone(&chrome_page);
+            let chrome_page2 = Arc::clone(&chrome_page);
 
             // let mut first_duplex = arc_duplex.lock().unwrap();
             sink.send(OwnedMessage::Text(discover))
@@ -328,24 +340,26 @@ fn runner(chrome_page: Arc<Mutex<ChromePage>>) {
                         chrome_page.lock().unwrap().poll_page_event_create(poll_result)
                     })
                     .and_then(move |target_info| {
-                        let (mid, new_command) = chrome_page2.lock().unwrap().create_msg_to_send(target::methods::AttachToTarget {
-                            target_id: &(target_info.unwrap().target_id),
-                            flatten: None,
-                        }, 
-                        MethodDestination::Browser,
-                        );
+                        let (mid, new_command) = chrome_page1.lock().unwrap().attach_page(target_info.unwrap());
                         new_sink.send(create_owned_message(new_command)).from_err()
                     })
                 })
                 .and_then(|new_sink| {
                     loop_fn(0_u8, move |_| {
                         let poll_result = arc_stream1.lock().unwrap().poll();
-                        chrome_page1.lock().unwrap().poll_page_event_create(poll_result)
+                        chrome_page2.lock().unwrap().poll_page_event_create(poll_result)
                     })
                 })
+                // .map_err(|_|()).map(|_|())
+                // .map(|_| ())
+                // Write any error to STDOUT
+                // .map_err(|e| println!("socket error = {:?}", e))
         });
 
-    runtime.block_on(runner).unwrap();
+    let rrr = runner.map(|v| println!("{:?}", v)).map_err(|_|());
+    // rrr
+    rt.spawn(rrr);
+    // rt.block_on(runner).unwrap();
 }
 
 #[cfg(test)]
@@ -360,6 +374,7 @@ mod tests {
     use websocket::r#async::TcpStream;
     use websocket::ClientBuilder;
     use websocket::Message;
+    use tokio::runtime::Runtime;
 
     use crate::browser::process::{LaunchOptions, LaunchOptionsBuilder, Process};
 
@@ -382,6 +397,24 @@ mod tests {
                 let chrome_page = Arc::new(Mutex::new(ChromePage {
                 counter: Arc::new(AtomicUsize::new(0))
             }));
-        runner(chrome_page);
+
+        // tokio::run(futures::lazy(move || {
+        //     runner(chrome_page);
+        //     Ok(())
+        // }));
+
+        // runner(chrome_page);
+        let mut rt = Runtime::new().unwrap();
+        runner(chrome_page, &mut rt);
+        // // Spawn the server task
+        // rt.spawn(futures::lazy(move || {
+        //     runner(chrome_page);
+        //     Ok(())
+        // }));
+
+        // Wait until the runtime becomes idle and shut it down.
+        
+        rt.shutdown_on_idle()
+            .wait().unwrap();
     }
 }

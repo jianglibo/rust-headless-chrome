@@ -67,16 +67,30 @@ pub enum MethodDestination {
     Browser,
 }
 
+#[derive(Debug)]
 struct MethodUtil {
     counter: Arc<AtomicUsize>,
 }
 
 impl MethodUtil {
 
-fn get_chrome_event(&self, owned_message: &OwnedMessage) -> Option<protocol::Event> {
-    if let Some(protocol::Message::Event(browser_event)) =
-        self.get_any_message_from_chrome(owned_message)
+// protocol::Message::Response is response for method call.
+fn get_chrome_response(owned_message: &OwnedMessage) -> Option<protocol::Response> {
+        if let Some(protocol::Message::Response(browser_response)) =
+        Self::get_any_message_from_chrome(owned_message)
     {
+        info!("got chrome response: {:?}", browser_response);
+        Some(browser_response)
+    } else {
+        None
+    }
+}
+
+fn get_chrome_event(owned_message: &OwnedMessage) -> Option<protocol::Event> {
+    if let Some(protocol::Message::Event(browser_event)) =
+        Self::get_any_message_from_chrome(owned_message)
+    {
+        info!("parsed chrome message: {:?}", browser_event);
         match browser_event {
             protocol::Event::TargetCreated(target_created_event) => {
                 info!("final event: {:?}", target_created_event);
@@ -150,24 +164,27 @@ fn get_chrome_event(&self, owned_message: &OwnedMessage) -> Option<protocol::Eve
         None
     }
 }
-
-fn get_any_message_from_chrome(&self, owned_message: &OwnedMessage) -> Option<protocol::Message> {
+// protocol::Message cover all possible messages from chrome.
+#[allow(clippy::single_match_else)]
+fn get_any_message_from_chrome(owned_message: &OwnedMessage) -> Option<protocol::Message> {
         match owned_message {
             OwnedMessage::Text(msg) => {
-                info!("got raw message: {}", msg);
                 if let Ok(m) = protocol::parse_raw_message(&msg) {
                     return Some(m);
+                } else {
+                    error!("got unparsable message from chrome. {}", msg);
                 }
-            }
-            _ => (),
+            },
+            _ => {
+                error!("got None text message from chrome. {:?}", owned_message);
+                ()
+            },
         };
         None
 }
-fn get_page_event_create(&self,
-    owned_message: &OwnedMessage,
-) -> Option<protocol::target::TargetInfo> {
+fn match_page_event_create(owned_message: &OwnedMessage) -> Option<protocol::target::TargetInfo> {
     if let Some(protocol::Message::Event(any_event_from_server)) =
-        self.get_any_message_from_chrome(owned_message)
+        Self::get_any_message_from_chrome(owned_message)
     {
         if let protocol::Event::TargetCreated(target_created_event) = any_event_from_server {
             let target_type = &(target_created_event.params.target_info.target_type);
@@ -187,14 +204,18 @@ fn get_page_event_create(&self,
 //     OwnedMessage::Text(txt.as_ref().to_string())
 // }
 
-    fn create_attach_method(&self, target_info: protocol::target::TargetInfo) -> (usize, String) {
-        self.create_msg_to_send(
-            target::methods::AttachToTarget {
-                target_id: &(target_info.target_id),
-                flatten: None,
-            },
-            MethodDestination::Browser,
-        )
+    fn create_attach_method(&self, target_info: &Option<protocol::target::TargetInfo>) -> Option<(usize, String)> {
+        if let Some(ti) = target_info {
+            Some(self.create_msg_to_send(
+                target::methods::AttachToTarget {
+                    target_id: &(ti.target_id),
+                    flatten: None,
+                },
+                MethodDestination::Browser,
+            ))
+        } else {
+            None
+        }
     }
 
     // if you take self, you consume youself.
@@ -224,59 +245,40 @@ fn get_page_event_create(&self,
 
 }
 
-// target::methods::AttachToTarget {
-//                 target_id: &target_id,
-//                 flatten: None,
-//             })
+#[derive(Debug)]
+struct ChromePage {
+    target_info: Option<protocol::target::TargetInfo>,
+    method_util: Arc<MethodUtil>,
+    waiting_method_id: usize,
+    session_id: Option<String>,
+}
 
+impl ChromePage {
+    fn create_attach_method(&mut self) -> Option<String> {
+        if let Some(ti) = &self.target_info {
+            let (mid, method_str) = self.method_util.create_msg_to_send(
+                target::methods::AttachToTarget {
+                    target_id: &(ti.target_id),
+                    flatten: None,
+                },
+                MethodDestination::Browser,
+            );
+            self.waiting_method_id = mid;
+            Some(method_str)
+        } else {
+            None
+        }
+    }
 
-
-// type RawPollResult = std::result::Result<
-//     futures::Async<std::option::Option<websocket::message::OwnedMessage>>,
-//     websocket::result::WebSocketError,
-// >;
-
-// type LoopEventResult =
-//     std::result::Result<Loop<Option<protocol::Event>, Option<protocol::Event>>, failure::Error>;
-
-// fn poll_chrome_message(stream_poll_result: RawPollResult) -> LoopEventResult {
-//     match stream_poll_result {
-//         Ok(Async::NotReady) => Ok(Loop::Continue(None)),
-//         Ok(Async::Ready(om_op)) => {
-//             if let Some(om) = om_op {
-//                 if let Some(m) = get_chrome_event(&om) {
-//                     Ok(Loop::Break(Some(m)))
-//                 } else {
-//                     Ok(Loop::Continue(None))
-//                 }
-//             } else {
-//                 Ok(Loop::Continue(None))
-//             }
-//         }
-//         Err(e) => Err(failure::Error::from(e)),
-//     }
-// }
-
-
-struct ChromePage {}
-
-// type SkipResult = Result<bool, ChannelBridgeError>;
-
-// impl ChromePage {
-
-    // fn catch_chrome_event(receiver: future_mpsc::Receiver<OwnedMessage>, method_util: Arc<MethodUtil>) -> futures::stream::SkipWhile<futures::sync::mpsc::Receiver<websocket::message::OwnedMessage>, Fn(&OwnedMessage) -> u8, std::result::Result<bool, ChannelBridgeError>> {
-    //         receiver
-    //                 .skip_while(move |msg| -> Result<_, ChannelBridgeError> {
-    //                     if let Some(ti) = method_util.get_page_event_create(msg) {
-    //                         info!("receive message: {:?}", msg);
-    //                         // Ok(false)
-    //                         Ok(false)
-    //                     } else {
-    //                         info!("skip message: {:?}", msg);
-    //                         Ok(true)
-    //                     }
-    //                 })        
-    // }
+    fn match_waiting_call_response(&self, owned_message: &OwnedMessage) -> Option<protocol::Response> {
+        if let Some(response) = MethodUtil::get_chrome_response(owned_message) {
+            if response.call_id == self.waiting_method_id {
+                return Some(response);
+            }
+        }
+        None
+    }
+}
 
     fn enable_discover_targets(
         method_util: Arc<MethodUtil>,
@@ -288,55 +290,63 @@ struct ChromePage {}
             SetDiscoverTargets { discover: true },
             MethodDestination::Browser,
         );
-        let method_util_1 = Arc::clone(&method_util);
-        let method_util_2 = Arc::clone(&method_util);
+
+        let chrome_page = Arc::new(Mutex::new(ChromePage {
+            target_info: None,
+            method_util: Arc::clone(&method_util),
+            waiting_method_id: 0,
+            session_id: None,
+        }));
+        let chrome_page_clone_1 =  Arc::clone(&chrome_page);
+
+        let method_util_clone_1 = Arc::clone(&method_util);
         let and_t = sender
             .send(OwnedMessage::Text(discover))
             .from_err()
-            .and_then(|sender1| { // and_then take a function as parameter, this function must return a IntoFuture which take the same Error type as self (it's sender here.) or the Error implement from self::Error.
-                let a = receiver
+            .and_then(|sender| { // and_then take a function as parameter, this function must return a IntoFuture which take the same Error type as self (it's sender here.) or the Error implement from self::Error.
+                receiver
                     .skip_while(move |msg| {
-                        if let Some(ti) = method_util_1.get_page_event_create(msg) {
-                            info!("receive message: {:?}", msg);
+                        if let Some(ti) = MethodUtil::match_page_event_create(msg) {
+                            chrome_page_clone_1.lock().unwrap().target_info = Some(ti);
+                            info!("waiting for page create message, got message: {:?}", msg);
                             Ok(false)
                         } else {
-                            info!("skip message: {:?}", msg);
+                            info!("waiting for page create message, skip message: {:?}", msg);
                             Ok(true)
                         }
                     })
                     .into_future()
-                    // .from_err()
-                    .and_then(|(item, s)| {
-                        info!("*** {:?}", item); // this item is page create event.
-                        // Ok(item)
-                        // let r: Result<_, ChannelBridgeError> = Ok((sender1, s));
-                        // r
-                        Ok((sender1, s))
-                        // if let Some(msg) = item {
-                        //     // let (mid, method_str) = method_util_2.create_attach_method(method_util_2.get_page_event_create(&msg).unwrap());
-                        //     Ok(true)
-                        // } else {
-                        //     Ok(false)
-                        //     // Ok(())
-                        // }
-                    });
-                a.map_err(|e|ChannelBridgeError::ReceivingError)
+                    .and_then(move |(_, s)| {
+                        Ok((sender, s))
+                    }).map_err(|e|ChannelBridgeError::ReceivingError)
             });
 
-        // and_t = and_t.from_err().and_then(|(sender, receiver)| {
-        //     let r: Result<u8, ChannelBridgeError> = Ok(9_u8);
-        //     r
-        // });
+        let chrome_page_clone_2 =  Arc::clone(&chrome_page);
+        let method_util_clone_2 = Arc::clone(&method_util);
+        let and_t = and_t.from_err().and_then(move|(sender, receiver)| {
+            let method_str = chrome_page_clone_2.lock().unwrap().create_attach_method().unwrap();
+            sender.send(OwnedMessage::Text(method_str)).from_err().and_then(|sender|{
+                receiver.skip_while(move |msg| {
+                    info!("waiting attach success. {:?}", msg);
+                    info!("waiting attach success. {:?}", MethodUtil::get_chrome_event(msg));
+                    let mut chrome = chrome_page_clone_2.lock().unwrap();
+                    if let Some(response) = chrome.match_waiting_call_response(msg) {
+                        if let Some(serde_json::value::Value::Object(value)) = response.result {
+                            if let Some(serde_json::value::Value::String(session_id)) = value.get("sessionId") {
+                                chrome.session_id = Some(session_id.clone());
+                                info!("{:?}", chrome);
+                                return Ok(false);
+                            }
+                        }
+                    }
+                    // Text("{\"id\":1,\"result\":{\"sessionId\":\"582952E26A7216935DB42D97332EA591\"}}")
+                    // AttachedToTarget(AttachedToTargetEvent { params: AttachedToTargetParams { session_id: "C0C21A585CB64F2DA76203D86D4A849B", target_info: TargetInfo { target_id: "37F3D648D4851AA1F203E03C77640B03", target_type: Page, title: "", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("CA26923A2EEFF72F824B257037870C7E") }, waiting_for_debugger: false } })
+                    // TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { target_info: TargetInfo { target_id: "37F3D648D4851AA1F203E03C77640B03", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("CA26923A2EEFF72F824B257037870C7E") } } })
 
-        
-            // and_t.and_then(|(sender, receiver)|{
-            //     Ok("abc")
-            // });
-                
-            // a.map_err(|_| {
-            //     error!("here error.");
-            //     ChannelBridgeError::ReceivingError
-            // })
+                    Ok(true)
+                }).into_future().map_err(|e|ChannelBridgeError::ReceivingError)
+            })
+        });
 
         rt.spawn(
             and_t
@@ -345,38 +355,6 @@ struct ChromePage {}
                 .map_err(|e| error!("{:?}", e)),
         );
     }
-
-//     fn poll_page_event_create(
-//         &self,
-//         stream_poll_result: RawPollResult,
-//     ) -> std::result::Result<Loop<Option<protocol::target::TargetInfo>, u8>, failure::Error>
-// // fn poll_page_event_create<T>(stream_poll_result: RawPollResult) -> IntoFuture<Item = Loop<T, _>, Error=failure::Error>
-//     {
-//         match stream_poll_result {
-//             Ok(Async::NotReady) => Ok(Loop::Continue(0)),
-//             Ok(Async::Ready(om_op)) => {
-//                 if let Some(om) = om_op {
-//                      if let Some(m) = get_page_event_create(&om) {
-//                         return Ok(Loop::Break(Some(m)));
-//                     }                   
-//                 }
-//                 Ok(Loop::Continue(0))
-//             }
-//             Err(e) => Err(failure::Error::from(e)),
-//         }
-//     }
-
-    // fn attach_page(&self, target_info: protocol::target::TargetInfo) -> (usize, String) {
-    //     self.create_msg_to_send(
-    //         target::methods::AttachToTarget {
-    //             target_id: &(target_info.target_id),
-    //             flatten: None,
-    //         },
-    //         MethodDestination::Browser,
-    //     )
-    // }
-
-// }
 
 #[derive(Debug, failure::Fail)]
 enum ChannelBridgeError {
@@ -492,66 +470,3 @@ mod tests {
         rt.shutdown_on_idle().wait().unwrap();
     }
 }
-
-    // fn runner(&'static self, rt: &mut Runtime) {
-    //     // let mut runtime = tokio::runtime::Builder::new().build().unwrap();
-    //     let options = LaunchOptionsBuilder::default()
-    //         .build()
-    //         .expect("Failed to find chrome");
-    //     let chrome_process = Process::new(options).unwrap();
-    //     let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
-    //     // info!("wait 3 sec.");
-    //     // thread::sleep(std::time::Duration::from_secs(3));
-
-    //     // let chrome_page1 = Arc::clone(&chrome_page);
-    //     // let chrome_page2 = Arc::clone(&chrome_page);
-
-    //     // let (tx, rx) = future_mpsc::channel(1_024);
-
-    //     let runner = ClientBuilder::new(&web_socket_debugger_url)
-    //         .unwrap()
-    //         .add_protocol("rust-websocket")
-    //         .async_connect_insecure()
-    //         .from_err()
-    //         .and_then(move |(duplex, _)| {
-    //             let (mut sink, mut stream) = duplex.split();
-    //             let (mid, discover) = self.create_msg_to_send(
-    //                 SetDiscoverTargets { discover: true },
-    //                 MethodDestination::Browser,
-    //             );
-
-    //             // stream.for_each()
-
-    //             let arc_stream = Arc::new(Mutex::new(stream));
-    //             let arc_stream1 = Arc::clone(&arc_stream);
-    //             // let arc_sink = Arc::new(Mutex::new(sink));
-    //             info!("connected.");
-    //             // let new_counter = Arc::clone(&start_counter);
-
-    //             // let chrome_page1 = Arc::clone(&chrome_page);
-    //             // let chrome_page2 = Arc::clone(&chrome_page);
-
-    //             // let mut first_duplex = arc_duplex.lock().unwrap();
-    //             sink.send(OwnedMessage::Text(discover))
-    //                 .from_err()
-    //                 .and_then(move |new_sink| {
-    //                     loop_fn(0_u8, move |_| {
-    //                         let poll_result = arc_stream.lock().unwrap().poll();
-    //                         self.poll_page_event_create(poll_result)
-    //                     })
-    //                     .and_then(move |target_info| {
-    //                         let (mid, new_command) = self.attach_page(target_info.unwrap());
-    //                         new_sink.send(create_owned_message(new_command)).from_err()
-    //                     })
-    //                 })
-    //                 .and_then(move |new_sink| {
-    //                     loop_fn(0_u8, move |_| {
-    //                         let poll_result = arc_stream1.lock().unwrap().poll();
-    //                         self.poll_page_event_create(poll_result)
-    //                     })
-    //                 })
-    //         });
-
-    //     let rrr = runner.map(|v| println!("{:?}", v)).map_err(|_| ());
-    //     rt.spawn(rrr);
-    // }

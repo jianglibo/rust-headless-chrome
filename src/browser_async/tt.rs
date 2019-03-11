@@ -21,6 +21,8 @@ mod tests {
     use futures::{stream, Future, Stream, Sink};
     use futures::future::lazy;
     use futures::sync::mpsc;
+    use websocket::ClientBuilder;
+    use websocket::Message;
 
     #[test]
     fn t_self_lifetime() {
@@ -61,5 +63,21 @@ mod tests {
                 Ok(())
             })
         }));
+    }
+    #[test]
+    fn t_echo() {
+        let mut runtime = tokio::runtime::Builder::new().build().unwrap();
+
+            // send a message and hear it come back
+            let echo_future = ClientBuilder::new("ws://echo.websocket.org").unwrap()
+                .async_connect_insecure()
+                .and_then(|(s, _)| s.send(Message::text("hallo").into()))
+                .and_then(|s| s.into_future().map_err(|e| e.0))
+                .map(|(m, _)| {
+                    assert_eq!(m, Some(Message::text("hallo").into()))
+                });
+                // .map(|a|{print!("{}", a)});
+
+            runtime.block_on(echo_future).unwrap();
     }
 }

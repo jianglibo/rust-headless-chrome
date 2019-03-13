@@ -159,7 +159,7 @@ impl MethodUtil {
     fn create_attach_method(
         &self,
         target_info: &Option<protocol::target::TargetInfo>,
-    ) -> Option<(usize, String)> {
+    ) -> Option<(usize, String, Option<usize>)> {
         if let Some(ti) = target_info {
             Some(self.create_msg_to_send(
                 target::methods::AttachToTarget {
@@ -167,6 +167,7 @@ impl MethodUtil {
                     flatten: None,
                 },
                 MethodDestination::Browser,
+                None,
             ))
         } else {
             None
@@ -174,7 +175,7 @@ impl MethodUtil {
     }
 
     // if you take self, you consume youself.
-    fn create_msg_to_send<C>(&self, method: C, destination: MethodDestination) -> (usize, String)
+    fn create_msg_to_send<C>(&self, method: C, destination: MethodDestination, mid: Option<usize>) -> (usize, String, Option<usize>)
     where
         C: protocol::Method + serde::Serialize,
     {
@@ -183,17 +184,18 @@ impl MethodUtil {
         let message_text = serde_json::to_string(&call).unwrap();
 
         match destination {
+            // If call method to target, it will not response with result, instead we will receive a message afterward. with the message id equal to call_id.
             MethodDestination::Target(session_id) => {
                 let target_method = target::methods::SendMessageToTarget {
                     target_id: None,
                     session_id: Some(session_id.as_str()),
                     message: &message_text,
                 };
-                self.create_msg_to_send(target_method, MethodDestination::Browser)
+                self.create_msg_to_send(target_method, MethodDestination::Browser, Some(call_id))
             }
             MethodDestination::Browser => {
                 info!("sending method: {}", message_text);
-                (call_id, message_text)
+                    (call_id, message_text, mid)
             }
         }
     }
@@ -203,7 +205,8 @@ impl MethodUtil {
 struct ChromePage {
     page_target_info: Option<protocol::target::TargetInfo>,
     method_util: Arc<MethodUtil>,
-    waiting_method_id: usize,
+    waiting_call_id: Option<usize>,  // this is direct browser response
+    waiting_message_id: Option<usize>, // this is message from target, but is response to user request.
     session_id: Option<String>,
 }
 
@@ -239,8 +242,9 @@ impl ChromePage {
     fn create_msg_to_send<C>(&mut self, method: C, destination: MethodDestination) -> String
     where
         C: protocol::Method + serde::Serialize, {
-            let (mid, method_str) = self.method_util.create_msg_to_send(method, destination);
-            self.waiting_method_id = mid;
+            let (call_id, method_str, message_id) = self.method_util.create_msg_to_send(method, destination, None);
+            self.waiting_call_id = Some(call_id);
+            self.waiting_message_id = message_id;
             method_str
         }
 
@@ -287,10 +291,10 @@ impl ChromePage {
         owned_message: &OwnedMessage,
     ) -> Option<protocol::Response> {
         if let Some(response) = MethodUtil::get_chrome_response(owned_message) {
-            if response.call_id == self.waiting_method_id {
+            if Some(response.call_id) == self.waiting_call_id {
                 return Some(response);
             } else {
-                info!("got response with call_id: {}, but waiting call_id is: {}", response.call_id, self.waiting_method_id);
+                info!("got response with call_id: {}, but waiting call_id is: {:?}", response.call_id, self.waiting_call_id);
             }
         }
         None
@@ -336,8 +340,9 @@ impl ChromePage {
     fn navigate_to(&mut self, url: &str) -> Option<String> {
         let c = Navigate { url };
         let md = MethodDestination::Target(self.session_id.clone().unwrap().into());
-        let (mid, method_str) = self.method_util.create_msg_to_send(c, md);
-        self.waiting_method_id = mid;
+        let (call_id, method_str, message_id) = self.method_util.create_msg_to_send(c, md, None);
+        self.waiting_call_id = Some(call_id);
+        self.waiting_message_id = message_id;
         Some(method_str)
     }
 
@@ -376,7 +381,8 @@ fn enable_discover_targets(
     let chrome_page = Arc::new(Mutex::new(ChromePage {
         page_target_info: None,
         method_util: Arc::clone(&method_util),
-        waiting_method_id: 0,
+        waiting_call_id: None,
+        waiting_message_id: None,
         session_id: None,
     }));
 

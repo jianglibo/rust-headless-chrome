@@ -19,6 +19,7 @@ use crate::protocol::browser::methods::GetVersion;
 pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 use crate::protocol::target::events as target_events;
 use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};
+use crate::protocol::dom;
 
 pub use crate::browser::process::LaunchOptionsBuilder;
 use crate::browser::process::{LaunchOptions, Process};
@@ -76,15 +77,23 @@ struct MethodUtil {
 }
 
 impl MethodUtil {
-    // protocol::Message::Response is response for method call.
+    // if get response by call_id, it's unnecessary to verify session and target_id.
     fn get_chrome_response(owned_message: &OwnedMessage) -> Option<protocol::Response> {
-        if let Some(protocol::Message::Response(browser_response)) =
-            Self::get_any_message_from_chrome(owned_message)
-        {
-            info!("got chrome response: {:?}", browser_response);
-            Some(browser_response)
-        } else {
-            None
+        match Self::get_any_message_from_chrome(owned_message) {
+            Some(protocol::Message::Response(browser_response)) => {
+                info!("got chrome response. {:?}", browser_response);
+                Some(browser_response)
+            },
+            Some(protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(target_message_event))) => {
+                let message = target_message_event.params.message;
+                if let Ok(protocol::Message::Response(resp)) = protocol::parse_raw_message(&message) {
+                    info!("got message from target response. {:?}", resp);
+                    Some(resp)
+                } else {
+                    None
+                }
+            },
+            _ => None
         }
     }
 
@@ -94,16 +103,6 @@ impl MethodUtil {
         {
             info!("parsed chrome message: {:?}", browser_event);
             match browser_event {
-                // protocol::Event::TargetCreated(target_created_event) => {
-                //     info!("final event: {:?}", target_created_event);
-                //     let target_type = &(target_created_event.params.target_info.target_type);
-                //     match target_type {
-                //         protocol::target::TargetType::Page => {
-                //             Some(protocol::Event::TargetCreated(target_created_event))
-                //         }
-                //         _ => None,
-                //     }
-                // }
                 protocol::Event::ReceivedMessageFromTarget(target_message_event) => {
                     let session_id: SessionId = target_message_event.params.session_id.into();
                     let raw_message = target_message_event.params.message;
@@ -231,29 +230,56 @@ impl ChromePage {
         Ok(true)
     }
 
+    // when got message {\"method\":\"Target.receivedMessageFromTarget\" from chrome, it has a params field, which has a 'message' field, 
+    // it's the response to your early method call.
+    fn get_document() -> Option<protocol::Response> {
+        None
+    }
+
+    fn create_msg_to_send<C>(&mut self, method: C, destination: MethodDestination) -> String
+    where
+        C: protocol::Method + serde::Serialize, {
+            let (mid, method_str) = self.method_util.create_msg_to_send(method, destination);
+            self.waiting_method_id = mid;
+            method_str
+        }
+
     fn create_attach_method(&mut self) -> Option<String> {
-        if let Some(ti) = &self.page_target_info {
-            let (mid, method_str) = self.method_util.create_msg_to_send(
+        let mut target_id: Option<String> = None;
+        if let Some(ti) = &mut self.page_target_info {
+            target_id = Some(ti.target_id.clone());
+        }
+        
+        if let Some(ti) = target_id {
+            let r = self.create_msg_to_send(
                 target::methods::AttachToTarget {
-                    target_id: &(ti.target_id),
+                    target_id: &ti,
                     flatten: None,
                 },
                 MethodDestination::Browser,
             );
-            self.waiting_method_id = mid;
-            Some(method_str)
+            Some(r)
         } else {
             None
         }
     }
 
+    fn create_msg_to_send_with_session_id<C>(&mut self, method: C, session_id: SessionId) -> String
+    where
+        C: protocol::Method + serde::Serialize, {
+        self.create_msg_to_send(method, MethodDestination::Target(session_id))
+    }
+
+    fn query_document_method(&mut self) -> String {
+        self.create_msg_to_send_with_session_id(
+                dom::methods::GetDocument {
+                    depth: Some(0),
+                    pierce: Some(false),
+                }, self.session_id.clone().unwrap().into())
+    }
+
     fn enable_discover_method(&mut self) -> String {
-        let (mid, discover) = self.method_util.create_msg_to_send(
-            SetDiscoverTargets { discover: true },
-            MethodDestination::Browser,
-        );
-        self.waiting_method_id = mid;
-        discover
+        self.create_msg_to_send(SetDiscoverTargets { discover: true }, MethodDestination::Browser)
     }
 
     fn match_waiting_call_response(
@@ -263,6 +289,8 @@ impl ChromePage {
         if let Some(response) = MethodUtil::get_chrome_response(owned_message) {
             if response.call_id == self.waiting_method_id {
                 return Some(response);
+            } else {
+                info!("got response with call_id: {}, but waiting call_id is: {}", response.call_id, self.waiting_method_id);
             }
         }
         None
@@ -425,6 +453,42 @@ fn enable_discover_targets(
                                 MethodUtil::get_chrome_event(msg)
                             );
                             chrome_page_clone_3.lock().unwrap().is_page_url_changed(msg)
+                        })
+                        .into_future()
+                        .and_then(move |(_, stream)| Ok((sender, stream)))
+                        .map_err(|_| ChannelBridgeError::ReceivingError)
+                })
+                .map_err(|_| ChannelBridgeError::ReceivingError)
+        });
+
+
+    let chrome_page_clone_4 = Arc::clone(&chrome_page);
+    let send_and_receive = send_and_receive
+        .from_err()
+        .and_then(move |(sender, receiver)| {
+            let query_document = chrome_page_clone_4
+                .lock()
+                .unwrap()
+                .query_document_method();
+            // this send will return Text("{\"id\":3,\"result\":{}}"), Nothing of result.
+            // We should waiting for TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { target_info: TargetInfo { target_id: "58D612AF212A5A1BE0138AF2971562C6", target_type: Page, title: "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/index.html", url: "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/index.html", attached: true, opener_id: None, browser_context_id: Some("11B2711DB1E72BFDC0D91DF5D5C859BC") } } })
+            //
+            sender
+                .send(OwnedMessage::Text(query_document))
+                .from_err()
+                .and_then(|sender| {
+                    //navigate to new page.
+                    receiver
+                        .skip_while(move |msg| {
+                            info!("waiting document raw_message. {:?}", msg);
+                            info!(
+                                "waiting document success. {:?}",
+                                MethodUtil::get_chrome_event(msg)
+                            );
+                            let resp = chrome_page_clone_4.lock().unwrap().match_waiting_call_response(&msg);
+                            let b = resp.is_some();
+                            info!("query document response: {:?}", resp);
+                            Ok(b)
                         })
                         .into_future()
                         .and_then(move |(_, stream)| Ok((sender, stream)))

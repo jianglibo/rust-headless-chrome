@@ -57,6 +57,10 @@ fn enable_discover_targets(
         root_node: None,
     }));
 
+    // let (out_side_sink, inner_stream) = future_mpsc::channel(1_024); // writer
+    // let (inner_sink, out_side_stream) = future_mpsc::channel(1_024); // reader
+
+
     let chrome_page_clone_1 = Arc::clone(&chrome_page);
     let chrome_page_clone_2 = Arc::clone(&chrome_page);
     let send_and_receive = sender
@@ -66,7 +70,7 @@ fn enable_discover_targets(
         .from_err()
         .and_then(|sender| {
             // and_then take a function as parameter, this function must return a IntoFuture which take the same Error type as self (it's sender here.) or the Error implement from self::Error.
-            receiver
+            let r = receiver
                 .skip_while(move |msg| {
                     chrome_page_clone_1
                         .lock()
@@ -75,7 +79,8 @@ fn enable_discover_targets(
                 })
                 .into_future()
                 .and_then(move |(_, s)| Ok((sender, s)))
-                .map_err(|e| ChannelBridgeError::ReceivingError)
+                .map_err(|e| ChannelBridgeError::ReceivingError);
+            r
         });
 
     let send_and_receive = send_and_receive
@@ -242,8 +247,8 @@ fn runner1(
     let chrome_process = Process::new(options).unwrap();
     let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
 
-    let (writer, rx) = future_mpsc::channel(1_024); // writer
-    let (tx1, reader) = future_mpsc::channel(1_024); // reader
+    let (out_side_sink, inner_stream) = future_mpsc::channel(1_024); // writer
+    let (inner_sink, out_side_stream) = future_mpsc::channel(1_024); // reader
 
     let runner = ClientBuilder::new(&web_socket_debugger_url)
         .unwrap()
@@ -255,8 +260,8 @@ fn runner1(
             // type annotations required: cannot resolve `_: std::convert::From<websocket::result::WebSocketError>`
             let writer_inner = sink
                 .sink_from_err::<failure::Error>()
-                .send_all(rx.map_err(|()| ChannelBridgeError::SendingError));
-            let reader_inner = stream.from_err().forward(tx1);
+                .send_all(inner_stream.map_err(|()| ChannelBridgeError::SendingError));
+            let reader_inner = stream.from_err().forward(inner_sink);
             reader_inner.join(writer_inner).from_err()
         });
 
@@ -266,7 +271,7 @@ fn runner1(
             .map(|_| info!("spawned websocket pairs done.")),
     );
 
-    (chrome_process, writer, reader)
+    (chrome_process, out_side_sink, out_side_stream)
 }
 
 #[cfg(test)]

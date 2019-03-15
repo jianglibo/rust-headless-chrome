@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use websocket::message::OwnedMessage;
 use crate::protocol::dom;
+use crate::protocol::page;
 use crate::protocol::page::methods::Navigate;
 use log::*;
 use crate::protocol::target;
@@ -295,6 +296,10 @@ impl<'a> ChromePage {
 
     pub fn enable_discover_method(&mut self) -> MethodBeforSendResult {
         self.create_msg_to_send(target::methods::SetDiscoverTargets { discover: true }, MethodDestination::Browser)
+    }
+
+    pub fn enable_page_notifications(&mut self) -> MethodBeforSendResult {
+        self.create_msg_to_send(page::methods::Enable {}, MethodDestination::Browser)
     }
 
     pub fn match_response_by_call_id(

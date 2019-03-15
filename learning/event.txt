@@ -1,3 +1,5 @@
+ctrl + shift + i
+
 [2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport] send method: {"method":"Target.setDiscoverTargets","id":0,"params":{"discover":true}}
 [2019-03-02T00:04:20Z TRACE headless_chrome::browser::transport::waiting_call_registry] registered 0
 // When I recieve TargetCreatedEvent and target_type is Page, we will call server method: Target.attachToTarget

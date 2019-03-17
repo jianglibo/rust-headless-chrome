@@ -1,13 +1,13 @@
 use crate::protocol;
-use failure;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use websocket::message::OwnedMessage;
 use crate::protocol::dom;
 use crate::protocol::page;
 use crate::protocol::page::methods::Navigate;
-use log::*;
 use crate::protocol::target;
+use failure;
+use log::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use websocket::message::OwnedMessage;
 
 type MethodBeforSendResult = Result<(usize, String, Option<usize>), failure::Error>;
 
@@ -35,17 +35,27 @@ pub enum MethodDestination {
 pub enum ChannelBridgeError {
     // #[fail(display = "invalid toolchain name: {}", name)]
     #[fail(display = "send to error")]
-    SendingError,
+    Sending,
     // #[fail(display = "unknown toolchain version: {}", version)]
     #[fail(display = "receiving error.")]
-    ReceivingError,
+    Receiving,
+    #[fail(display = "ws error.")]
+    Ws(websocket::result::WebSocketError),
 }
 
 impl std::convert::From<futures::sync::mpsc::SendError<websocket::message::OwnedMessage>>
     for ChannelBridgeError
 {
     fn from(t: futures::sync::mpsc::SendError<websocket::message::OwnedMessage>) -> Self {
-        ChannelBridgeError::ReceivingError
+        ChannelBridgeError::Receiving
+    }
+}
+
+impl std::convert::From<websocket::result::WebSocketError>
+    for ChannelBridgeError
+{
+    fn from(t: websocket::result::WebSocketError) -> Self {
+        ChannelBridgeError::Ws(t)
     }
 }
 
@@ -61,14 +71,12 @@ pub enum ChromePageError {
     NoRootNode,
 }
 
-
 #[derive(Debug)]
 pub struct MethodUtil {
     counter: Arc<AtomicUsize>,
 }
 
 impl MethodUtil {
-
     pub fn new() -> Self {
         Self {
             counter: Arc::new(AtomicUsize::new(0)),
@@ -76,23 +84,37 @@ impl MethodUtil {
     }
     // if get response by call_id, it's unnecessary to verify session and target_id.
     fn get_chrome_response(owned_message: &OwnedMessage) -> Option<protocol::Response> {
-        match Self::get_any_message_from_chrome(owned_message) {
-            Some(protocol::Message::Response(browser_response)) => {
-                info!("got chrome response. {:?}", browser_response);
-                Some(browser_response)
-            },
-            Some(protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(target_message_event))) => {
-                let message = target_message_event.params.message;
-                if let Ok(protocol::Message::Response(resp)) = protocol::parse_raw_message(&message) {
-                    info!("got message from target response. {:?}", resp);
-                    Some(resp)
-                } else {
+        let r = Self::get_any_message_from_chrome(owned_message);
+        if let Some(message) = r {
+            match message {
+                protocol::Message::Response(browser_response) => {
+                    info!("got chrome response. {:?}", browser_response);
+                    Some(browser_response)
+                }
+                protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
+                    target_message_event,
+                )) => {
+                    let message = &target_message_event.params.message;
+                    if let Ok(protocol::Message::Response(resp)) =
+                        protocol::parse_raw_message(&message)
+                    {
+                        info!("got message from target response. {:?}", resp);
+                        Some(resp)
+                    } else {
+                        error!("got unknown message: {:?}", target_message_event);
+                        None
+                    }
+                }
+                other => {
+                    error!("got unknown message: {:?}", other);
                     None
                 }
-            },
-            _ => None
+            }
+        } else {
+            None
         }
     }
+    // \"error\":{\"code\":-32601,\"message\":\"\'Page.enable\' wasn\'t found\"},\"id\":1}"
 
     pub fn get_chrome_event(owned_message: &OwnedMessage) -> Option<protocol::Event> {
         if let Some(protocol::Message::Event(browser_event)) =
@@ -172,7 +194,12 @@ impl MethodUtil {
     }
 
     // if you take self, you consume youself.
-    fn create_msg_to_send<C>(&self, method: C, destination: MethodDestination, mid: Option<usize>) -> MethodBeforSendResult
+    fn create_msg_to_send<C>(
+        &self,
+        method: C,
+        destination: MethodDestination,
+        mid: Option<usize>,
+    ) -> MethodBeforSendResult
     where
         C: protocol::Method + serde::Serialize,
     {
@@ -198,13 +225,11 @@ impl MethodUtil {
     }
 }
 
-
-
 #[derive(Debug)]
 pub struct ChromePage {
     pub page_target_info: Option<protocol::target::TargetInfo>,
     pub method_util: Arc<MethodUtil>,
-    pub waiting_call_id: Option<usize>,  // this is direct browser response
+    pub waiting_call_id: Option<usize>, // this is direct browser response
     pub waiting_message_id: Option<usize>, // this is message from target, but is response to user request.
     pub session_id: Option<String>,
     pub root_node: Option<dom::Node>,
@@ -233,24 +258,30 @@ impl<'a> ChromePage {
         Ok(true)
     }
 
-    // when got message {\"method\":\"Target.receivedMessageFromTarget\" from chrome, it has a params field, which has a 'message' field, 
+    // when got message {\"method\":\"Target.receivedMessageFromTarget\" from chrome, it has a params field, which has a 'message' field,
     // it's the response to your early method call.
     pub fn get_document() -> Option<protocol::Response> {
         None
     }
 
-    fn create_msg_to_send<C>(&mut self, method: C, destination: MethodDestination) -> MethodBeforSendResult
+    fn create_msg_to_send<C>(
+        &mut self,
+        method: C,
+        destination: MethodDestination,
+    ) -> MethodBeforSendResult
     where
-        C: protocol::Method + serde::Serialize, {
-            self.method_util.create_msg_to_send(method, destination, None)
-        }
+        C: protocol::Method + serde::Serialize,
+    {
+        self.method_util
+            .create_msg_to_send(method, destination, None)
+    }
 
     pub fn create_attach_method(&mut self) -> MethodBeforSendResult {
         let mut target_id: Option<String> = None;
         if let Some(ti) = &mut self.page_target_info {
             target_id = Some(ti.target_id.clone());
         }
-        
+
         if let Some(ti) = target_id {
             self.create_msg_to_send(
                 target::methods::AttachToTarget {
@@ -266,7 +297,8 @@ impl<'a> ChromePage {
 
     fn create_msg_to_send_with_session_id<C>(&mut self, method: C) -> MethodBeforSendResult
     where
-        C: protocol::Method + serde::Serialize, {
+        C: protocol::Method + serde::Serialize,
+    {
         if let Some(session_id) = &self.session_id {
             self.create_msg_to_send(method, MethodDestination::Target(session_id.clone().into()))
         } else {
@@ -275,17 +307,15 @@ impl<'a> ChromePage {
     }
 
     pub fn query_document_method(&mut self) -> MethodBeforSendResult {
-        self.create_msg_to_send_with_session_id(
-                dom::methods::GetDocument {
-                    depth: Some(0),
-                    pierce: Some(false),
-                })
+        self.create_msg_to_send_with_session_id(dom::methods::GetDocument {
+            depth: Some(0),
+            pierce: Some(false),
+        })
     }
 
     pub fn find_node_method(&'a mut self, selector: &'a str) -> MethodBeforSendResult {
         if let Some(rn) = &self.root_node {
-         self.create_msg_to_send_with_session_id(
-                dom::methods::QuerySelector {
+            self.create_msg_to_send_with_session_id(dom::methods::QuerySelector {
                 node_id: rn.node_id,
                 selector,
             })
@@ -295,7 +325,10 @@ impl<'a> ChromePage {
     }
 
     pub fn enable_discover_method(&mut self) -> MethodBeforSendResult {
-        self.create_msg_to_send(target::methods::SetDiscoverTargets { discover: true }, MethodDestination::Browser)
+        self.create_msg_to_send(
+            target::methods::SetDiscoverTargets { discover: true },
+            MethodDestination::Browser,
+        )
     }
 
     pub fn enable_page_notifications(&mut self) -> MethodBeforSendResult {
@@ -321,7 +354,9 @@ impl<'a> ChromePage {
         call_id: usize,
     ) -> Option<dom::Node> {
         if let Some(response) = self.match_response_by_call_id(owned_message, call_id) {
-            if let Ok(c) = protocol::parse_response::<dom::methods::GetDocumentReturnObject>(response) {
+            if let Ok(c) =
+                protocol::parse_response::<dom::methods::GetDocumentReturnObject>(response)
+            {
                 info!("got document Node: {:?}", c.root);
                 return Some(c.root);
             }
@@ -335,7 +370,9 @@ impl<'a> ChromePage {
         call_id: usize,
     ) -> Option<u16> {
         if let Some(response) = self.match_response_by_call_id(owned_message, call_id) {
-            if let Ok(c) = protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(response) {
+            if let Ok(c) =
+                protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(response)
+            {
                 info!("got query selector Node: {:?}", c);
                 return Some(c.node_id);
             }
@@ -351,14 +388,20 @@ impl<'a> ChromePage {
             if Some(response.call_id) == self.waiting_call_id {
                 return Some(response);
             } else {
-                info!("got response with call_id: {}, but waiting call_id is: {:?}", response.call_id, self.waiting_call_id);
+                info!(
+                    "got response with call_id: {}, but waiting call_id is: {:?}",
+                    response.call_id, self.waiting_call_id
+                );
             }
         }
         None
     }
 
     // return Ok(true) if keeping skip.
-    pub fn is_response_for_attach_page(&mut self, owned_message: &OwnedMessage) -> Result<bool, ()> {
+    pub fn is_response_for_attach_page(
+        &mut self,
+        owned_message: &OwnedMessage,
+    ) -> Result<bool, ()> {
         if let Some(response) = self.match_waiting_call_response(owned_message) {
             if let Some(serde_json::value::Value::Object(value)) = response.result {
                 if let Some(serde_json::value::Value::String(session_id)) = value.get("sessionId") {

@@ -34,6 +34,7 @@ use crate::protocol::target;
 
 
 mod chrome_page;
+mod by_enum;
 use crate::browser_async::chrome_page::{MethodUtil, ChromePage, ChannelBridgeError, ChromePageError};
 
 /// ["Browser" domain](https://chromedevtools.github.io/devtools-protocol/tot/Browser)
@@ -79,20 +80,46 @@ fn enable_discover_targets(
                 })
                 .into_future()
                 .and_then(move |(_, s)| Ok((sender, s)))
-                .map_err(|e| ChannelBridgeError::ReceivingError);
+                .map_err(|e| ChannelBridgeError::Receiving);
             r
         });
+
+    let chrome_page_clone_6 = Arc::clone(&chrome_page);
+    let send_and_receive = send_and_receive
+        .from_err()
+        .and_then(move |(sender, receiver)| {
+            let (_, method_str, _) = chrome_page_clone_6
+                .lock()
+                .unwrap()
+                .enable_page_notifications()
+                .unwrap();
+
+            sender
+                .send(OwnedMessage::Text(method_str))
+                .from_err()
+                .and_then(|sender| {
+                    receiver
+                        .skip_while(move |msg| {
+                            Ok(false)
+                        })
+                        .into_future()
+                        .and_then(move |(_, stream)| Ok((sender, stream)))
+                        .map_err(|e| ChannelBridgeError::Receiving)
+                })
+                .map_err(|_| ChannelBridgeError::Receiving)
+        });
+
 
     let send_and_receive = send_and_receive
         .from_err()
         .and_then(move |(sender, receiver)| {
-            let method_str = chrome_page_clone_2
+            let (_, method_str, _) = chrome_page_clone_2
                 .lock()
                 .unwrap()
                 .create_attach_method()
                 .unwrap();
             sender
-                .send(OwnedMessage::Text(method_str.1))
+                .send(OwnedMessage::Text(method_str))
                 .from_err()
                 .and_then(|sender| {
                     receiver
@@ -102,9 +129,9 @@ fn enable_discover_targets(
                         })
                         .into_future()
                         .and_then(move |(_, stream)| Ok((sender, stream)))
-                        .map_err(|e| ChannelBridgeError::ReceivingError)
+                        .map_err(|e| ChannelBridgeError::Receiving)
                 })
-                .map_err(|_| ChannelBridgeError::ReceivingError)
+                .map_err(|_| ChannelBridgeError::Receiving)
         });
 
     let chrome_page_clone_3 = Arc::clone(&chrome_page);
@@ -138,9 +165,9 @@ fn enable_discover_targets(
                         })
                         .into_future()
                         .and_then(move |(_, stream)| Ok((sender, stream)))
-                        .map_err(|_| ChannelBridgeError::ReceivingError)
+                        .map_err(|_| ChannelBridgeError::Receiving)
                 })
-                .map_err(|_| ChannelBridgeError::ReceivingError)
+                .map_err(|_| ChannelBridgeError::Receiving)
         });
 
 // 
@@ -180,9 +207,9 @@ fn enable_discover_targets(
                                     })
                                     .into_future()
                                     .and_then(move |(_, stream)| Ok((sender, stream)))
-                                    .map_err(|_| ChannelBridgeError::ReceivingError)
+                                    .map_err(|_| ChannelBridgeError::Receiving)
                             })
-                            .map_err(|_| ChannelBridgeError::ReceivingError)
+                            .map_err(|_| ChannelBridgeError::Receiving)
         });
 
 
@@ -193,7 +220,7 @@ fn enable_discover_targets(
             let (_, method_str, option_call_id) = chrome_page_clone_5
                 .lock()
                 .unwrap()
-                .find_node_method("#ddlogin-iframe").unwrap();
+                .find_node_method("#ddlogin").unwrap();
 
             let call_id = option_call_id.unwrap();
             // this send will return Text("{\"id\":3,\"result\":{}}"), Nothing of result.
@@ -211,16 +238,17 @@ fn enable_discover_targets(
                                             "waiting document success. {:?}",
                                             MethodUtil::get_chrome_event(msg)
                                         );
-                                        let resp = chrome_page_clone_5.lock().unwrap().match_document_by_call_id(&msg, call_id);
+                                        let resp = chrome_page_clone_5.lock().unwrap().match_query_selector_by_call_id(&msg, call_id);
                                         let b = !resp.is_some();
                                         info!("query document response: {:?}", resp);
-                                        Ok(b)
+                                        // Ok(b)
+                                        Ok(true)
                                     })
                                     .into_future()
                                     .and_then(move |(_, stream)| Ok((sender, stream)))
-                                    .map_err(|_| ChannelBridgeError::ReceivingError)
+                                    .map_err(|_| ChannelBridgeError::Receiving)
                             })
-                            .map_err(|_| ChannelBridgeError::ReceivingError)
+                            .map_err(|_| ChannelBridgeError::Receiving)
 
         });
 
@@ -260,7 +288,7 @@ fn runner1(
             // type annotations required: cannot resolve `_: std::convert::From<websocket::result::WebSocketError>`
             let writer_inner = sink
                 .sink_from_err::<failure::Error>()
-                .send_all(inner_stream.map_err(|()| ChannelBridgeError::SendingError));
+                .send_all(inner_stream.map_err(|()| ChannelBridgeError::Sending));
             let reader_inner = stream.from_err().forward(inner_sink);
             reader_inner.join(writer_inner).from_err()
         });

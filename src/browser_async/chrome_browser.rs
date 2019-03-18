@@ -115,12 +115,15 @@ impl Stream for ChromeBrowser {
                     trace!("enter sending.");
                     match self.ws_client.as_mut().unwrap().poll_complete() {
                         Ok(Async::Ready(_)) => {
+                            info!("swith to receiving state.");
                             self.state = BrowserState::Receiving;
                         },
                         Ok(Async::NotReady) => {
+                            info!("sending not ready.");
                             return Ok(Async::NotReady);
                         },
                         Err(e) => {
+                            error!("{:?}", e);
                             return Err(e.into());
                         }
                     }

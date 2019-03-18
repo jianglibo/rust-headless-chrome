@@ -6,10 +6,11 @@ use crate::protocol::target;
 use failure;
 use log::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use websocket::message::OwnedMessage;
 
-type MethodBeforSendResult = Result<(usize, String, Option<usize>), failure::Error>;
+pub type MethodBeforSendResult = Result<(usize, String, Option<usize>), failure::Error>;
+
+pub static GLOBAL_METHOD_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(String);
@@ -72,17 +73,9 @@ pub enum ChromePageError {
 }
 
 #[derive(Debug)]
-pub struct MethodUtil {
-    counter: Arc<AtomicUsize>,
-}
+pub struct MethodUtil;
 
 impl MethodUtil {
-    pub fn new() -> Self {
-        Self {
-            counter: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-    // if get response by call_id, it's unnecessary to verify session and target_id.
     fn get_chrome_response(owned_message: &OwnedMessage) -> Option<protocol::Response> {
         let r = Self::get_any_message_from_chrome(owned_message);
         if let Some(message) = r {
@@ -115,6 +108,53 @@ impl MethodUtil {
         }
     }
     // \"error\":{\"code\":-32601,\"message\":\"\'Page.enable\' wasn\'t found\"},\"id\":1}"
+
+    pub fn is_page_event_create(message: protocol::Message) -> Option<protocol::target::TargetInfo> {
+        if let protocol::Message::Event(any_event_from_server) = message
+        {
+            if let protocol::Event::TargetCreated(target_created_event) = any_event_from_server {
+                let target_type = &(target_created_event.params.target_info.target_type);
+                match target_type {
+                    protocol::target::TargetType::Page => {
+                        trace!(
+                            "receive page create event. {:?}",
+                            target_created_event.params.target_info
+                        );
+                        return Some(target_created_event.params.target_info);
+                    }
+                    _ => (),
+                }
+            }
+        }
+        None
+    }
+
+
+    pub fn is_page_attach_event(message: protocol::Message) -> Option<(String, protocol::target::TargetInfo)> {
+                if let protocol::Message::Event(any_event_from_server) = message
+        {
+
+        if let protocol::Event::AttachedToTarget(event) = any_event_from_server
+        {
+            let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
+                event.params;
+            let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
+
+            match target_info.target_type {
+                protocol::target::TargetType::Page => {
+                    info!(
+                        "got attach to page event and sessionId: {}",
+                        attach_to_target_params.session_id
+                    );
+                    return Some((attach_to_target_params.session_id, target_info));
+                }
+                _ => (),
+            }
+        }
+        }
+        None
+    }
+
 
     pub fn get_chrome_event(owned_message: &OwnedMessage) -> Option<protocol::Event> {
         if let Some(protocol::Message::Event(browser_event)) =
@@ -171,16 +211,11 @@ impl MethodUtil {
         None
     }
 
-    // fn create_owned_message<T: std::convert::AsRef<str>>(&self, txt: T) -> OwnedMessage {
-    //     OwnedMessage::Text(txt.as_ref().to_string())
-    // }
-
     fn create_attach_method(
-        &self,
         target_info: &Option<protocol::target::TargetInfo>,
     ) -> MethodBeforSendResult {
         if let Some(ti) = target_info {
-            self.create_msg_to_send(
+            Self::create_msg_to_send(
                 target::methods::AttachToTarget {
                     target_id: &(ti.target_id),
                     flatten: None,
@@ -194,8 +229,7 @@ impl MethodUtil {
     }
 
     // if you take self, you consume youself.
-    fn create_msg_to_send<C>(
-        &self,
+    pub fn create_msg_to_send<C>(
         method: C,
         destination: MethodDestination,
         mid: Option<usize>,
@@ -203,7 +237,7 @@ impl MethodUtil {
     where
         C: protocol::Method + serde::Serialize,
     {
-        let call_id = self.counter.fetch_add(1, Ordering::SeqCst);
+        let call_id = GLOBAL_METHOD_CALL_COUNT.fetch_add(1, Ordering::SeqCst);
         let call = method.to_method_call(call_id);
         let message_text = serde_json::to_string(&call).unwrap();
 
@@ -215,7 +249,7 @@ impl MethodUtil {
                     session_id: Some(session_id.as_str()),
                     message: &message_text,
                 };
-                self.create_msg_to_send(target_method, MethodDestination::Browser, Some(call_id))
+                Self::create_msg_to_send(target_method, MethodDestination::Browser, Some(call_id))
             }
             MethodDestination::Browser => {
                 info!("sending method: {}", message_text);
@@ -228,7 +262,6 @@ impl MethodUtil {
 #[derive(Debug)]
 pub struct ChromePage {
     pub page_target_info: Option<protocol::target::TargetInfo>,
-    pub method_util: Arc<MethodUtil>,
     pub waiting_call_id: Option<usize>, // this is direct browser response
     pub waiting_message_id: Option<usize>, // this is message from target, but is response to user request.
     pub session_id: Option<String>,
@@ -272,8 +305,7 @@ impl<'a> ChromePage {
     where
         C: protocol::Method + serde::Serialize,
     {
-        self.method_util
-            .create_msg_to_send(method, destination, None)
+        MethodUtil::create_msg_to_send(method, destination, None)
     }
 
     pub fn create_attach_method(&mut self) -> MethodBeforSendResult {
@@ -440,7 +472,7 @@ impl<'a> ChromePage {
     pub fn navigate_to(&mut self, url: &str) -> MethodBeforSendResult {
         let c = Navigate { url };
         let md = MethodDestination::Target(self.session_id.clone().unwrap().into());
-        self.method_util.create_msg_to_send(c, md, None)
+        MethodUtil::create_msg_to_send(c, md, None)
     }
 
     pub fn is_page_url_changed(&mut self, owned_message: &OwnedMessage) -> Result<bool, ()> {

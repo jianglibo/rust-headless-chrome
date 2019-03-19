@@ -1,8 +1,9 @@
 use crate::protocol;
 use crate::protocol::page;
+use crate::protocol::dom;
 use crate::browser_async::chrome_browser::{ChromeBrowser};
 use crate::browser_async::dev_tools_method_util::{
-    MethodUtil,MethodDestination, MethodBeforSendResult,
+    MethodUtil,MethodDestination, MethodBeforSendResult, ChromePageError,
 };
 use crate::protocol::page::methods::{Navigate};
 use crate::protocol::target;
@@ -12,11 +13,11 @@ use log::*;
 #[derive(Debug)]
 enum OnePageState {
     WaitingPageCreate,
-    PageCreated,
     WaitingPageAttach,
-    PageAttached,
-    Navigating,
+    WaitingPageEnable(usize),
     WaitingPageLoadEvent,
+    WaitingGetDocument(usize),
+    WaitingNode(String, usize),
     Steady,
 }
 
@@ -26,32 +27,71 @@ pub struct OnePage {
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
     entry_url: &'static str,
+    root_node: Option<dom::Node>,
 }
 
 impl OnePage {
     fn new(stream: ChromeBrowser, entry_url: &'static str) -> Self {
-        Self { stream, state: OnePageState::WaitingPageCreate, target_info: None, session_id: None, entry_url: entry_url }
+        Self { stream, state: OnePageState::WaitingPageCreate, target_info: None, session_id: None, entry_url: entry_url, root_node: None }
     }
 
-    pub fn create_attach_method(&mut self) -> MethodBeforSendResult {
-        MethodUtil::create_msg_to_send(target::methods::AttachToTarget {
+    pub fn attach_to_page(&mut self) {
+        let (_, method_str, _) = MethodUtil::create_msg_to_send(target::methods::AttachToTarget {
                 target_id: &(self.target_info.as_mut().unwrap().target_id),
                 flatten: None,
             },
-            MethodDestination::Browser, None)
+            MethodDestination::Browser, None).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingPageAttach;
     }
 
-    fn create_msg_to_send_with_session_id<C>(&mut self, method: C) -> MethodBeforSendResult
+    fn create_msg_to_send_with_session_id<C>(&self, method: C) -> MethodBeforSendResult
     where
         C: protocol::Method + serde::Serialize,
     {   
-        let session_id = self.session_id.as_mut().unwrap();
+        let session_id = self.session_id.as_ref().unwrap();
         MethodUtil::create_msg_to_send(method, MethodDestination::Target(session_id.clone().into()), None)
     }
 
-    pub fn navigate_to(&mut self, url: &str) -> MethodBeforSendResult {
-        let c = Navigate { url };
-        self.create_msg_to_send_with_session_id(c)
+    pub fn page_enable(&mut self) {
+        let (_, method_str, mid) = self.create_msg_to_send_with_session_id(page::methods::Enable {}).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingPageEnable(mid.unwrap());
+    }
+
+    pub fn navigate_to(&mut self, url: &str) {
+        let (_, method_str, _) = self.create_msg_to_send_with_session_id(Navigate { url }).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingPageLoadEvent;
+    }
+
+    pub fn get_document(&mut self) {
+        let (_, method_str, mid) =  self.create_msg_to_send_with_session_id(dom::methods::GetDocument {
+            depth: Some(0),
+            pierce: Some(false),
+        }).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingGetDocument(mid.unwrap());
+    }
+
+    fn wait_page_load_event_fired(&mut self, value: protocol::Message) {
+        if let Some(receive_message_from_target_params) = MethodUtil::is_page_load_event_fired(value) {
+            if (receive_message_from_target_params.target_id == self.target_info.as_mut().unwrap().target_id) && (receive_message_from_target_params.session_id == *self.session_id.as_mut().unwrap()) {
+                self.get_document();
+            } else {
+                info!("unequal session_id or target_id.");
+            }
+        }
+    }
+
+    pub fn find_node<'a>(&'a mut self, selector: &'a str) {
+        let rn = self.root_node.as_ref().unwrap();
+        let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::QuerySelector {
+            node_id: rn.node_id,
+            selector,
+        }).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingNode(selector.to_string(), mid.unwrap());
     }
 }
 
@@ -61,54 +101,61 @@ impl Future for OnePage {
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
         loop {
-            match try_ready!(self.stream.poll()) {
-                Some(value) => {
+            if let Some(value) = try_ready!(self.stream.poll()) {
                     match &mut self.state {
                         OnePageState::WaitingPageCreate => {
                             if let Some(target_info) = MethodUtil::is_page_event_create(value) {
                                 self.target_info = Some(target_info);
-                                self.state = OnePageState::PageCreated;
+                                self.attach_to_page();
                             }
-                        },
-                        OnePageState::PageCreated => {
-                            let (_, method_str, _) = self.create_attach_method().unwrap();
-                            self.stream.send_message(method_str);
-                            self.state = OnePageState::WaitingPageAttach;
                         },
                         OnePageState::WaitingPageAttach => {
                             if let Some((session_id, target_info)) = MethodUtil::is_page_attach_event(value) {
                                 self.session_id = Some(session_id);
                                 self.target_info = Some(target_info);
-                                self.state = OnePageState::PageAttached;
+                                self.page_enable();
                             }
                         }
-                        OnePageState::PageAttached => {
-                            let (_, method_str, _) = self.create_msg_to_send_with_session_id(page::methods::Enable {}).unwrap();
-                            self.stream.send_message(method_str);
-                            self.state = OnePageState::Navigating;
-                        }
-                        OnePageState::Navigating => {
-                            let (_, method_str, _) = self.navigate_to(self.entry_url).unwrap();
-                            self.stream.send_message(method_str);
-                            self.state = OnePageState::WaitingPageLoadEvent;
+                        OnePageState::WaitingPageEnable(mid) => {
+                            if MethodUtil::match_chrome_response(value, mid).is_some() {
+                                self.navigate_to(self.entry_url);
+                            }
                         }
                         OnePageState::WaitingPageLoadEvent => {
-                            if let Some(receive_message_from_target_params) = MethodUtil::is_page_load_event_fired(value) {
-                                if (receive_message_from_target_params.target_id == self.target_info.as_mut().unwrap().target_id) && (receive_message_from_target_params.session_id == *self.session_id.as_mut().unwrap()) {
-                                    self.state = OnePageState::Steady;
+                            self.wait_page_load_event_fired(value);
+                        }
+                        OnePageState::WaitingGetDocument(mid) => {
+                            if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                                if let Ok(c) =
+                                    protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)
+                                {
+                                    info!("got document Node: {:?}", c.root);
+                                    self.root_node = Some(c.root);
+                                    self.find_node("#ddlogin");
                                 } else {
-                                    info!("unequal session_id or target_id.");
+                                    return Err(ChromePageError::NoRootNode.into());
                                 }
                             }
+                        }
+                        OnePageState::WaitingNode(selector, mid) => {
+                            if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                                info!("----------got ddlogin Node: {:?}", resp);
+                                self.state = OnePageState::Steady;
+                            }
+                            // match selector {
+                            //     "#ddlogin" => {
+                            //         info!("----------got ddlogin Node: {:?}", value);
+                            //     }
+                            // }
                         }
                         _ => {
                             trace!("receive message: {:?}", value);
                         },
                     }
-                },
-                None => (),
-            };
-        }
+                } else {
+                    error!("got None, was stream ended?");
+                }
+            }
     }
 }
 

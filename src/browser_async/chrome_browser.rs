@@ -88,12 +88,24 @@ impl Stream for ChromeBrowser {
                     self.state = BrowserState::StartSend(md);
                 }
                 BrowserState::Receiving => {
-                    if let Ok(Async::Ready(Some(message))) = self.ws_client.as_mut().unwrap().poll() {
-                        if let OwnedMessage::Text(msg) = message {
-                            let parsed_message = protocol::parse_raw_message(&msg);
-                            return Ok(Async::Ready(Some(parsed_message.unwrap())));
-                        } else {
-                            error!("got unknown message: {:?}", message);
+                    match self.ws_client.as_mut().unwrap().poll() {
+                        Ok(Async::Ready(Some(message))) => {
+                            if let OwnedMessage::Text(msg) = message {
+                                let parsed_message = protocol::parse_raw_message(&msg);
+                                trace!("got message (every message): {:?}", parsed_message);
+                                return Ok(Async::Ready(Some(parsed_message.unwrap())));
+                            } else {
+                                error!("got unknown message: {:?}", message);
+                            }
+                        }
+                        Ok(Async::Ready(None)) => {
+                            return Ok(Async::Ready(None));
+                        }
+                        Ok(Async::NotReady) => {
+                            return Ok(Async::NotReady);
+                        }
+                        Err(e) => {
+                            return Err(e.into());
                         }
                     }
                 },
@@ -115,7 +127,7 @@ impl Stream for ChromeBrowser {
                     trace!("enter sending.");
                     match self.ws_client.as_mut().unwrap().poll_complete() {
                         Ok(Async::Ready(_)) => {
-                            info!("swith to receiving state.");
+                            info!("switch to receiving state.");
                             self.state = BrowserState::Receiving;
                         },
                         Ok(Async::NotReady) => {

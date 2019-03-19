@@ -74,6 +74,45 @@ pub struct MethodUtil;
 
 impl MethodUtil {
 
+    pub fn match_chrome_response(message: protocol::Message, mid: &usize) -> Option<protocol::Response> {
+        if let Some(resp) = Self::get_chrome_response(message) {
+            if &resp.call_id == mid {
+                trace!("got response, call_id: {:?}", mid);
+                return Some(resp);
+            } else {
+                trace!("waiting for response, call_id: {:?}", mid);
+            }
+        } else {
+            trace!("waiting for response, call_id: {:?}", mid);
+        }
+        None
+    }
+    pub fn get_chrome_response(message: protocol::Message) -> Option<protocol::Response> {
+            match message {
+                protocol::Message::Response(browser_response) => {
+                    info!("got chrome response. {:?}", browser_response);
+                    return Some(browser_response);
+                }
+                protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
+                    target_message_event,
+                )) => {
+                    let message_field = &target_message_event.params.message;
+                    if let Ok(protocol::Message::Response(resp)) =
+                        protocol::parse_raw_message(&message_field)
+                    {
+                        info!("got message from target response. {:?}", resp);
+                        return Some(resp);
+                    } else {
+                        error!("got unknown message: {:?}", target_message_event);
+                    }
+                }
+                other => {
+                    error!("got unknown message: {:?}", other);
+                }
+            }
+            None
+    }
+
     pub fn is_received_message_from_target_event(message: protocol::Message) -> Option<protocol::target::events::ReceivedMessageFromTargetParams> {
             match message {
                 protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
@@ -82,7 +121,7 @@ impl MethodUtil {
                     return Some(target_message_event.params);
                 }
                 other => {
-                    error!("got unknown message: {:?}", other);
+                    info!("got ignored event message: {:?}", other);
                 }
             }
             None
@@ -180,7 +219,7 @@ impl MethodUtil {
                 Self::create_msg_to_send(target_method, MethodDestination::Browser, Some(call_id))
             }
             MethodDestination::Browser => {
-                info!("sending method: {}", message_text);
+                info!("sending method call_id: {:?}, {:?}", call_id, message_text);
                 Ok((call_id, message_text, mid))
             }
         }
@@ -243,37 +282,6 @@ impl MethodUtil {
     // }
 
 
-    // fn get_chrome_response(owned_message: &OwnedMessage) -> Option<protocol::Response> {
-    //     let r = Self::get_any_message_from_chrome(owned_message);
-    //     if let Some(message) = r {
-    //         match message {
-    //             protocol::Message::Response(browser_response) => {
-    //                 info!("got chrome response. {:?}", browser_response);
-    //                 Some(browser_response)
-    //             }
-    //             protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
-    //                 target_message_event,
-    //             )) => {
-    //                 let message = &target_message_event.params.message;
-    //                 if let Ok(protocol::Message::Response(resp)) =
-    //                     protocol::parse_raw_message(&message)
-    //                 {
-    //                     info!("got message from target response. {:?}", resp);
-    //                     Some(resp)
-    //                 } else {
-    //                     error!("got unknown message: {:?}", target_message_event);
-    //                     None
-    //                 }
-    //             }
-    //             other => {
-    //                 error!("got unknown message: {:?}", other);
-    //                 None
-    //             }
-    //         }
-    //     } else {
-    //         None
-    //     }
-    // }
 
 // #[derive(Debug)]
 // pub struct ChromePage {

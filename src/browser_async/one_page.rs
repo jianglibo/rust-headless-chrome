@@ -7,6 +7,7 @@ use crate::browser_async::dev_tools_method_util::{
 };
 use crate::protocol::page::methods::{Navigate};
 use crate::protocol::target;
+use crate::browser::tab::element::{Element};
 use websocket::futures::{Async, Future, Poll, Stream};
 use log::*;
 
@@ -19,6 +20,7 @@ enum OnePageState {
     WaitingGetDocument(usize),
     WaitingNode(String, usize),
     WaitingDescribeNode(Option<String>, usize),
+    WaitingRemoteObject(dom::NodeId, String, usize),
     Consuming,
 }
 
@@ -93,6 +95,14 @@ impl OnePage {
         }).unwrap();
         self.stream.send_message(method_str);
         self.state = OnePageState::WaitingNode(selector.to_string(), mid.unwrap());
+    }
+
+    pub fn find_element(&mut self, selector: String, backend_node_id: dom::NodeId) {
+        let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::ResolveNode {
+            backend_node_id: Some(backend_node_id),
+        }).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingRemoteObject(backend_node_id, selector, mid.unwrap());
     }
 
     pub fn describe_node(&mut self, selector: Option<String>, node_id: dom::NodeId) {
@@ -172,9 +182,26 @@ impl Stream for OnePage {
                                 if let Ok(v)  = protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
                                     trace!("----------got describe Node: {:?}", v.node);
                                     let maybe_selector_cloned = maybe_selector.clone();
-                                    self.state = OnePageState::Consuming;
+                                    // self.state = OnePageState::Consuming;
+                                    self.find_element(maybe_selector_cloned.clone().unwrap(), v.node.backend_node_id);
                                     return Ok(Async::Ready(Some(PageMessage::FindNode(maybe_selector_cloned, v.node))));
                                 }
+                            }
+                        }
+                        OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
+                            if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                                if let Ok(v)  = protocol::parse_response::<dom::methods::ResolveNodeReturnObject>(resp) {
+                                    self.state = OnePageState::Consuming;
+                                    // let element = Element {
+                                    //     remote_object_id: v.object.object_id.unwrap(),
+                                    //     backend_node_id: *backend_node_id,
+                                    //     parent: &self,
+                                    //     found_via_selector: &selector,
+                                    // };
+                                    // return Ok(Async::Ready(Some(PageMessage::FindNode(maybe_selector_cloned, v.node))));
+                                }
+                                // info!("got remote object: {:?}", resp);
+                                self.state = OnePageState::Consuming;
                             }
                         }
                         _ => {

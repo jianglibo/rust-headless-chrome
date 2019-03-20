@@ -35,14 +35,17 @@ impl Future for MyPage {
                         MyPageState::Start => {
                             if let PageMessage::DocumentAvailable = value {
                                 self.state = MyPageState::WaitingNode;
-                                self.chrome_page.find_node("#ddlogin");
+                                // self.chrome_page.find_node("#ddlogin");
+                                self.chrome_page.find_node("#mw-content-text > div > table.infobox.vevent");
                             }
                         }
                         MyPageState::WaitingNode => {
                             info!("waiting node.");
                             if let PageMessage::FindNode(maybe_selector, nd) = value {
-                                if Some("#ddlogin".to_string()) == maybe_selector {
+                                // if Some("#ddlogin".to_string()) == maybe_selector {
+                                if Some("#mw-content-text > div > table.infobox.vevent".to_string()) == maybe_selector {
                                     info!("got node {:?}", nd);
+                                    self.state = MyPageState::Consuming;
                                 }
                             }
                         }
@@ -60,20 +63,15 @@ impl Future for MyPage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::page::methods::Navigate;
-    use crate::protocol::page::ScreenshotFormat;
-    use futures::stream::Stream;
     use tokio;
-    use tokio::runtime::Runtime;
-    use websocket::futures::{Async, Future, Poll, Sink};
-    use websocket::r#async::client::{Client, ClientNew};
-    use websocket::r#async::TcpStream;
-    use websocket::ClientBuilder;
-    use websocket::Message;
+    use websocket::futures::{Future};
 
-    use crate::browser::process::{LaunchOptions, LaunchOptionsBuilder, Process};
+    // const ENTERY: &'static str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+    const ENTERY: &'static str = "https://en.wikipedia.org/wiki/WebKit";
+    // https://en.wikipedia.org/wiki/WebKit
+    // #mw-content-text > div > table.infobox.vevent
 
-    const ENTERY: &'static str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+
 
     #[test]
     fn t_by_enum() {

@@ -18,7 +18,8 @@ enum OnePageState {
     WaitingPageLoadEvent,
     WaitingGetDocument(usize),
     WaitingNode(String, usize),
-    Steady,
+    WaitingDescribeNode(Option<String>, usize),
+    Consuming,
 }
 
 pub struct OnePage {
@@ -31,7 +32,7 @@ pub struct OnePage {
 }
 
 impl OnePage {
-    fn new(stream: ChromeBrowser, entry_url: &'static str) -> Self {
+    pub fn new(stream: ChromeBrowser, entry_url: &'static str) -> Self {
         Self { stream, state: OnePageState::WaitingPageCreate, target_info: None, session_id: None, entry_url: entry_url, root_node: None }
     }
 
@@ -93,13 +94,31 @@ impl OnePage {
         self.stream.send_message(method_str);
         self.state = OnePageState::WaitingNode(selector.to_string(), mid.unwrap());
     }
+
+    pub fn describe_node(&mut self, selector: Option<String>, node_id: dom::NodeId) {
+        let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::DescribeNode {
+                node_id: Some(node_id),
+                backend_node_id: None,
+                depth: Some(100),
+            }).unwrap();
+        self.stream.send_message(method_str);
+        self.state = OnePageState::WaitingDescribeNode(selector, mid.unwrap());
+    }
 }
 
-impl Future for OnePage {
-    type Item = ();
+
+#[derive(Debug)]
+pub enum PageMessage {
+    DocumentAvailable,
+    FindNode(Option<String>, dom::Node),
+    MessageAvailable(protocol::Message),
+} 
+
+impl Stream for OnePage {
+    type Item = PageMessage;
     type Error = failure::Error;
 
-    fn poll(&mut self) -> Poll<(), Self::Error> {
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             if let Some(value) = try_ready!(self.stream.poll()) {
                     match &mut self.state {
@@ -131,7 +150,7 @@ impl Future for OnePage {
                                 {
                                     info!("got document Node: {:?}", c.root);
                                     self.root_node = Some(c.root);
-                                    self.find_node("#ddlogin");
+                                    return Ok(Async::Ready(Some(PageMessage::DocumentAvailable)));
                                 } else {
                                     return Err(ChromePageError::NoRootNode.into());
                                 }
@@ -139,55 +158,33 @@ impl Future for OnePage {
                         }
                         OnePageState::WaitingNode(selector, mid) => {
                             if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
-                                info!("----------got ddlogin Node: {:?}", resp);
-                                self.state = OnePageState::Steady;
+                                let selector_cloned = Some(selector.clone());
+                                // let backend_node_id = self.describe_node(node_id)?.backend_node_id;
+                                if let Ok(v)  = protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
+                                    self.describe_node(selector_cloned, v.node_id);
+                                }
                             }
-                            // match selector {
-                            //     "#ddlogin" => {
-                            //         info!("----------got ddlogin Node: {:?}", value);
-                            //     }
-                            // }
+                        }
+                        OnePageState::WaitingDescribeNode(maybe_selector, mid) => {
+                            if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                                 trace!("----------got describe Node resp: {:?}", resp);
+                                // let backend_node_id = self.describe_node(node_id)?.backend_node_id;
+                                if let Ok(v)  = protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
+                                    trace!("----------got describe Node: {:?}", v.node);
+                                    let maybe_selector_cloned = maybe_selector.clone();
+                                    self.state = OnePageState::Consuming;
+                                    return Ok(Async::Ready(Some(PageMessage::FindNode(maybe_selector_cloned, v.node))));
+                                }
+                            }
                         }
                         _ => {
                             trace!("receive message: {:?}", value);
+                            return Ok(Async::Ready(Some(PageMessage::MessageAvailable(value))));
                         },
                     }
                 } else {
                     error!("got None, was stream ended?");
                 }
             }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::protocol::page::methods::Navigate;
-    use crate::protocol::page::ScreenshotFormat;
-    use futures::stream::Stream;
-    use tokio;
-    use tokio::runtime::Runtime;
-    use websocket::futures::{Async, Future, Poll, Sink};
-    use websocket::r#async::client::{Client, ClientNew};
-    use websocket::r#async::TcpStream;
-    use websocket::ClientBuilder;
-    use websocket::Message;
-
-    use crate::browser::process::{LaunchOptions, LaunchOptionsBuilder, Process};
-
-    const ENTERY: &'static str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-
-    #[test]
-    fn t_by_enum() {
-        ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
-        env_logger::init();
-
-        let fib = ChromeBrowser::new();
-        let display = OnePage::new(fib, ENTERY);
-
-        tokio::run(display.map_err(|_| ()));
-
-        // let mut rt = Runtime::new().unwrap();
-        // rt.shutdown_on_idle().wait().unwrap();
     }
 }

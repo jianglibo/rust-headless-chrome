@@ -74,6 +74,8 @@ pub struct MethodUtil;
 
 impl MethodUtil {
 
+    // protocol::Response has three field, call_id => id, result, error
+    // protocol::Message maybe is an Event, a response, event wrapped a response.
     pub fn match_chrome_response(message: protocol::Message, mid: &usize) -> Option<protocol::Response> {
         if let Some(resp) = Self::get_chrome_response(message) {
             if &resp.call_id == mid {

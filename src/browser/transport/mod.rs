@@ -25,7 +25,6 @@ use web_socket_connection::WebSocketConnection;
 
 mod waiting_call_registry;
 mod web_socket_connection;
-mod transport_async;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(String);

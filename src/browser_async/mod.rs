@@ -1,5 +1,6 @@
 mod dev_tools_method_util;
 mod chrome_browser;
+mod my_page;
 mod one_page;
 
 

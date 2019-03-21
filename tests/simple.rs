@@ -1,9 +1,19 @@
 #![allow(unused_variables)]
 
-use headless_chrome::{protocol::page::ScreenshotFormat, Browser, LaunchOptionsBuilder, Tab};
+use std::sync::Arc;
+
+use base64;
 use log::*;
 use rand::prelude::*;
-use std::sync::Arc;
+
+use headless_chrome::browser::tab::RequestInterceptionDecision;
+use headless_chrome::protocol::network::methods::RequestPattern;
+use headless_chrome::{
+    browser::default_executable, browser::tab::Tab, protocol::page::ScreenshotFormat, Browser,
+    LaunchOptionsBuilder,
+};
+use std::thread::sleep;
+use std::time::Duration;
 
 mod logging;
 mod server;
@@ -20,7 +30,13 @@ fn dumb_server(data: &'static str) -> (server::Server, Browser, Arc<Tab>) {
 }
 
 fn dumb_client(server: &server::Server) -> (Browser, Arc<Tab>) {
-    let browser = Browser::new(LaunchOptionsBuilder::default().build().unwrap()).unwrap();
+    let browser = Browser::new(
+        LaunchOptionsBuilder::default()
+            .path(Some(default_executable().unwrap()))
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
     let tab = browser.wait_for_initial_tab().unwrap();
     tab.navigate_to(&format!("http://127.0.0.1:{}", server.port()))
         .unwrap();
@@ -81,6 +97,17 @@ fn decode_png(i: &[u8]) -> Result<Vec<u8>, failure::Error> {
     Ok(buf)
 }
 
+fn sum_of_errors(inp: &[u8], fixture: &[u8]) -> u32 {
+    inp.chunks_exact(fixture.len())
+        .map(|c| {
+            c.iter()
+                .zip(fixture)
+                .map(|(b, e)| (i32::from(*b) - i32::from(*e)).pow(2) as u32)
+                .sum::<u32>()
+        })
+        .sum()
+}
+
 #[test]
 fn capture_screenshot_png() -> Result<(), failure::Error> {
     logging::enable_logging();
@@ -89,7 +116,7 @@ fn capture_screenshot_png() -> Result<(), failure::Error> {
     // Check that the top-left pixel on the page has the background color set in simple.html
     let png_data = tab.capture_screenshot(ScreenshotFormat::PNG, None, true)?;
     let buf = decode_png(&png_data[..])?;
-    assert_eq!(buf[0..4], [0x11, 0x22, 0x33, 0xff][..]);
+    assert!(sum_of_errors(&buf[0..4], &[0x11, 0x22, 0x33, 0xff]) < 5);
     Ok(())
 }
 
@@ -103,7 +130,7 @@ fn capture_screenshot_element() -> Result<(), failure::Error> {
         .capture_screenshot(ScreenshotFormat::PNG)?;
     let buf = decode_png(&png_data[..])?;
     for i in 0..buf.len() / 4 {
-        assert_eq!(buf[i * 4..(i + 1) * 4], [0x33, 0x22, 0x11, 0xff][..]);
+        assert!(sum_of_errors(&buf[i * 4..(i + 1) * 4], &[0x33, 0x22, 0x11, 0xff]) < 5);
     }
     Ok(())
 }
@@ -117,7 +144,7 @@ fn capture_screenshot_element_box() -> Result<(), failure::Error> {
     let png_data =
         tab.capture_screenshot(ScreenshotFormat::PNG, Some(pox.border_viewport()), true)?;
     let buf = decode_png(&png_data[..])?;
-    assert_eq!(buf[0..4], [0x22, 0x11, 0x33, 0xff][..]);
+    assert!(dbg!(sum_of_errors(&buf[0..4], &[0x22, 0x11, 0x33, 0xff])) < 15);
     Ok(())
 }
 
@@ -129,14 +156,17 @@ fn capture_screenshot_jpeg() -> Result<(), failure::Error> {
     let jpg_data = tab.capture_screenshot(ScreenshotFormat::JPEG(Some(100)), None, true)?;
     let mut decoder = jpeg_decoder::Decoder::new(&jpg_data[..]);
     let buf = decoder.decode().unwrap();
-    // Check that the total compression error is small-ish compared to the expected
-    // pixel color
-    let err = buf
-        .iter()
-        .zip(&[0x11, 0x22, 0x33])
-        .map(|(b, e)| (i32::from(*b) - e).pow(2) as u32)
-        .sum::<u32>();
-    assert!(err < 5);
+    assert!(sum_of_errors(&buf[0..4], &[0x11, 0x22, 0x33]) < 5);
+    Ok(())
+}
+
+#[test]
+fn test_print_file_to_pdf() -> Result<(), failure::Error> {
+    logging::enable_logging();
+    let (_, browser, tab) = dumb_server(include_str!("./pdfassets/index.html"));
+    let local_pdf = tab.wait_until_navigated()?.print_to_pdf(None)?;
+    assert_eq!(true, local_pdf.len() > 1000); // an arbitrary size
+    assert!(local_pdf.starts_with(b"%PDF"));
     Ok(())
 }
 
@@ -148,6 +178,53 @@ fn get_box_model() -> Result<(), failure::Error> {
     // Check that the div has exactly the dimensions we set in simple.html
     assert_eq!(pox.width, 3 + 100 + 3);
     assert_eq!(pox.height, 3 + 20 + 3);
+    Ok(())
+}
+
+#[test]
+fn box_model_geometry() -> Result<(), failure::Error> {
+    logging::enable_logging();
+    let (_, browser, tab) = dumb_server(include_str!("simple.html"));
+    let center = tab.wait_for_element("div#position-test")?.get_box_model()?;
+    let within = tab.wait_for_element("div#within")?.get_box_model()?;
+    let above = tab
+        .wait_for_element("div#strictly-above")?
+        .get_box_model()?;
+    let below = tab
+        .wait_for_element("div#strictly-below")?
+        .get_box_model()?;
+    let left = tab.wait_for_element("div#strictly-left")?.get_box_model()?;
+    let right = tab
+        .wait_for_element("div#strictly-right")?
+        .get_box_model()?;
+
+    assert!(above.content.strictly_above(&center.content));
+    assert!(above.content.above(&center.content));
+    assert!(above.margin.above(&center.content));
+    assert!(!above.margin.strictly_above(&center.content));
+    assert!(above.content.within_horizontal_bounds_of(&center.content));
+    assert!(!above.content.within_vertical_bounds_of(&center.content));
+
+    assert!(below.content.strictly_below(&center.content));
+    assert!(below.content.below(&center.content));
+    assert!(below.margin.below(&center.content));
+    assert!(!below.margin.strictly_below(&center.content));
+
+    assert!(left.content.strictly_left_of(&center.content));
+    assert!(left.content.left_of(&center.content));
+    assert!(left.margin.left_of(&center.content));
+    assert!(!left.margin.strictly_left_of(&center.content));
+    assert!(!left.content.within_horizontal_bounds_of(&center.content));
+    assert!(left.content.within_vertical_bounds_of(&center.content));
+
+    assert!(right.content.strictly_right_of(&center.content));
+    assert!(right.content.right_of(&center.content));
+    assert!(right.margin.right_of(&center.content));
+    assert!(!right.margin.strictly_right_of(&center.content));
+
+    assert!(within.content.within_bounds_of(&center.content));
+    assert!(!center.content.within_bounds_of(&within.content));
+
     Ok(())
 }
 
@@ -181,5 +258,152 @@ fn reload() -> Result<(), failure::Error> {
         .find(|n| n.node_value == "1")
         .is_some());
     // TODO test effect of scriptEvaluateOnLoad
+    Ok(())
+}
+
+#[test]
+fn find_elements() -> Result<(), failure::Error> {
+    logging::enable_logging();
+    let (server, browser, tab) = dumb_server(include_str!("simple.html"));
+    let divs = tab.wait_for_elements("div")?;
+    assert_eq!(8, divs.len());
+    Ok(())
+}
+
+#[test]
+fn set_request_interception() -> Result<(), failure::Error> {
+    logging::enable_logging();
+    let server = server::Server::with_dumb_html(include_str!(
+        "coverage_fixtures/basic_page_with_js_scripts.html"
+    ));
+
+    let browser = Browser::new(
+        LaunchOptionsBuilder::default()
+            .path(Some(default_executable().unwrap()))
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+
+    let tab = browser.wait_for_initial_tab().unwrap();
+
+    //    tab.call_method(network::methods::Enable{})?;
+
+    let patterns = vec![
+        RequestPattern {
+            url_pattern: None,
+            resource_type: None,
+            interception_stage: Some("HeadersReceived"),
+        },
+        RequestPattern {
+            url_pattern: None,
+            resource_type: None,
+            interception_stage: Some("Request"),
+        },
+    ];
+
+    tab.enable_request_interception(
+        &patterns,
+        Box::new(|transport, session_id, intercepted| {
+            if intercepted.request.url.ends_with(".js") {
+                let js_body = r#"document.body.appendChild(document.createElement("hr"));"#;
+                let js_response = tiny_http::Response::new(
+                    200.into(),
+                    vec![tiny_http::Header::from_bytes(
+                        &b"Content-Type"[..],
+                        &b"application/javascript"[..],
+                    )
+                    .unwrap()],
+                    js_body.as_bytes(),
+                    Some(js_body.len()),
+                    None,
+                );
+
+                let mut wrapped_writer = Vec::new();
+                js_response
+                    .raw_print(&mut wrapped_writer, (1, 2).into(), &[], false, None)
+                    .unwrap();
+
+                let base64_response = base64::encode(&wrapped_writer);
+
+                RequestInterceptionDecision::Response(base64_response)
+            } else {
+                RequestInterceptionDecision::Continue
+            }
+        }),
+    )?;
+
+    // ignore cache:
+    tab.navigate_to(&format!("http://127.0.0.1:{}", server.port()))
+        .unwrap();
+
+    tab.wait_until_navigated()?;
+
+    // There are two JS scripts that get loaded via network, they both append an element like this:
+    assert_eq!(2, tab.wait_for_elements("hr")?.len());
+
+    Ok(())
+}
+
+#[test]
+fn incognito_contexts() -> Result<(), failure::Error> {
+    logging::enable_logging();
+    let (server, browser, tab) = dumb_server(include_str!("simple.html"));
+
+    let incognito_context = browser.new_context()?;
+    let incognito_tab: Arc<Tab> = incognito_context.new_tab()?;
+    let tab_context_id = incognito_tab.get_target_info()?.browser_context_id.unwrap();
+
+    assert_eq!(incognito_context.get_id(), tab_context_id);
+    assert_eq!(
+        incognito_context.get_tabs()?[0].get_target_id(),
+        incognito_tab.get_target_id()
+    );
+    Ok(())
+}
+
+#[test]
+fn get_script_source() -> Result<(), failure::Error> {
+    logging::enable_logging();
+    let server = server::file_server("tests/coverage_fixtures");
+    let browser = Browser::new(
+        LaunchOptionsBuilder::default()
+            .path(Some(default_executable().unwrap()))
+            .headless(false)
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+
+    let tab: Arc<Tab> = browser.wait_for_initial_tab()?;
+
+    tab.enable_profiler()?;
+    tab.start_js_coverage()?;
+
+    tab.navigate_to(&format!(
+        "{}/basic_page_with_js_scripts.html",
+        &server.url()
+    ))?;
+
+    tab.wait_until_navigated()?;
+
+    sleep(Duration::from_millis(100));
+
+    let script_coverages = tab.take_precise_js_coverage()?;
+
+    tab.enable_debugger()?;
+
+    let contents = tab.get_script_source(&script_coverages[0].script_id)?;
+    assert_eq!(
+        include_str!("coverage_fixtures/coverage_fixture1.js"),
+        contents
+    );
+
+    let contents = tab.get_script_source(&script_coverages[1].script_id)?;
+    assert_eq!(
+        include_str!("coverage_fixtures/coverage_fixture2.js"),
+        contents
+    );
+
     Ok(())
 }

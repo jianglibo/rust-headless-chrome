@@ -5,7 +5,7 @@ pub type NodeId = u16;
 
 pub type NodeAttributes = HashMap<String, String>;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     pub node_id: NodeId,
@@ -41,7 +41,7 @@ pub struct Node {
     pub is_svg: Option<bool>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BackendNode {
     node_type: NodeId,
@@ -49,7 +49,7 @@ pub struct BackendNode {
     backend_node_id: NodeId,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum PseudoType {
     FirstLine,
@@ -69,7 +69,7 @@ pub enum PseudoType {
     InputListButton,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum ShadowRootType {
     UserAgent,
@@ -217,6 +217,22 @@ pub mod methods {
     impl<'a> Method for QuerySelector<'a> {
         const NAME: &'static str = "DOM.querySelector";
         type ReturnObject = QuerySelectorReturnObject;
+    }
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct QuerySelectorAll<'a> {
+        pub node_id: super::NodeId,
+        pub selector: &'a str,
+    }
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct QuerySelectorAllReturnObject {
+        pub node_ids: Vec<super::NodeId>,
+    }
+    impl<'a> Method for QuerySelectorAll<'a> {
+        const NAME: &'static str = "DOM.querySelectorAll";
+        type ReturnObject = QuerySelectorAllReturnObject;
     }
 
     #[derive(Debug, Deserialize)]

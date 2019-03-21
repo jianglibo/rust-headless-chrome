@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Frame {
     pub id: String,
@@ -43,13 +43,48 @@ pub enum ScreenshotFormat {
     PNG,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintToPdfOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub landscape: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_header_footer: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub print_background: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paper_width: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paper_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub margin_top: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub margin_bottom: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub margin_left: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub margin_right: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_ranges: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_invalid_page_ranges: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header_template: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub footer_template: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefer_css_page_size: Option<bool>,
+}
+
 pub mod events {
     use serde::Deserialize;
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct LifecycleEvent {
         pub params: LifecycleParams,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct LifecycleParams {
         pub frame_id: String,
@@ -58,31 +93,31 @@ pub mod events {
         pub timestamp: f32,
     }
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FrameStartedLoadingEvent {
         pub params: FrameStartedLoadingParams,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct FrameStartedLoadingParams {
         pub frame_id: String,
     }
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FrameNavigatedEvent {
         pub params: FrameNavigatedParams,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct FrameNavigatedParams {
         pub frame: super::Frame,
     }
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FrameStoppedLoadingEvent {
         pub params: FrameStoppedLoadingParams,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct FrameStoppedLoadingParams {
         pub frame_id: String,
@@ -90,6 +125,7 @@ pub mod events {
 }
 
 pub mod methods {
+    use super::PrintToPdfOptions;
     use crate::protocol::Method;
     use serde::{Deserialize, Serialize};
 
@@ -111,6 +147,22 @@ pub mod methods {
     impl Method for CaptureScreenshot {
         const NAME: &'static str = "Page.captureScreenshot";
         type ReturnObject = CaptureScreenshotReturnObject;
+    }
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct PrintToPdf {
+        #[serde(flatten)]
+        pub options: Option<PrintToPdfOptions>,
+    }
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct PrintToPdfReturnObject {
+        pub data: String,
+    }
+    impl Method for PrintToPdf {
+        const NAME: &'static str = "Page.printToPDF";
+        type ReturnObject = PrintToPdfReturnObject;
     }
 
     #[derive(Serialize, Debug)]

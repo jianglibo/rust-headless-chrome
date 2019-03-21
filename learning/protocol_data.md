@@ -12,3 +12,5 @@ http://localhost:9222/json
    "webSocketDebuggerUrl": "ws://localhost:9222/devtools/page/F6E874EA9CEDB6682EE90EF6877B7318"
 }
 ```
+
+git pull https://github.com/atroche/rust-headless-chrome.git

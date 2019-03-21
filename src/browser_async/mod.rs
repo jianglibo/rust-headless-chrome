@@ -2,6 +2,9 @@ mod dev_tools_method_util;
 mod chrome_browser;
 mod my_page;
 mod one_page;
+mod element_async;
+mod point_async;
+mod keys_async;
 
 
 // pub use crate::protocol::browser::methods::VersionInformationReturnObject;

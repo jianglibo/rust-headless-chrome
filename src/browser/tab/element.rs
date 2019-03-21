@@ -6,6 +6,7 @@ use crate::protocol::dom;
 use crate::protocol::page;
 use crate::protocol::runtime;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 #[derive(Debug, Copy, Clone)]
 pub struct ElementQuad {
@@ -48,6 +49,101 @@ impl ElementQuad {
     /// The width divided by the height
     pub fn aspect_ratio(&self) -> f64 {
         self.width() / self.height()
+    }
+
+    /// The most left (smallest) x-coordinate
+    pub fn most_left(&self) -> f64 {
+        self.top_right
+            .x
+            .min(self.top_left.x)
+            .min(self.bottom_right.x)
+            .min(self.bottom_left.x)
+    }
+
+    /// The most right (largest) x-coordinate
+    pub fn most_right(&self) -> f64 {
+        self.top_right
+            .x
+            .max(self.top_left.x)
+            .max(self.bottom_right.x)
+            .max(self.bottom_left.x)
+    }
+
+    /// The most top (smallest) y-coordinate
+    pub fn most_top(&self) -> f64 {
+        self.top_right
+            .y
+            .min(self.top_left.y)
+            .min(self.bottom_right.y)
+            .min(self.bottom_left.y)
+    }
+
+    /// The most bottom (largest) y-coordinate
+    fn most_bottom(&self) -> f64 {
+        self.top_right
+            .y
+            .max(self.top_left.y)
+            .max(self.bottom_right.y)
+            .max(self.bottom_left.y)
+    }
+
+    /// If the most bottom point of `self` is above the most top point of `other`
+    pub fn strictly_above(&self, other: &Self) -> bool {
+        self.most_bottom() < other.most_top()
+    }
+
+    /// If the most bottom point of `self` is above or on the same line as the
+    /// most top point of `other`
+    pub fn above(&self, other: &Self) -> bool {
+        self.most_bottom() <= other.most_top()
+    }
+
+    /// If the most top point of `self` is below the most bottom point of `other`
+    pub fn strictly_below(&self, other: &Self) -> bool {
+        self.most_top() > other.most_bottom()
+    }
+
+    /// If the most top point of `self` is below or on the same line as the
+    /// most bottom point of `other`
+    pub fn below(&self, other: &Self) -> bool {
+        self.most_top() >= other.most_bottom()
+    }
+
+    /// If the most right point of `self` is left of the most left point of `other`
+    pub fn strictly_left_of(&self, other: &Self) -> bool {
+        self.most_right() < other.most_left()
+    }
+
+    /// If the most right point of `self` is left or on the same line as the
+    /// most left point of `other`
+    pub fn left_of(&self, other: &Self) -> bool {
+        self.most_right() <= other.most_left()
+    }
+
+    /// If the most left point of `self` is right of the most right point of `other`
+    pub fn strictly_right_of(&self, other: &Self) -> bool {
+        self.most_left() > other.most_right()
+    }
+
+    /// If the most left point of `self` is right or on the same line as the
+    /// most right point of `other`
+    pub fn right_of(&self, other: &Self) -> bool {
+        self.most_left() >= other.most_right()
+    }
+
+    /// If `self` is within the left/right boundaries defined by `other`.
+    pub fn within_horizontal_bounds_of(&self, other: &Self) -> bool {
+        self.most_left() >= other.most_left() && self.most_right() <= other.most_right()
+    }
+
+    /// If `self` is within the top/bottom boundaries defined by `other`.
+    pub fn within_vertical_bounds_of(&self, other: &Self) -> bool {
+        self.most_top() >= other.most_top() && self.most_bottom() <= other.most_bottom()
+    }
+
+    /// If `self` is within the boundaries defined by `other`.
+    pub fn within_bounds_of(&self, other: &Self) -> bool {
+        self.within_horizontal_bounds_of(&other) && self.within_vertical_bounds_of(&other)
     }
 }
 
@@ -111,13 +207,51 @@ pub struct Element<'a> {
     pub remote_object_id: String,
     pub backend_node_id: dom::NodeId,
     pub parent: &'a super::Tab,
-    pub found_via_selector: &'a str,
+}
+
+impl<'a> Debug for Element<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "Element {}", self.backend_node_id)?;
+        Ok(())
+    }
 }
 
 impl<'a> Element<'a> {
-    pub fn click(&self) -> Result<&Self, Error> {
-        debug!("Clicking element found via {}", self.found_via_selector);
+    /// Using a 'node_id', of the type returned by QuerySelector and QuerySelectorAll, this finds
+    /// the 'backend_node_id' and 'remote_object_id' which are stable identifiers, unlike node_id.
+    /// We use these two when making various calls to the API because of that.
+    pub fn new(parent: &'a super::Tab, node_id: dom::NodeId) -> Result<Self, Error> {
+        if node_id == 0 {
+            return Err(super::NoElementFound {}.into());
+        }
 
+        let backend_node_id = parent.describe_node(node_id)?.backend_node_id;
+
+        let remote_object_id = {
+            let object = parent
+                .call_method(dom::methods::ResolveNode {
+                    backend_node_id: Some(backend_node_id),
+                })?
+                .object;
+            object.object_id.expect("couldn't find object ID")
+        };
+
+        Ok(Element {
+            remote_object_id,
+            backend_node_id,
+            parent,
+        })
+    }
+
+    /// Moves the mouse to the middle of this element
+    pub fn move_mouse_over(&self) -> Result<&Self, Error> {
+        let midpoint = self.get_midpoint()?;
+        self.parent.move_mouse_to_point(midpoint)?;
+        Ok(self)
+    }
+
+    pub fn click(&self) -> Result<&Self, Error> {
+        debug!("Clicking element {:?}", &self);
         let midpoint = self.get_midpoint()?;
         self.parent.click_point(midpoint)?;
         Ok(self)
@@ -126,10 +260,7 @@ impl<'a> Element<'a> {
     pub fn type_into(&self, text: &str) -> Result<&Self, Error> {
         self.click()?;
 
-        debug!(
-            "Typing into element ( {} ): {}",
-            self.found_via_selector, text
-        );
+        debug!("Typing into element ( {:?} ): {}", &self, text);
 
         self.parent.type_str(text)?;
 

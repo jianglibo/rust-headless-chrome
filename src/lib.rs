@@ -3,7 +3,6 @@
 #![warn(renamed_and_removed_lints)]
 #![allow(
     clippy::unknown_clippy_lints,
-    clippy::stutter,
     clippy::module_name_repetitions,
     clippy::doc_markdown, // a number of false positives here
     clippy::default_trait_access, // fails on output of derive_builder
@@ -15,15 +14,12 @@ extern crate log;
 #[macro_use]
 extern crate derive_builder;
 
-extern crate tokio_io;
-extern crate tokio_tcp;
-
 #[macro_use]
 extern crate futures;
 
 pub mod browser;
 pub mod protocol;
-pub mod browser_async;
+pub mod util;
 
 pub use browser::{Browser, LaunchOptionsBuilder, Tab};
 

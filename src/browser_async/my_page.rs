@@ -18,13 +18,13 @@ enum MyPageState {
     Consuming,
 }
 
-pub struct MyPage {
-    chrome_page: OnePage,
+pub struct MyPage<'a> {
+    chrome_page:&'a mut OnePage<'a>,
     state: MyPageState,
 }
 
 
-impl Future for MyPage {
+impl<'a> Future for MyPage<'a> {
     type Item = ();
     type Error = failure::Error;
 
@@ -77,11 +77,12 @@ mod tests {
     fn t_by_enum() {
         ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
+        let  entry_url = "https://en.wikipedia.org/wiki/WebKit";
 
-        let browser = ChromeBrowser::new();
-        let page = OnePage::new(browser, ENTERY);
+        let mut browser = ChromeBrowser::new();
+        let mut page = OnePage::new(&mut browser, entry_url);
         let my_page = MyPage {
-            chrome_page: page,
+            chrome_page: &mut page,
             state: MyPageState::Start
         };
 

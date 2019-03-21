@@ -12,33 +12,33 @@ use crate::protocol::target;
 use crate::browser_async::element_async::{Element};
 use websocket::futures::{Async, Future, Poll, Stream};
 use crate::browser_async::point_async::{Point};
-use crate::browser_async::keys_async;
+use crate::browser::tab::keys;
 use log::*;
 
 #[derive(Debug)]
-enum OnePageState<'a> {
+enum OnePageState {
     WaitingPageCreate,
     WaitingPageAttach,
     WaitingPageEnable(usize),
     WaitingPageLoadEvent,
     WaitingGetDocument(usize),
-    WaitingNode(&'a str, usize),
-    WaitingDescribeNode(Option<&'a str>, usize),
-    WaitingRemoteObject(dom::NodeId, &'a str, usize),
+    WaitingNode(String, usize),
+    WaitingDescribeNode(Option<String>, usize),
+    WaitingRemoteObject(dom::NodeId, String, usize),
     Consuming,
 }
 
-pub struct OnePage<'a> {
-    stream: &'a mut ChromeBrowser,
-    state: OnePageState<'a>,
+pub struct OnePage {
+    stream: ChromeBrowser,
+    state: OnePageState,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
-    entry_url: &'a str,
+    entry_url: String,
     root_node: Option<dom::Node>,
 }
 
-impl<'a> OnePage<'a> {
-    pub fn new(stream: &'a mut ChromeBrowser, entry_url: &'a str) -> Self {
+impl OnePage {
+    pub fn new(stream: ChromeBrowser, entry_url: String) -> Self {
         Self { stream, state: OnePageState::WaitingPageCreate, target_info: None, session_id: None, entry_url: entry_url, root_node: None }
     }
 
@@ -91,25 +91,25 @@ impl<'a> OnePage<'a> {
         }
     }
 
-    pub fn find_node(&mut self, selector: &'a str) {
+    pub fn find_node<'b>(&mut self, selector: &'b str) {
         let rn = self.root_node.as_ref().unwrap();
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::QuerySelector {
             node_id: rn.node_id,
             selector,
         }).unwrap();
         self.stream.send_message(method_str);
-        self.state = OnePageState::WaitingNode(selector, mid.unwrap());
+        self.state = OnePageState::WaitingNode(selector.to_string(), mid.unwrap());
     }
 
-    pub fn find_element(&mut self, selector: &'a str, backend_node_id: dom::NodeId) {
+    pub fn find_element(&mut self, selector: String, backend_node_id: dom::NodeId) {
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::ResolveNode {
             backend_node_id: Some(backend_node_id),
         }).unwrap();
         self.stream.send_message(method_str);
-        self.state = OnePageState::WaitingRemoteObject(backend_node_id, selector, mid.unwrap());
+        self.state = OnePageState::WaitingRemoteObject(backend_node_id, selector.to_string(), mid.unwrap());
     }
 
-    pub fn describe_node(&mut self, selector: Option<&'a str>, node_id: dom::NodeId) {
+    pub fn describe_node(&mut self, selector: Option<String>, node_id: dom::NodeId) {
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::DescribeNode {
                 node_id: Some(node_id),
                 backend_node_id: None,
@@ -130,18 +130,44 @@ impl<'a> OnePage<'a> {
     }
 
     pub fn press_key(&mut self, key: &str) {
-        let definition = keys_async::get_key_definition(key).unwrap();
+        let definition = keys::get_key_definition(key).unwrap();
+
+        // See https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L114-L115
+        let text = definition.text.or_else(|| {
+            if definition.key.len() == 1 {
+                Some(definition.key)
+            } else {
+                None
+            }
+        });
+
+        // See https://github.com/GoogleChrome/puppeteer/blob/62da2366c65b335751896afbb0206f23c61436f1/lib/Input.js#L52
+        let key_down_event_type = if text.is_some() {
+            "keyDown"
+        } else {
+            "rawKeyDown"
+        };
+
+        let key = Some(definition.key);
+        let code = Some(definition.code);
+
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(input::methods::DispatchKeyEvent {
-            event_type: "keyDown",
-            key: definition.key,
-            text: definition.text,
+            event_type: key_down_event_type,
+            key,
+            text,
+            code: Some(definition.code),
+            windows_virtual_key_code: definition.key_code,
+            native_virtual_key_code: definition.key_code,
         }).unwrap();
         self.stream.send_message(method_str);
 
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(input::methods::DispatchKeyEvent {
             event_type: "keyUp",
-            key: definition.key,
-            text: definition.text,
+            key,
+            text,
+            code,
+            windows_virtual_key_code: definition.key_code,
+            native_virtual_key_code: definition.key_code,
         }).unwrap();
         self.stream.send_message(method_str);
     }
@@ -196,18 +222,18 @@ impl<'a> OnePage<'a> {
         }
 }
 
-pub enum PageMessage<'a> {
+pub enum PageMessage {
     DocumentAvailable,
-    FindNode(Option<&'a str>, dom::Node),
-    FindElement(Element<'a>),
+    FindNode(Option<String>, dom::Node),
+    FindElement(Element),
     MessageAvailable(protocol::Message),
 }
 
-impl<'a> fmt::Debug for PageMessage<'a> {
+impl fmt::Debug for PageMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PageMessage::FindElement(ele) => {
-                write!(f, "remote_object_id: {}, backend_node_id: {},found_via_selector: {}", ele.remote_object_id, ele.backend_node_id, ele.found_via_selector)
+                write!(f, "remote_object_id: {}, backend_node_id: {}", ele.remote_object_id, ele.backend_node_id)
             }
             _ => write!(f, "{:?}", self)
         }
@@ -215,8 +241,8 @@ impl<'a> fmt::Debug for PageMessage<'a> {
     }
 }
 
-impl<'a> Stream for OnePage<'a> {
-    type Item = PageMessage<'a>;
+impl Stream for OnePage {
+    type Item = PageMessage;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -238,7 +264,7 @@ impl<'a> Stream for OnePage<'a> {
                         }
                         OnePageState::WaitingPageEnable(mid) => {
                             if MethodUtil::match_chrome_response(value, mid).is_some() {
-                                self.navigate_to(self.entry_url);
+                                self.navigate_to(self.entry_url.clone().as_str());
                             }
                         }
                         OnePageState::WaitingPageLoadEvent => {
@@ -282,13 +308,9 @@ impl<'a> Stream for OnePage<'a> {
                         OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
                             if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                                 if let Ok(v)  = protocol::parse_response::<dom::methods::ResolveNodeReturnObject>(resp) {
-                                    self.state = OnePageState::Consuming;
-                                    
                                         let element = Element {
                                             remote_object_id: v.object.object_id.unwrap().clone(),
                                             backend_node_id: *backend_node_id,
-                                            parent: self,
-                                            found_via_selector: selector,
                                             };
                                     return Ok(Async::Ready(Some(PageMessage::FindElement(element))));
                                     

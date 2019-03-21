@@ -18,13 +18,13 @@ enum MyPageState {
     Consuming,
 }
 
-pub struct MyPage<'a> {
-    chrome_page:&'a mut OnePage<'a>,
+pub struct MyPage {
+    chrome_page: OnePage,
     state: MyPageState,
 }
 
 
-impl<'a> Future for MyPage<'a> {
+impl Future for MyPage {
     type Item = ();
     type Error = failure::Error;
 
@@ -80,9 +80,9 @@ mod tests {
         let  entry_url = "https://en.wikipedia.org/wiki/WebKit";
 
         let mut browser = ChromeBrowser::new();
-        let mut page = OnePage::new(&mut browser, entry_url);
+        let mut page = OnePage::new(browser, entry_url.to_string());
         let my_page = MyPage {
-            chrome_page: &mut page,
+            chrome_page: page,
             state: MyPageState::Start
         };
 

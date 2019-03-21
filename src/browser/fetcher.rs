@@ -233,7 +233,7 @@ where
     }
 }
 
-fn archive_name<R: AsRef<str>>(_revision: R) -> Result<&'static str, Error> {
+fn archive_name<R: AsRef<str>>(revision: R) -> Result<&'static str, Error> {
     #[cfg(target_os = "linux")]
     {
         Ok("chrome-linux")

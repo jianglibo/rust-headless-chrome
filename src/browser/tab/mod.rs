@@ -23,7 +23,7 @@ use crate::protocol::dom::Node;
 use std::time::Duration;
 
 pub mod element;
-mod keys;
+pub mod keys;
 mod point;
 
 #[derive(Debug)]

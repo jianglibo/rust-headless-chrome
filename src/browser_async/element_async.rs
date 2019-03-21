@@ -112,10 +112,10 @@ pub struct Element {
     pub remote_object_id: String,
     pub backend_node_id: dom::NodeId,
     // pub parent: &'a OnePage<'a>,
-    pub found_via_selector: &'a str,
+    // pub found_via_selector: &'a str,
 }
 
-impl<'a> Element<'a> {
+impl Element {
     // pub fn click(&self) {
     //     debug!("Clicking element found via {}", self.found_via_selector);
 

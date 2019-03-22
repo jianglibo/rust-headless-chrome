@@ -14,32 +14,35 @@ use websocket::futures::{Async, Future, Poll, Stream};
 use crate::browser_async::point_async::{Point};
 use crate::browser::tab::keys;
 use log::*;
+use tokio::timer::{Interval, Timeout};
+use std::time::Duration;
 
 #[derive(Debug)]
 enum OnePageState {
     WaitingPageCreate,
     WaitingPageAttach,
     WaitingPageEnable(usize),
-    WaitingPageLoadEvent,
+    WaitingPageLoadEvent(Timeout<u8>),
     WaitingGetDocument(usize),
     WaitingNode(String, usize),
     WaitingDescribeNode(Option<String>, usize),
     WaitingRemoteObject(dom::NodeId, String, usize),
+    WaitingScreenShot(usize),
     Consuming,
 }
 
 pub struct OnePage {
-    stream: ChromeBrowser,
+    chrome_browser: ChromeBrowser,
     state: OnePageState,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
-    entry_url: String,
+    entry_url: &'static str,
     root_node: Option<dom::Node>,
 }
 
 impl OnePage {
-    pub fn new(stream: ChromeBrowser, entry_url: String) -> Self {
-        Self { stream, state: OnePageState::WaitingPageCreate, target_info: None, session_id: None, entry_url: entry_url, root_node: None }
+    pub fn new(chrome_browser: ChromeBrowser, entry_url: &'static str) -> Self {
+        Self { chrome_browser, state: OnePageState::WaitingPageCreate, target_info: None, session_id: None, entry_url: entry_url, root_node: None }
     }
 
     pub fn attach_to_page(&mut self) {
@@ -48,8 +51,8 @@ impl OnePage {
                 flatten: None,
             },
             MethodDestination::Browser, None).unwrap();
-        self.stream.send_message(method_str);
-        self.state = OnePageState::WaitingPageAttach;
+        self.state = OnePageState::WaitingPageAttach; // change state first.
+        self.chrome_browser.send_message(method_str);
     }
 
     fn create_msg_to_send_with_session_id<C>(&self, method: C) -> MethodBeforSendResult
@@ -62,14 +65,14 @@ impl OnePage {
 
     pub fn page_enable(&mut self) {
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(page::methods::Enable {}).unwrap();
-        self.stream.send_message(method_str);
         self.state = OnePageState::WaitingPageEnable(mid.unwrap());
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn navigate_to(&mut self, url: &str) {
         let (_, method_str, _) = self.create_msg_to_send_with_session_id(Navigate { url }).unwrap();
-        self.stream.send_message(method_str);
-        self.state = OnePageState::WaitingPageLoadEvent;
+        self.state = OnePageState::WaitingPageLoadEvent(Interval::new_interval(Duration::from_secs(10)));
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn get_document(&mut self) {
@@ -77,8 +80,8 @@ impl OnePage {
             depth: Some(0),
             pierce: Some(false),
         }).unwrap();
-        self.stream.send_message(method_str);
         self.state = OnePageState::WaitingGetDocument(mid.unwrap());
+        self.chrome_browser.send_message(method_str);
     }
 
     fn wait_page_load_event_fired(&mut self, value: protocol::Message) {
@@ -97,16 +100,16 @@ impl OnePage {
             node_id: rn.node_id,
             selector,
         }).unwrap();
-        self.stream.send_message(method_str);
         self.state = OnePageState::WaitingNode(selector.to_string(), mid.unwrap());
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn find_element(&mut self, selector: String, backend_node_id: dom::NodeId) {
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::ResolveNode {
             backend_node_id: Some(backend_node_id),
         }).unwrap();
-        self.stream.send_message(method_str);
         self.state = OnePageState::WaitingRemoteObject(backend_node_id, selector.to_string(), mid.unwrap());
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn describe_node(&mut self, selector: Option<String>, node_id: dom::NodeId) {
@@ -115,8 +118,8 @@ impl OnePage {
                 backend_node_id: None,
                 depth: Some(100),
             }).unwrap();
-        self.stream.send_message(method_str);
         self.state = OnePageState::WaitingDescribeNode(selector, mid.unwrap());
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn type_str(&mut self, string_to_type: &str) {
@@ -159,7 +162,7 @@ impl OnePage {
             windows_virtual_key_code: definition.key_code,
             native_virtual_key_code: definition.key_code,
         }).unwrap();
-        self.stream.send_message(method_str);
+        self.chrome_browser.send_message(method_str);
 
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(input::methods::DispatchKeyEvent {
             event_type: "keyUp",
@@ -169,7 +172,7 @@ impl OnePage {
             windows_virtual_key_code: definition.key_code,
             native_virtual_key_code: definition.key_code,
         }).unwrap();
-        self.stream.send_message(method_str);
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn click_point(&mut self, point: Point) {
@@ -184,7 +187,7 @@ impl OnePage {
             y: point.y,
             ..Default::default()
         }).unwrap();
-        self.stream.send_message(method_str);
+        self.chrome_browser.send_message(method_str);
 
 
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(input::methods::DispatchMouseEvent {
@@ -194,7 +197,7 @@ impl OnePage {
             button: Some("left"),
             click_count: Some(1),
         }).unwrap();
-        self.stream.send_message(method_str);
+        self.chrome_browser.send_message(method_str);
 
         let (_, method_str, mid) = self.create_msg_to_send_with_session_id(input::methods::DispatchMouseEvent {
             event_type: "mouseReleased",
@@ -203,7 +206,7 @@ impl OnePage {
             button: Some("left"),
             click_count: Some(1),
         }).unwrap();
-        self.stream.send_message(method_str);
+        self.chrome_browser.send_message(method_str);
     }
 
     pub fn request_midpoint(&mut self, backend_node_id: dom::NodeId) {
@@ -212,28 +215,58 @@ impl OnePage {
                 backend_node_id: Some(backend_node_id),
                 object_id: None,
             }).unwrap();
-            self.stream.send_message(method_str);
+            self.chrome_browser.send_message(method_str);
 
             // let return_object = self.parent.call_method()?;
             // let raw_quad = return_object.quads.first().unwrap();
             // let input_quad = ElementQuad::from_raw_points(&raw_quad);
 
             // Ok((input_quad.bottom_right + input_quad.top_left) / 2.0)
-        }
+    }
+
+    pub fn capture_screenshot(
+        &mut self,
+        format: page::ScreenshotFormat,
+        clip: Option<page::Viewport>,
+        from_surface: bool,
+    ) /*-> Result<Vec<u8>, Error>*/ {
+        let (format, quality) = match format {
+            page::ScreenshotFormat::JPEG(quality) => {
+                (page::InternalScreenshotFormat::JPEG, quality)
+            }
+            page::ScreenshotFormat::PNG => (page::InternalScreenshotFormat::PNG, None),
+        };
+
+        let (_, method_str, mid) = self.create_msg_to_send_with_session_id(page::methods::CaptureScreenshot {
+                format,
+                clip,
+                quality,
+                from_surface,
+            }).unwrap();
+        self.state = OnePageState::WaitingScreenShot(mid.unwrap());
+        self.chrome_browser.send_message(method_str);
+
+        // let data = self
+        //     .call_method()?
+        //     .data;
+        // base64::decode(&data).map_err(Into::into)
+    }
+
 }
 
 pub enum PageMessage {
     DocumentAvailable,
     FindNode(Option<String>, dom::Node),
-    FindElement(Element),
+    FindElement(String, Element),
+    Screenshot(Vec<u8>),
     MessageAvailable(protocol::Message),
 }
 
 impl fmt::Debug for PageMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            PageMessage::FindElement(ele) => {
-                write!(f, "remote_object_id: {}, backend_node_id: {}", ele.remote_object_id, ele.backend_node_id)
+            PageMessage::FindElement(selector, ele) => {
+                write!(f, "selector: {}, remote_object_id: {}, backend_node_id: {}",selector, ele.remote_object_id, ele.backend_node_id)
             }
             _ => write!(f, "{:?}", self)
         }
@@ -247,15 +280,17 @@ impl Stream for OnePage {
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
-            if let Some(value) = try_ready!(self.stream.poll()) {
+            if let Some(value) = try_ready!(self.chrome_browser.poll()) {
                     match &mut self.state {
                         OnePageState::WaitingPageCreate => {
+                            info!("*** WaitingPageCreate ***");
                             if let Some(target_info) = MethodUtil::is_page_event_create(value) {
                                 self.target_info = Some(target_info);
                                 self.attach_to_page();
                             }
                         },
                         OnePageState::WaitingPageAttach => {
+                            info!("*** WaitingPageAttach ***");
                             if let Some((session_id, target_info)) = MethodUtil::is_page_attach_event(value) {
                                 self.session_id = Some(session_id);
                                 self.target_info = Some(target_info);
@@ -263,14 +298,27 @@ impl Stream for OnePage {
                             }
                         }
                         OnePageState::WaitingPageEnable(mid) => {
+                            info!("*** WaitingPageEnable ***");
                             if MethodUtil::match_chrome_response(value, mid).is_some() {
-                                self.navigate_to(self.entry_url.clone().as_str());
+                                self.navigate_to(self.entry_url);
                             }
                         }
-                        OnePageState::WaitingPageLoadEvent => {
+                        OnePageState::WaitingPageLoadEvent(interval) => {
+                            info!("*** WaitingPageLoadEvent ***");
                             self.wait_page_load_event_fired(value);
+                            if let Some(t) = try_ready!(
+                                interval.poll()
+                                    // The interval can fail if the Tokio runtime is unavailable.
+                                    // In this example, the error is ignored.
+                                    // .map_err(|_| ())
+                            ) {
+                                info!("time out {:?}", t);
+                            } else {
+
+                            }
                         }
                         OnePageState::WaitingGetDocument(mid) => {
+                            info!("*** WaitingGetDocument ***");
                             if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                                 if let Ok(c) =
                                     protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)
@@ -284,6 +332,7 @@ impl Stream for OnePage {
                             }
                         }
                         OnePageState::WaitingNode(selector, mid) => {
+                            info!("*** WaitingNode {:?} ***", mid);
                             if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                                 let selector_cloned = Some(selector.clone());
                                 // let backend_node_id = self.describe_node(node_id)?.backend_node_id;
@@ -293,29 +342,41 @@ impl Stream for OnePage {
                             }
                         }
                         OnePageState::WaitingDescribeNode(maybe_selector, mid) => {
+                            info!("*** WaitingDescribeNode ***");
                             if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                                  trace!("----------got describe Node resp: {:?}", resp);
                                 // let backend_node_id = self.describe_node(node_id)?.backend_node_id;
                                 if let Ok(v)  = protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
                                     trace!("----------got describe Node: {:?}", v.node);
                                     let maybe_selector_cloned = maybe_selector.clone();
-                                    // self.state = OnePageState::Consuming;
                                     self.find_element(maybe_selector_cloned.clone().unwrap(), v.node.backend_node_id);
                                     return Ok(Async::Ready(Some(PageMessage::FindNode(maybe_selector_cloned, v.node))));
                                 }
                             }
                         }
                         OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
+                            info!("*** WaitingRemoteObject ***");
                             if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                                 if let Ok(v)  = protocol::parse_response::<dom::methods::ResolveNodeReturnObject>(resp) {
-                                        let element = Element {
-                                            remote_object_id: v.object.object_id.unwrap().clone(),
-                                            backend_node_id: *backend_node_id,
-                                            };
-                                    return Ok(Async::Ready(Some(PageMessage::FindElement(element))));
+                                    let selector_cloned = selector.clone();
+                                    let element = Element {
+                                        remote_object_id: v.object.object_id.unwrap().clone(),
+                                        backend_node_id: *backend_node_id,
+                                        };
+                                    return Ok(Async::Ready(Some(PageMessage::FindElement(selector_cloned, element))));
                                     
                                 }
-                                // info!("got remote object: {:?}", resp);
+                                self.state = OnePageState::Consuming;
+                            }
+                        }
+                        OnePageState::WaitingScreenShot(mid) => {
+                            info!("*** WaitingScreenShot ***");
+                            if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                                if let Ok(v)  = protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp) {
+                                    self.state = OnePageState::Consuming;
+                                    let data_v8 = base64::decode(&v.data).unwrap();
+                                    return Ok(Async::Ready(Some(PageMessage::Screenshot(data_v8))));
+                                }
                                 self.state = OnePageState::Consuming;
                             }
                         }

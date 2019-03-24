@@ -14,15 +14,16 @@ use websocket::futures::{Async, Future, Poll, Stream};
 use crate::browser_async::point_async::{Point};
 use crate::browser::tab::keys;
 use log::*;
-use tokio::timer::{Interval, Timeout};
-use std::time::Duration;
+use tokio::timer::{Interval, Timeout, Delay};
+use std::time::{Duration, Instant};
+
 
 #[derive(Debug)]
 enum OnePageState {
     WaitingPageCreate,
     WaitingPageAttach,
     WaitingPageEnable(usize),
-    WaitingPageLoadEvent(Timeout<u8>),
+    WaitingPageLoadEvent(Delay),
     WaitingGetDocument(usize),
     WaitingNode(String, usize),
     WaitingDescribeNode(Option<String>, usize),
@@ -71,7 +72,7 @@ impl OnePage {
 
     pub fn navigate_to(&mut self, url: &str) {
         let (_, method_str, _) = self.create_msg_to_send_with_session_id(Navigate { url }).unwrap();
-        self.state = OnePageState::WaitingPageLoadEvent(Interval::new_interval(Duration::from_secs(10)));
+        self.state = OnePageState::WaitingPageLoadEvent(Delay::new(Instant::now() + Duration::from_secs(10)));
         self.chrome_browser.send_message(method_str);
     }
 
@@ -279,7 +280,17 @@ impl Stream for OnePage {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
+        trace!("chrome page got polled");
+        loop { // this loop may stop when no more methods be sent to server. delay detecting inside loop maybe don't work because it's not get executed.
+            match &mut self.state {
+                OnePageState::WaitingPageLoadEvent(delay) => {
+                    if delay.is_elapsed() {
+                        error!("WaitingPageLoadEvent time out {:?}", delay.deadline());
+                        self.get_document();
+                    }
+                }
+                _ => ()
+            }
             if let Some(value) = try_ready!(self.chrome_browser.poll()) {
                     match &mut self.state {
                         OnePageState::WaitingPageCreate => {
@@ -303,19 +314,9 @@ impl Stream for OnePage {
                                 self.navigate_to(self.entry_url);
                             }
                         }
-                        OnePageState::WaitingPageLoadEvent(interval) => {
+                        OnePageState::WaitingPageLoadEvent(delay) => {
                             info!("*** WaitingPageLoadEvent ***");
                             self.wait_page_load_event_fired(value);
-                            if let Some(t) = try_ready!(
-                                interval.poll()
-                                    // The interval can fail if the Tokio runtime is unavailable.
-                                    // In this example, the error is ignored.
-                                    // .map_err(|_| ())
-                            ) {
-                                info!("time out {:?}", t);
-                            } else {
-
-                            }
                         }
                         OnePageState::WaitingGetDocument(mid) => {
                             info!("*** WaitingGetDocument ***");

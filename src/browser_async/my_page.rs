@@ -37,13 +37,14 @@ impl Future for MyPage {
             if let Some(value) = try_ready!(self.chrome_page.poll()) {
                     match &mut self.state {
                         MyPageState::Start => {
+                            info!("*** Start ***");
                             if let PageMessage::DocumentAvailable = value {
                                 self.state = MyPageState::WaitingNode;
                                 self.chrome_page.find_node(self.node_id);
                             }
                         }
                         MyPageState::WaitingNode => {
-                            info!("waiting node.");
+                            info!("*** WaitingNode ***");
                             if let PageMessage::FindNode(maybe_selector, nd) = value {
                                 if Some(self.node_id.to_string()) == maybe_selector {
                                     info!("got node {:?}", nd);
@@ -52,20 +53,20 @@ impl Future for MyPage {
                             }
                         }
                         MyPageState::WaitElement => {
-                            info!("waiting Element.");
+                            info!("*** WaitingElement ***");
                             if let PageMessage::FindElement(selector, element) = value {
                                 if self.node_id == &selector {
                                     info!("got element {:?}", element);
                                     self.state = MyPageState::WaitingScreenshot;
                                     self.chrome_page.capture_screenshot(page::ScreenshotFormat::JPEG(Some(100)),
                                         None,
-                                        false
+                                        true
                                     )
                                 }
                             }
                         }
                         MyPageState::WaitingScreenshot => {
-                            info!("waiting Screenshot.");
+                            info!("*** WaitingScreenshot ***");
                             if let PageMessage::Screenshot(jpeg_data) = value {
                                 self.state = MyPageState::Consuming;
                                 fs::write("screenshot.jpg", &jpeg_data).unwrap();

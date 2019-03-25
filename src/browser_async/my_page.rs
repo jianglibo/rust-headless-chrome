@@ -12,18 +12,19 @@ use log::*;
 use crate::browser_async::one_page::{OnePage, PageMessage};
 use std::fs;
 
-#[derive(Debug)]
-enum MyPageState {
-    Start,
-    WaitingNode,
-    WaitElement,
-    WaitingScreenshot,
-    Consuming,
-}
+// #[derive(Debug)]
+// enum MyPageState {
+//     Start,
+//     // WaitingNode,
+//     // WaitElement,
+//     // WaitModelBox,
+//     // WaitingScreenshot,
+//     Consuming,
+// }
 
 pub struct MyPage {
     chrome_page: OnePage,
-    state: MyPageState,
+    // state: MyPageState,
     node_id: &'static str,
 }
 
@@ -34,47 +35,35 @@ impl Future for MyPage {
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
         loop {
+            info!("mypage loop ****************************");
             if let Some(value) = try_ready!(self.chrome_page.poll()) {
-                    match &mut self.state {
-                        MyPageState::Start => {
-                            info!("*** Start ***");
-                            if let PageMessage::DocumentAvailable = value {
-                                self.state = MyPageState::WaitingNode;
-                                self.chrome_page.find_node(self.node_id);
+                match value {
+                        PageMessage::DocumentAvailable => {
+                            self.chrome_page.find_node(self.node_id);
+                        }
+                        PageMessage::FindNode(maybe_selector, nd) => {
+                            if Some(self.node_id.to_string()) == maybe_selector {
+                                info!("got node {:?}", nd);
                             }
                         }
-                        MyPageState::WaitingNode => {
-                            info!("*** WaitingNode ***");
-                            if let PageMessage::FindNode(maybe_selector, nd) = value {
-                                if Some(self.node_id.to_string()) == maybe_selector {
-                                    info!("got node {:?}", nd);
-                                    self.state = MyPageState::WaitElement;
-                                }
+                        PageMessage::FindElement(selector, element) => {
+                            if self.node_id == &selector {
+                                info!("got element {:?}", element);
                             }
                         }
-                        MyPageState::WaitElement => {
-                            info!("*** WaitingElement ***");
-                            if let PageMessage::FindElement(selector, element) = value {
-                                if self.node_id == &selector {
-                                    info!("got element {:?}", element);
-                                    self.state = MyPageState::WaitingScreenshot;
-                                    self.chrome_page.capture_screenshot(page::ScreenshotFormat::JPEG(Some(100)),
-                                        None,
-                                        true
-                                    )
-                                }
-                            }
+                        PageMessage::GetBoxModel(backend_node_id, box_model) => {
+                            info!("box model: {:?}", box_model);
+                            self.chrome_page.capture_screenshot(page::ScreenshotFormat::JPEG(Some(100)),
+                                Some(box_model.content_viewport()),
+                                true
+                            );
                         }
-                        MyPageState::WaitingScreenshot => {
-                            info!("*** WaitingScreenshot ***");
-                            if let PageMessage::Screenshot(jpeg_data) = value {
-                                self.state = MyPageState::Consuming;
-                                fs::write("screenshot.jpg", &jpeg_data).unwrap();
-                            }
+                        PageMessage::Screenshot(jpeg_data) => {
+                            fs::write("screenshot.jpg", &jpeg_data).unwrap();
                         }
                         _ => {
-                            trace!("receive message: {:?}", value);
-                        },
+                            info!("got unused page message {:?}", value);
+                        }
                     }
                 } else {
                     error!("got None, was stream ended?");
@@ -105,7 +94,7 @@ mod tests {
         let page = OnePage::new(browser, entry_url);
         let my_page = MyPage {
             chrome_page: page,
-            state: MyPageState::Start,
+            // state: MyPageState::Start,
             node_id: "#ddlogin",
         };
 

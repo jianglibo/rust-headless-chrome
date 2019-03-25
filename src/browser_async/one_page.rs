@@ -9,7 +9,7 @@ use crate::browser_async::dev_tools_method_util::{
 };
 use crate::protocol::page::methods::{Navigate};
 use crate::protocol::target;
-use crate::browser_async::element_async::{Element};
+use crate::browser_async::element_async::{Element, BoxModel, ElementQuad};
 use websocket::futures::{Async, Future, Poll, Stream};
 use crate::browser_async::point_async::{Point};
 use crate::browser::tab::keys;
@@ -28,6 +28,7 @@ enum OnePageState {
     WaitingNode(String, usize),
     WaitingDescribeNode(Option<String>, usize),
     WaitingRemoteObject(dom::NodeId, String, usize),
+    WaitingModelBox(dom::NodeId, usize),
     WaitingScreenShot(usize),
     Consuming,
 }
@@ -92,7 +93,37 @@ impl OnePage {
             } else {
                 info!("unequal session_id or target_id.");
             }
+        } else {
+            info!("isn't is_page_load_event_fired.");
         }
+    }
+
+    pub fn get_box_model(&mut self, element: &Element) {
+        let (_, method_str, mid) = self.create_msg_to_send_with_session_id(dom::methods::GetBoxModel {
+                node_id: None,
+                backend_node_id: Some(element.backend_node_id),
+                object_id: None,
+            }).unwrap();
+
+        self.state = OnePageState::WaitingModelBox(element.backend_node_id, mid.unwrap());
+        self.chrome_browser.send_message(method_str);
+
+        // let model = self
+        //     .parent
+        //     .call_method(dom::methods::GetBoxModel {
+        //         node_id: None,
+        //         backend_node_id: Some(self.backend_node_id),
+        //         object_id: None,
+        //     })?
+        //     .model;
+        // Ok(BoxModel {
+        //     content: ElementQuad::from_raw_points(&model.content),
+        //     padding: ElementQuad::from_raw_points(&model.padding),
+        //     border: ElementQuad::from_raw_points(&model.border),
+        //     margin: ElementQuad::from_raw_points(&model.margin),
+        //     width: model.width,
+        //     height: model.height,
+        // })
     }
 
     pub fn find_node<'b>(&mut self, selector: &'b str) {
@@ -259,6 +290,7 @@ pub enum PageMessage {
     DocumentAvailable,
     FindNode(Option<String>, dom::Node),
     FindElement(String, Element),
+    GetBoxModel(dom::NodeId, BoxModel),
     Screenshot(Vec<u8>),
     MessageAvailable(protocol::Message),
 }
@@ -275,6 +307,7 @@ impl fmt::Debug for PageMessage {
     }
 }
 
+// The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
 impl Stream for OnePage {
     type Item = PageMessage;
     type Error = failure::Error;
@@ -282,6 +315,7 @@ impl Stream for OnePage {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         trace!("chrome page got polled");
         loop { // this loop may stop when no more methods be sent to server. delay detecting inside loop maybe don't work because it's not get executed.
+            trace!("chrome page got polled in loop........................");
             match &mut self.state {
                 OnePageState::WaitingPageLoadEvent(delay) => {
                     if delay.is_elapsed() {
@@ -315,7 +349,7 @@ impl Stream for OnePage {
                             }
                         }
                         OnePageState::WaitingPageLoadEvent(delay) => {
-                            info!("*** WaitingPageLoadEvent ***");
+                            info!("*** WaitingPageLoadEvent *** {:?}", delay);
                             self.wait_page_load_event_fired(value);
                         }
                         OnePageState::WaitingGetDocument(mid) => {
@@ -364,10 +398,33 @@ impl Stream for OnePage {
                                         remote_object_id: v.object.object_id.unwrap().clone(),
                                         backend_node_id: *backend_node_id,
                                         };
+                                    self.get_box_model(&element);
                                     return Ok(Async::Ready(Some(PageMessage::FindElement(selector_cloned, element))));
-                                    
                                 }
                                 self.state = OnePageState::Consuming;
+                            }
+                        }
+                        OnePageState::WaitingModelBox(backend_node_id, mid) => {
+                            info!("*** WaitingModelBox ***");
+                            if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                                if let Ok(v)  = protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp) {
+                                    let raw_model = v.model;
+                                    let model_box = 
+                                        BoxModel {
+                                            content: ElementQuad::from_raw_points(&raw_model.content),
+                                            padding: ElementQuad::from_raw_points(&raw_model.padding),
+                                            border: ElementQuad::from_raw_points(&raw_model.border),
+                                            margin: ElementQuad::from_raw_points(&raw_model.margin),
+                                            width: raw_model.width,
+                                            height: raw_model.height,
+                                        };
+                                    return Ok(Async::Ready(Some(PageMessage::GetBoxModel(*backend_node_id, model_box))));
+                                } else {
+                                    info!("waiting for WaitingModelBox...1");
+                                }
+                                self.state = OnePageState::Consuming;
+                            } else {
+                                info!("waiting for WaitingModelBox...2");
                             }
                         }
                         OnePageState::WaitingScreenShot(mid) => {

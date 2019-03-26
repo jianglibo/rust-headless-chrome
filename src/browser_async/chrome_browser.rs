@@ -2,6 +2,7 @@ use crate::protocol;
 
 use failure;
 use log::*;
+use std::fmt;
 
 
 pub use crate::protocol::browser::methods::VersionInformationReturnObject;
@@ -34,6 +35,17 @@ enum BrowserState {
     Sending,
 }
 
+impl fmt::Debug for BrowserState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BrowserState::Connecting(_) => {
+                write!(f, "connecting")
+            }
+            _ => write!(f, "{:?}", self)
+        }
+    }
+}
+
 pub struct ChromeBrowser {
     state: BrowserState,
     ws_client: Option<WsClient>,
@@ -59,6 +71,7 @@ impl Stream for ChromeBrowser {
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
+            trace!("browser loop {:?}", self.state);
             match &mut self.state {
                 BrowserState::Unconnected => {
                     trace!("enter unconnected state.");

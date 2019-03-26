@@ -12,19 +12,8 @@ use log::*;
 use crate::browser_async::one_page::{OnePage, PageMessage};
 use std::fs;
 
-// #[derive(Debug)]
-// enum MyPageState {
-//     Start,
-//     // WaitingNode,
-//     // WaitElement,
-//     // WaitModelBox,
-//     // WaitingScreenshot,
-//     Consuming,
-// }
-
 pub struct MyPage {
     chrome_page: OnePage,
-    // state: MyPageState,
     node_id: &'static str,
 }
 
@@ -39,27 +28,10 @@ impl Future for MyPage {
             if let Some(value) = try_ready!(self.chrome_page.poll()) {
                 match value {
                         PageMessage::DocumentAvailable => {
-                            self.chrome_page.find_node(self.node_id);
+                            self.chrome_page.capture_screenshot_by_selector(self.node_id, page::ScreenshotFormat::JPEG(Some(100)), true);
                         }
-                        PageMessage::FindNode(maybe_selector, nd) => {
-                            if Some(self.node_id.to_string()) == maybe_selector {
-                                info!("got node {:?}", nd);
-                            }
-                        }
-                        PageMessage::FindElement(selector, element) => {
-                            if self.node_id == &selector {
-                                info!("got element {:?}", element);
-                            }
-                        }
-                        PageMessage::GetBoxModel(backend_node_id, box_model) => {
-                            info!("box model: {:?}", box_model);
-                            self.chrome_page.capture_screenshot(page::ScreenshotFormat::JPEG(Some(100)),
-                                Some(box_model.content_viewport()),
-                                true
-                            );
-                        }
-                        PageMessage::Screenshot(jpeg_data) => {
-                            fs::write("screenshot.jpg", &jpeg_data).unwrap();
+                        PageMessage::Screenshot(selector,_, _, jpeg_data) => {
+                            fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
                         }
                         _ => {
                             info!("got unused page message {:?}", value);

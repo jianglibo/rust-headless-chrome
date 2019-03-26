@@ -41,7 +41,21 @@ impl fmt::Debug for BrowserState {
             BrowserState::Connecting(_) => {
                 write!(f, "connecting")
             }
-            _ => write!(f, "{:?}", self)
+            BrowserState::Unconnected => {
+                write!(f, "Unconnected")
+            }
+            BrowserState::EnableDiscover => {
+                write!(f, "EnableDiscover")
+            }
+            BrowserState::Receiving => {
+                write!(f, "Receiving")
+            }
+            BrowserState::StartSend(content) => {
+                write!(f, "start sending: {}", content)
+            }
+            BrowserState::Sending => {
+                write!(f, "Sending")
+            }
         }
     }
 }
@@ -112,12 +126,16 @@ impl Stream for ChromeBrowser {
                             }
                         }
                         Ok(Async::Ready(None)) => {
+                            trace!("enter receiving None, end?");
                             return Ok(Async::Ready(None));
                         }
                         Ok(Async::NotReady) => {
+                            // if return not ready, when to pull again is job of underlying. is out of our controls.
+                            trace!("enter receiving not NotReady");
                             return Ok(Async::NotReady);
                         }
                         Err(e) => {
+                            trace!("enter receiving err");
                             return Err(e.into());
                         }
                     }

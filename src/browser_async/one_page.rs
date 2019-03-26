@@ -16,6 +16,8 @@ use crate::browser::tab::keys;
 use log::*;
 use tokio::timer::{Interval, Timeout, Delay};
 use std::time::{Duration, Instant};
+use tokio_timer::{TimeoutStream};
+
 
 pub enum PageMessage {
     DocumentAvailable,
@@ -455,3 +457,5 @@ impl Stream for OnePage {
             }
     }
 }
+
+// pub type OnePageWithTimeout = TimeoutStream<OnePage>;

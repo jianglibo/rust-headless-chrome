@@ -16,6 +16,7 @@ extern crate derive_builder;
 
 #[macro_use]
 extern crate futures;
+extern crate tokio_timer;
 
 pub mod browser;
 pub mod protocol;

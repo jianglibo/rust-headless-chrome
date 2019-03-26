@@ -11,9 +11,11 @@ use websocket::futures::{Async, Future, Poll, Stream};
 use log::*;
 use crate::browser_async::one_page::{OnePage, PageMessage};
 use std::fs;
+use std::time::{Duration, Instant};
+use tokio_timer::{Timer, TimeoutStream};
 
 pub struct MyPage {
-    chrome_page: OnePage,
+    chrome_page: TimeoutStream<OnePage>,
     node_id: &'static str,
 }
 
@@ -64,11 +66,15 @@ mod tests {
 
         let browser = ChromeBrowser::new();
         let page = OnePage::new(browser, entry_url);
+
+
+
         let my_page = MyPage {
-            chrome_page: page,
+            chrome_page: Timer::timeout_stream(page, Duration::from_secs(10)),
             // state: MyPageState::Start,
             node_id: "#ddlogin",
         };
+
 
         tokio::run(my_page.map_err(|_| ()));
     }

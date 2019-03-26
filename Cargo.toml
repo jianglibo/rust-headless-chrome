@@ -25,6 +25,7 @@ chrono = "0.4"
 base64 = "0.10"
 derive_builder = "0.7.1"
 tokio = "0.1"
+tokio-timer = "0.2.10"
 futures = "0.1"
 which = "2.0"
 reqwest = { version = "0.9", optional = true }

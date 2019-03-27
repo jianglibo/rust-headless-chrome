@@ -17,6 +17,7 @@ use websocket::message::OwnedMessage;
 use websocket::r#async::client::{Client, ClientNew};
 use websocket::r#async::TcpStream;
 use websocket::ClientBuilder;
+use std::time::{Duration, Instant};
 
 use crate::protocol::target;
 
@@ -64,6 +65,7 @@ pub struct ChromeBrowser {
     state: BrowserState,
     ws_client: Option<WsClient>,
     process: Option<Process>,
+    last_be_polled: Instant,
 }
 
 impl ChromeBrowser {
@@ -72,10 +74,15 @@ impl ChromeBrowser {
             state: BrowserState::Unconnected,
             ws_client: None,
             process: None,
+            last_be_polled: Instant::now(),
         }
     }
     pub fn send_message(&mut self, md: String) {
         self.state = BrowserState::StartSend(md);
+    }
+
+    pub fn have_not_be_polled_for(&self, duration: Duration) -> bool {
+        (self.last_be_polled - Instant::now()) > duration
     }
 }
 
@@ -84,6 +91,7 @@ impl Stream for ChromeBrowser {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        self.last_be_polled = Instant::now();
         loop {
             trace!("browser loop {:?}", self.state);
             match &mut self.state {

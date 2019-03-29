@@ -365,6 +365,7 @@ impl Stream for OnePage {
                         info!("*** WaitingPageEnable ***");
                         if MethodUtil::match_chrome_response(value, mid).is_some() {
                             self.navigate_to(self.entry_url);
+                            return Ok(Some(PageMessage::NavigatingToTarget).into());
                         }
                     }
                     OnePageState::WaitingPageLoadEvent => {

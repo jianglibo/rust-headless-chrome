@@ -39,11 +39,6 @@ impl Future for FutureConsumeInterval {
 
 pub struct MyPage {
     chrome_page: IntervalOnePage,
-    node_id: &'static str,
-    interval: Interval,
-    count: usize,
-    last_not_ready: Instant,
-    delay: Option<Delay>,
 }
 
 
@@ -52,14 +47,15 @@ impl Future for MyPage {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
-        let mut loop_count = 0_usize;
         loop {
-            loop_count += 1;
-            info!("mypage loop ****************************");
+            info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.chrome_page.poll()) {
                 match value {
+                    PageMessage::NavigatingToTarget => {
+                        self.chrome_page.sleep(Duration::from_secs(10));
+                    },
                     PageMessage::DocumentAvailable => {
-                        self.chrome_page.one_page.capture_screenshot_by_selector(self.node_id, page::ScreenshotFormat::JPEG(Some(100)), true);
+                        self.chrome_page.one_page.capture_screenshot_by_selector("#ddlogin", page::ScreenshotFormat::JPEG(Some(100)), true);
                     }
                     PageMessage::Screenshot(selector,_, _, jpeg_data) => {
                         fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
@@ -86,7 +82,6 @@ mod tests {
     const ENTERY: &'static str = "https://en.wikipedia.org/wiki/WebKit";
     // https://en.wikipedia.org/wiki/WebKit
     // "#mw-content-text > div > table.infobox.vevent"
-
 
     struct Count {
         remaining: usize,
@@ -140,19 +135,9 @@ mod tests {
 
         let my_page = MyPage {
             chrome_page: interval_page,
-            // state: MyPageState::Start,
-            node_id: "#ddlogin",
-            interval: Interval::new_interval(Duration::from_secs(10)),
-            count: 0,
-            last_not_ready: Instant::now(),
-            delay: None,
         };
 
         tokio::run(my_page.map_err(|_| ()));
 
-        // let ft = FutureConsumeInterval {
-        //     interval: Interval::new_interval(Duration::from_secs(10)),
-        // };
-        // tokio::run(ft.map_err(|_| ()));
     }
 }

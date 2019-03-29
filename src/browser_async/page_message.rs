@@ -5,6 +5,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum PageMessage {
+    NavigatingToTarget,
     DocumentAvailable,
     FindNode(Option<&'static str>, Option<dom::Node>),
     FindElement(Option<&'static str>, Option<Element>),

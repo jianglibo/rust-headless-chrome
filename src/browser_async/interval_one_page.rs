@@ -17,6 +17,7 @@ use log::*;
 pub struct IntervalOnePage {
     interval_page_message: IntervalPageMessage,
     pub one_page: OnePage,
+    end_of_sleep: Option<Instant>,
     flag: bool,
 }
 
@@ -28,6 +29,7 @@ impl IntervalOnePage {
         Self {
             interval_page_message,
             one_page,
+            end_of_sleep: None,
             flag: false,
         }
     }
@@ -52,6 +54,30 @@ impl Stream for IntervalPageMessage {
     }
 }
 
+impl IntervalOnePage {
+    pub fn sleep(&mut self, duration:Duration) {
+        if self.end_of_sleep.is_none() {
+            self.end_of_sleep = Some(Instant::now() + duration);
+        }
+    }
+
+    pub fn send_page_message(&mut self, item: PageMessage) -> Poll<Option<PageMessage>, failure::Error> {
+        info!("{:?}", item);
+        match &item {
+            PageMessage::Interval => {
+                if let Some(inst) = self.end_of_sleep {
+                    if Instant::now() > inst {
+                        info!("sleep over>>>>>>>>>>>>>>>");
+                        self.end_of_sleep = None;
+                    }
+                }
+            },
+            _ => ()
+        }
+        return Ok(Some(item).into());
+    }
+}
+
 
 impl Stream for IntervalOnePage {
     type Item = PageMessage;
@@ -67,10 +93,7 @@ impl Stream for IntervalOnePage {
         };
         self.flag = !self.flag;
         let a_done = match a.poll()? {
-            Async::Ready(Some(item)) => {
-                info!("{:?}", item);
-                return Ok(Some(item).into());
-            },
+            Async::Ready(Some(item)) => return self.send_page_message(item),
             Async::Ready(None) => true,
             Async::NotReady => false,
         };
@@ -82,8 +105,7 @@ impl Stream for IntervalOnePage {
                 if !a_done {
                     self.flag = !self.flag;
                 }
-                info!("{:?}", item);
-                Ok(Some(item).into())
+                self.send_page_message(item)
             }
             Async::Ready(None) if a_done => Ok(None.into()),
             Async::Ready(None) | Async::NotReady => Ok(Async::NotReady),

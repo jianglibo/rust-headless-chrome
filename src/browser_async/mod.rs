@@ -4,7 +4,8 @@ mod my_page;
 mod one_page;
 mod element_async;
 mod point_async;
-
+mod interval_one_page;
+mod page_message;
 
 // pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 // use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};

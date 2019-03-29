@@ -3,20 +3,15 @@ use crate::browser_async::chrome_browser::ChromeBrowser;
 use crate::browser_async::dev_tools_method_util::{
     ChromePageError, MethodBeforSendResult, MethodDestination, MethodUtil,
 };
-use crate::browser_async::element_async::{BoxModel, Element, ElementQuad};
+use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::browser_async::point_async::Point;
-use crate::protocol;
-use crate::protocol::dom;
-use crate::protocol::input;
-use crate::protocol::page;
-use crate::protocol::page::methods::Navigate;
-use crate::protocol::target;
+use crate::protocol::{self, dom, input, page, page::methods::Navigate, target};
 use log::*;
-use std::fmt;
 use websocket::futures::{Async, Future, Poll, Stream};
 // use tokio::timer::{Interval, Timeout};
 // use std::time::{Duration, Instant};
 use failure::{Error, Fail};
+use super::page_message::{PageMessage};
 
 #[derive(Debug, Fail)]
 #[fail(display = "The event waited for never came")]
@@ -28,19 +23,6 @@ impl std::convert::From<tokio_timer::timeout::Error<Error>> for WaitTimeout {
     }
 }
 
-pub enum PageMessage {
-    DocumentAvailable,
-    FindNode(Option<&'static str>, Option<dom::Node>),
-    FindElement(Option<&'static str>, Option<Element>),
-    GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
-    Screenshot(
-        Option<&'static str>,
-        page::ScreenshotFormat,
-        bool,
-        Option<Vec<u8>>,
-    ),
-    MessageAvailable(protocol::Message),
-}
 
 #[derive(Debug)]
 enum OnePageState {
@@ -352,25 +334,6 @@ impl OnePage {
     }
 }
 
-impl fmt::Debug for PageMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            PageMessage::FindElement(selector, ele) => {
-                let a = selector.map_or("None", |v| v);
-                if let Some(el) = ele {
-                    write!(
-                        f,
-                        "selector: {}, remote_object_id: {}, backend_node_id: {}",
-                        a, el.remote_object_id, el.backend_node_id
-                    )
-                } else {
-                    write!(f, "selector: {}, None", a)
-                }
-            }
-            _ => write!(f, "{:?}", self),
-        }
-    }
-}
 
 // The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
 impl Stream for OnePage {

@@ -9,11 +9,14 @@ use crate::protocol::page::methods::{Navigate};
 use crate::protocol::target;
 use websocket::futures::{Async, Future, Poll, Stream};
 use log::*;
-use crate::browser_async::one_page::{OnePage, PageMessage};
+use super::one_page::{OnePage};
+use super::page_message::{PageMessage};
+use super::interval_one_page::{IntervalOnePage};
 use std::fs;
 use std::time::{Duration, Instant};
 use tokio::timer::{Interval};
 use tokio_timer::*;
+use tokio::prelude::stream::Select;
 
 #[derive(Debug)]
 struct FutureConsumeInterval {
@@ -35,7 +38,7 @@ impl Future for FutureConsumeInterval {
 }
 
 pub struct MyPage {
-    chrome_page: OnePage,
+    chrome_page: IntervalOnePage,
     node_id: &'static str,
     interval: Interval,
     count: usize,
@@ -52,63 +55,22 @@ impl Future for MyPage {
         let mut loop_count = 0_usize;
         loop {
             loop_count += 1;
-
             info!("mypage loop ****************************");
-            // If the poll result is not ready, then only the arrives of new messages can awake this loop.
-            // when after a success poll we invoke a interval polling, the interval will awake this loop again.
-            match self.chrome_page.poll() {
-                Ok(Async::Ready(Some(value))) => {
-                    loop_count = 0_usize;
-                    match value {
-                            PageMessage::DocumentAvailable => {
-                                self.chrome_page.capture_screenshot_by_selector(self.node_id, page::ScreenshotFormat::JPEG(Some(100)), true);
-                            }
-                            PageMessage::Screenshot(selector,_, _, jpeg_data) => {
-                                fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
-                            }
-                            _ => {
-                                info!("got unused page message {:?}", value);
-                            }
+            if let Some(value) = try_ready!(self.chrome_page.poll()) {
+                match value {
+                    PageMessage::DocumentAvailable => {
+                        self.chrome_page.one_page.capture_screenshot_by_selector(self.node_id, page::ScreenshotFormat::JPEG(Some(100)), true);
+                    }
+                    PageMessage::Screenshot(selector,_, _, jpeg_data) => {
+                        fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
+                    }
+                    _ => {
+                        info!("got unused page message {:?}", value);
                     }
                 }
-                Ok(Async::NotReady) => {
-                    self.count += 1;
-                    let elapsed = self.last_not_ready.elapsed();
-                    info!("not ready! {}, {:?}, loop_count {}", self.count, elapsed, loop_count);
-                    self.last_not_ready = Instant::now();
-                    // if elapsed > Duration::from_secs(3) {
-                    //     self.delay = Delay::new(Instant::now() + Duration::from_secs)
-                    // } else {
-                        return Ok(Async::NotReady);
-                    // }
-                    // If I return NotReady that means I will get polled again only if new message arrives.
-                }
-                Ok(Async::Ready(None)) => {
-                    info!("reach stream end.");
-                }
-                Err(e) => {
-                    error!("{:?}", e);
-                }
+            } else {
+                error!("got None, was stream ended?");
             }
-            // if let Some(value) = try_ready!(self.chrome_page.poll()) {
-            //     match value {
-            //             PageMessage::DocumentAvailable => {
-            //                 self.chrome_page.capture_screenshot_by_selector(self.node_id, page::ScreenshotFormat::JPEG(Some(100)), true);
-            //             }
-            //             PageMessage::Screenshot(selector,_, _, jpeg_data) => {
-            //                 fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
-            //             }
-            //             _ => {
-            //                 info!("got unused page message {:?}", value);
-            //             }
-            //         }
-            //     info!("try interval.");
-            //     if let Some(inst) = try_ready!(self.interval.poll()) {
-            //         info!("{:?}", inst);
-            //     }
-            // } else {
-            //     error!("got None, was stream ended?");
-            // }
         }
     }
 }
@@ -154,13 +116,19 @@ mod tests {
         ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
         let ct = Count {remaining: 100};
+
+        let itv = Interval::new_interval(Duration::from_secs(10));
+        let itv_1 = Interval::new_interval(Duration::from_secs(20));
+
+        // let select2 = Select::new(itv, itv_1);
         tokio::run(ct.map_err(|_| ()));
     }
 
 
     #[test]
     fn t_by_enum() {
-        ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
+        ::std::env::set_var("RUST_LOG", "headless_chrome=info,browser_async=debug");
+        // ::std::env::set_var("RUST_LOG", "trace");
         env_logger::init();
         // let entry_url = "https://en.wikipedia.org/wiki/WebKit";
         let entry_url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
@@ -168,8 +136,10 @@ mod tests {
         let browser = ChromeBrowser::new();
         let page = OnePage::new(browser, entry_url);
 
+        let interval_page = IntervalOnePage::new(Duration::from_secs(3), page);
+
         let my_page = MyPage {
-            chrome_page: page,
+            chrome_page: interval_page,
             // state: MyPageState::Start,
             node_id: "#ddlogin",
             interval: Interval::new_interval(Duration::from_secs(10)),

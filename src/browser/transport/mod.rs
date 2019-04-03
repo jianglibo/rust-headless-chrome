@@ -346,7 +346,6 @@ impl Transport {
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        println!("dropping transport");
         info!("dropping transport");
     }
 }

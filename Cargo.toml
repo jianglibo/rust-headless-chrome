@@ -20,15 +20,13 @@ log = "0.4"
 env_logger = "0.6"
 rand = "0.6"
 tempfile = "3"
-toml = "0.4"
-chrono = "0.4"
 base64 = "0.10"
 derive_builder = "0.7.1"
 tokio = "0.1"
 tokio-timer = "0.2.10"
 futures = "0.1"
 which = "2.0"
-reqwest = { version = "0.9", optional = true }
+ureq = { version = "0.9", optional = true }
 directories = { version = "1.0", optional = true }
 zip = { version = "0.5", optional = true }
 
@@ -36,6 +34,7 @@ zip = { version = "0.5", optional = true }
 winreg = "0.6"
 
 [dev-dependencies]
+chrono = "0.4"
 tiny_http = "0.6"
 png = "0.14"
 jpeg-decoder = { version = "0.1", default_features = false }
@@ -46,6 +45,6 @@ name = "headless_chrome"
 path = "src/lib.rs"
 
 [features]
-# default = [ "fetch" ]
-fetch = ["reqwest", "directories", "zip"]
+// default = [ "fetch" ]
+fetch = [ "ureq", "directories", "zip" ]
 nightly = []

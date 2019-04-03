@@ -7,6 +7,7 @@ use std::fmt;
 pub enum PageMessage {
     NavigatingToTarget,
     DocumentAvailable,
+    EnablePageDone,
     FindNode(Option<&'static str>, Option<dom::Node>),
     FindElement(Option<&'static str>, Option<Element>),
     GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
@@ -17,7 +18,10 @@ pub enum PageMessage {
         Option<Vec<u8>>,
     ),
     MessageAvailable(protocol::Message),
+    FrameNavigatedEvent(String, String, protocol::page::events::FrameNavigatedEvent),
+    TargetInfoChanged(protocol::target::events::TargetInfoChangedEvent),
     Interval,
+    SecondsElapsed(usize),
 }
 
 // impl fmt::Debug for PageMessage {

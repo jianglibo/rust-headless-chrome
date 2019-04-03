@@ -4,6 +4,7 @@ mod my_page;
 mod one_page;
 mod element_async;
 mod point_async;
+mod interval_page_message;
 mod interval_one_page;
 mod page_message;
 

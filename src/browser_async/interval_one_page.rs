@@ -3,6 +3,7 @@ use websocket::futures::{Future, Stream, Fuse};
 use tokio::timer::{Interval};
 use super::one_page::{OnePage};
 use super::page_message::{PageMessage};
+use super::interval_page_message::{IntervalPageMessage};
 use failure::{self, Error, Fail};
 use std::time::{Duration, Instant};
 use log::*;
@@ -17,60 +18,49 @@ use log::*;
 pub struct IntervalOnePage {
     interval_page_message: IntervalPageMessage,
     pub one_page: OnePage,
-    end_of_sleep: Option<Instant>,
+    // end_of_sleep: Option<Instant>,
+    seconds_from_start: usize,
     flag: bool,
 }
 
 impl IntervalOnePage {
     pub fn new(duration: Duration, one_page: OnePage) -> Self {
-        let interval_page_message = IntervalPageMessage {
-            interval: Interval::new_interval(duration),
-        };
+        let interval_page_message = IntervalPageMessage::new();
         Self {
             interval_page_message,
             one_page,
-            end_of_sleep: None,
+            // end_of_sleep: None,
+            seconds_from_start: 0,
             flag: false,
         }
     }
 }
 
 
-#[derive(Debug)]
-pub struct IntervalPageMessage {
-    interval: Interval,
-}
-
-impl Stream for IntervalPageMessage {
-    type Item = PageMessage;
-    type Error = failure::Error;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            if let Some(_) = try_ready!(self.interval.poll()) {
-                return Ok(Async::Ready(Some(PageMessage::Interval)));
-            }
-        }
-    }
-}
-
 impl IntervalOnePage {
-    pub fn sleep(&mut self, duration:Duration) {
-        if self.end_of_sleep.is_none() {
-            self.end_of_sleep = Some(Instant::now() + duration);
-        }
+    // pub fn sleep(&mut self, duration:Duration) {
+    //     if self.end_of_sleep.is_none() {
+    //         self.end_of_sleep = Some(Instant::now() + duration);
+    //     }
+    // }
+
+
+    pub fn navigate_to(&mut self, url: &str, timeout_seconds: usize) {
+        self.one_page.navigate_to(url);
     }
 
     pub fn send_page_message(&mut self, item: PageMessage) -> Poll<Option<PageMessage>, failure::Error> {
         info!("{:?}", item);
         match &item {
             PageMessage::Interval => {
-                if let Some(inst) = self.end_of_sleep {
-                    if Instant::now() > inst {
-                        info!("sleep over>>>>>>>>>>>>>>>");
-                        self.end_of_sleep = None;
-                    }
-                }
+                self.seconds_from_start += 1;
+                return Ok(Some(PageMessage::SecondsElapsed(self.seconds_from_start)).into());
+                // if let Some(inst) = self.end_of_sleep {
+                //     if Instant::now() > inst {
+                //         info!("sleep over>>>>>>>>>>>>>>>");
+                //         self.end_of_sleep = None;
+                //     }
+                // }
             },
             _ => ()
         }

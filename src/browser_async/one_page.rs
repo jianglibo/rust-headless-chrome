@@ -25,12 +25,14 @@ impl std::convert::From<tokio_timer::timeout::Error<Error>> for WaitTimeout {
 
 
 #[derive(Debug)]
-enum OnePageState {
+pub enum OnePageState {
     WaitingPageCreate,
     WaitingPageAttach,
     WaitingPageEnable(usize),
-    WaitingPageLoadEvent,
-    WaitingGetDocument(usize),
+    WaitingFrameTree(usize),
+    AfterInvokeNavigate,
+    // WaitingPageLoadEvent,
+    WaitingGetDocument(usize, Option<&'static str>),
     WaitingNode(Option<&'static str>, usize),
     WaitingDescribeNode(Option<&'static str>, usize),
     WaitingRemoteObject(dom::NodeId, Option<&'static str>, usize),
@@ -41,22 +43,22 @@ enum OnePageState {
 
 pub struct OnePage {
     chrome_browser: ChromeBrowser,
-    state: OnePageState,
+    pub state: OnePageState,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
-    entry_url: &'static str,
+    // entry_url: &'static str,
     root_node: Option<dom::Node>,
     expect_page_message: PageMessage,
 }
 
 impl OnePage {
-    pub fn new(chrome_browser: ChromeBrowser, entry_url: &'static str) -> Self {
+    pub fn new(chrome_browser: ChromeBrowser/*, entry_url: &'static str*/) -> Self {
         Self {
             chrome_browser,
             state: OnePageState::WaitingPageCreate,
             target_info: None,
             session_id: None,
-            entry_url: entry_url,
+            // entry_url: entry_url,
             root_node: None,
             expect_page_message: PageMessage::DocumentAvailable,
         }
@@ -104,38 +106,38 @@ impl OnePage {
         let (_, method_str, _) = self
             .create_msg_to_send_with_session_id(Navigate { url })
             .unwrap();
-        self.state = OnePageState::WaitingPageLoadEvent;
+        self.state = OnePageState::AfterInvokeNavigate;
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn get_document(&mut self) {
+    pub fn get_document(&mut self, then_find_node: Option<&'static str>) {
         let (_, method_str, mid) = self
             .create_msg_to_send_with_session_id(dom::methods::GetDocument {
                 depth: Some(0),
                 pierce: Some(false),
             })
             .unwrap();
-        self.state = OnePageState::WaitingGetDocument(mid.unwrap());
+        self.state = OnePageState::WaitingGetDocument(mid.unwrap(), then_find_node);
         self.chrome_browser.send_message(method_str);
     }
 
-    fn wait_page_load_event_fired(&mut self, value: protocol::Message) {
-        if let Some(receive_message_from_target_params) =
-            MethodUtil::is_page_load_event_fired(value)
-        {
-            if (receive_message_from_target_params.target_id
-                == self.target_info.as_mut().unwrap().target_id)
-                && (receive_message_from_target_params.session_id
-                    == *self.session_id.as_mut().unwrap())
-            {
-                self.get_document();
-            } else {
-                info!("unequal session_id or target_id.");
-            }
-        } else {
-            info!("isn't is_page_load_event_fired.");
-        }
-    }
+    // fn wait_page_load_event_fired(&mut self, value: protocol::Message) {
+    //     if let Some(receive_message_from_target_params) =
+    //         MethodUtil::is_page_load_event_fired(value)
+    //     {
+    //         if (receive_message_from_target_params.target_id
+    //             == self.target_info.as_mut().unwrap().target_id)
+    //             && (receive_message_from_target_params.session_id
+    //                 == *self.session_id.as_mut().unwrap())
+    //         {
+    //             self.get_document();
+    //         } else {
+    //             info!("unequal session_id or target_id.");
+    //         }
+    //     } else {
+    //         info!("isn't is_page_load_event_fired.");
+    //     }
+    // }
 
     pub fn get_box_model(&mut self, selector: Option<&'static str>, element: &Element) {
         let (_, method_str, mid) = self
@@ -151,14 +153,26 @@ impl OnePage {
     }
 
     pub fn find_node(&mut self, selector: &'static str) {
-        let rn = self.root_node.as_ref().unwrap();
+        if self.root_node.is_some() {
+            let rn = self.root_node.as_ref().unwrap();
+            let (_, method_str, mid) = self
+                .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
+                    node_id: rn.node_id,
+                    selector,
+                })
+                .unwrap();
+            self.state = OnePageState::WaitingNode(Some(selector), mid.unwrap());
+            self.chrome_browser.send_message(method_str);
+        } else {
+            self.get_document(Some(selector));
+        }
+    }
+
+    pub fn get_frame_tree(&mut self) {
         let (_, method_str, mid) = self
-            .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
-                node_id: rn.node_id,
-                selector,
-            })
+            .create_msg_to_send_with_session_id(page::methods::GetFrameTree {})
             .unwrap();
-        self.state = OnePageState::WaitingNode(Some(selector), mid.unwrap());
+        self.state = OnePageState::WaitingFrameTree(mid.unwrap());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -364,15 +378,50 @@ impl Stream for OnePage {
                     OnePageState::WaitingPageEnable(mid) => {
                         info!("*** WaitingPageEnable ***");
                         if MethodUtil::match_chrome_response(value, mid).is_some() {
-                            self.navigate_to(self.entry_url);
-                            return Ok(Some(PageMessage::NavigatingToTarget).into());
+                            return Ok(Some(PageMessage::EnablePageDone).into());
                         }
                     }
-                    OnePageState::WaitingPageLoadEvent => {
-                        info!("*** WaitingPageLoadEvent ***");
-                        self.wait_page_load_event_fired(value);
+                    OnePageState::AfterInvokeNavigate => {
+                        info!("*** AfterInvokeNavigate ***");
+                        if let Some(mg) = MethodUtil::is_received_message_from_target_event(&value) {
+                            if let Ok(inner_message) = protocol::parse_raw_message(&mg.message) {
+                                if let protocol::Message::Event(inner_event) = inner_message {
+                                    match inner_event {
+                                        protocol::Event::FrameNavigated(frame_navigated_event) => return Ok(Some(PageMessage::FrameNavigatedEvent((&mg.session_id).clone(), (&mg.target_id).clone(), frame_navigated_event)).into()),
+                                        protocol::Event::TargetInfoChanged(target_info_changed) => return Ok(Some(PageMessage::TargetInfoChanged(target_info_changed)).into()),
+                                        _ => {
+                                            info!("inner event: {:?}", inner_event);
+                                        }
+                                    }
+                                }
+                            } else {
+                                info!("parse inner event failure: {:?}", value);
+                            }
+
+                            // if let Ok(inner_msg) = MethodUtil::parse_target_message_event(&mg.message) {
+                            //     // match inner_msg {
+                            //         info!("json value: {:?}", inner_msg);
+                            //         // _ => ()
+                            //     // }
+                            // } else {
+                            //     info!("{:?}", value);
+                            // }
+                        } else {
+                            info!("{:?}", value);
+                        }
                     }
-                    OnePageState::WaitingGetDocument(mid) => {
+                    OnePageState::WaitingFrameTree(mid) => {
+                        info!("*** WaitingFrameTree {:?} ***", mid);
+                        if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                            if let Ok(v) = protocol::parse_response::<
+                                page::methods::GetFrameTreeReturnObject,
+                            >(resp)
+                            {
+                                info!("----------------- got frames: {:?}", v);
+                            }
+                        }
+                    }
+                    OnePageState::WaitingGetDocument(mid, ref next_find_node) => {
                         info!("*** WaitingGetDocument ***");
                         if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                             if let Ok(c) = protocol::parse_response::<
@@ -381,6 +430,10 @@ impl Stream for OnePage {
                             {
                                 info!("got document Node: {:?}", c.root);
                                 self.root_node = Some(c.root);
+                                if let Some(selector) = next_find_node.as_ref() {
+                                    let s = *selector;
+                                    self.find_node(s);
+                                }
                                 return Ok(Async::Ready(Some(PageMessage::DocumentAvailable)));
                             } else {
                                 return Err(ChromePageError::NoRootNode.into());

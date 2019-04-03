@@ -105,22 +105,22 @@ impl MethodUtil {
                         info!("got message from target response. {:?}", resp);
                         return Some(resp);
                     } else {
-                        error!("got unknown message: {:?}", target_message_event);
+                        error!("got unknown message0: {:?}", target_message_event);
                     }
                 }
                 other => {
-                    error!("got unknown message: {:?}", other);
+                    error!("got unknown message1: {:?}", other);
                 }
             }
             None
     }
 
-    pub fn is_received_message_from_target_event(message: protocol::Message) -> Option<protocol::target::events::ReceivedMessageFromTargetParams> {
+    pub fn is_received_message_from_target_event<'a>(message: &'a protocol::Message) -> Option<&'a protocol::target::events::ReceivedMessageFromTargetParams> {
             match message {
                 protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
                     target_message_event,
                 )) => {
-                    return Some(target_message_event.params);
+                    return Some(&target_message_event.params);
                 }
                 other => {
                     info!("got ignored event message: {:?}", other);
@@ -130,14 +130,14 @@ impl MethodUtil {
     }
     //{ session_id: "5566C53458FD05F52B70FD9F07336F5D", target_id: "224A448D4698866E1FA56CBBD0455384", message: "{\"method\":\"Page.loadEventFired\",\"params\":{\"timestamp\":345434.504916}}" } }
 
-    pub fn is_page_load_event_fired(message: protocol::Message) -> Option<protocol::target::events::ReceivedMessageFromTargetParams> {
-        if let Some(mg) = Self::is_received_message_from_target_event(message) {
+    pub fn is_page_load_event_fired<'a>(message: &'a protocol::Message) -> Option<&'a protocol::target::events::ReceivedMessageFromTargetParams> {
+        if let Some(mg) = Self::is_received_message_from_target_event(&message) {
             if let Ok(inner_msg) = Self::parse_target_message_event(&mg.message) {
                 match inner_msg {
                     serde_json::Value::Object(map) => {
                         if let Some(serde_json::Value::String(method_name)) = map.get("method") {
                             if method_name == "Page.loadEventFired" {
-                                return Some(mg);
+                                return Some(&mg);
                             }
                         }
                     }

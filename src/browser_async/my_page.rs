@@ -51,14 +51,31 @@ impl Future for MyPage {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.chrome_page.poll()) {
                 match value {
-                    PageMessage::NavigatingToTarget => {
-                        self.chrome_page.sleep(Duration::from_secs(10));
+                    PageMessage::EnablePageDone => {
+                        info!("page enabled.");
+                        self.chrome_page.one_page.navigate_to("https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/");
+                        // self.chrome_page.sleep(Duration::from_secs(10));
                     },
                     PageMessage::DocumentAvailable => {
-                        self.chrome_page.one_page.capture_screenshot_by_selector("#ddlogin", page::ScreenshotFormat::JPEG(Some(100)), true);
+                        
                     }
                     PageMessage::Screenshot(selector,_, _, jpeg_data) => {
                         fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
+                    },
+                    PageMessage::SecondsElapsed(seconds) => {
+                        info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
+                    }
+                    PageMessage::FrameNavigatedEvent(session_id, target_id, frame_navigated_event) => {
+                        info!("frame event: {:?}", frame_navigated_event);
+                        if let Some(frame_name) = frame_navigated_event.params.frame.name {
+                            info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxx frame name {}", frame_name);
+                            if frame_name == "ddlogin-iframe" {
+                                // 82C4F7B7F89577C8A118D17F12B82EB1
+                                self.chrome_page.one_page.get_frame_tree();
+                                // self.chrome_page.one_page.capture_screenshot_by_selector("#ddlogin-iframe", page::ScreenshotFormat::JPEG(Some(100)), true);
+                            }
+                            
+                        }
                     }
                     _ => {
                         info!("got unused page message {:?}", value);
@@ -129,7 +146,7 @@ mod tests {
         let entry_url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
         let browser = ChromeBrowser::new();
-        let page = OnePage::new(browser, entry_url);
+        let page = OnePage::new(browser);
 
         let interval_page = IntervalOnePage::new(Duration::from_secs(3), page);
 

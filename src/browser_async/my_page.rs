@@ -71,8 +71,8 @@ impl Future for MyPage {
                             info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxx frame name {}", frame_name);
                             if frame_name == "ddlogin-iframe" {
                                 // 82C4F7B7F89577C8A118D17F12B82EB1
-                                self.chrome_page.one_page.get_frame_tree();
-                                // self.chrome_page.one_page.capture_screenshot_by_selector("#ddlogin-iframe", page::ScreenshotFormat::JPEG(Some(100)), true);
+                                // self.chrome_page.one_page.get_frame_tree();
+                                self.chrome_page.one_page.capture_screenshot_by_selector("#ddlogin-iframe", page::ScreenshotFormat::JPEG(Some(100)), true);
                             }
                             
                         }
@@ -143,7 +143,7 @@ mod tests {
         // ::std::env::set_var("RUST_LOG", "trace");
         env_logger::init();
         // let entry_url = "https://en.wikipedia.org/wiki/WebKit";
-        let entry_url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+        // let entry_url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
         let browser = ChromeBrowser::new();
         let page = OnePage::new(browser);

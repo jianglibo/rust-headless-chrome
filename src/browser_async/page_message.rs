@@ -19,6 +19,7 @@ pub enum PageMessage {
     ),
     MessageAvailable(protocol::Message),
     FrameNavigatedEvent(String, String, protocol::page::events::FrameNavigatedEvent),
+    GetFrameTree(protocol::page::methods::FrameTree),
     TargetInfoChanged(protocol::target::events::TargetInfoChangedEvent),
     Interval,
     SecondsElapsed(usize),

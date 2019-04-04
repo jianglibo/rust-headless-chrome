@@ -418,6 +418,7 @@ impl Stream for OnePage {
                             >(resp)
                             {
                                 info!("----------------- got frames: {:?}", v);
+                                return Ok(Some(PageMessage::GetFrameTree(v.frame_tree)).into());
                             }
                         }
                     }
@@ -434,7 +435,7 @@ impl Stream for OnePage {
                                     let s = *selector;
                                     self.find_node(s);
                                 }
-                                return Ok(Async::Ready(Some(PageMessage::DocumentAvailable)));
+                                return Ok(Some(PageMessage::DocumentAvailable).into());
                             } else {
                                 return Err(ChromePageError::NoRootNode.into());
                             }
@@ -461,10 +462,10 @@ impl Stream for OnePage {
                             >(resp)
                             {
                                 if let PageMessage::FindNode(_, _) = &self.expect_page_message {
-                                    return Ok(Async::Ready(Some(PageMessage::FindNode(
+                                    return Ok(Some(PageMessage::FindNode(
                                         *maybe_selector,
                                         Some(v.node),
-                                    ))));
+                                    )).into());
                                 } else {
                                     let selector_cloned = maybe_selector.clone();
                                     self.find_element(selector_cloned, v.node.backend_node_id);
@@ -485,10 +486,10 @@ impl Stream for OnePage {
                                     backend_node_id: *backend_node_id,
                                 };
                                 if let PageMessage::FindElement(_, _) = self.expect_page_message {
-                                    return Ok(Async::Ready(Some(PageMessage::FindElement(
+                                    return Ok(Some(PageMessage::FindElement(
                                         selector_cloned,
                                         Some(element),
-                                    ))));
+                                    )).into());
                                 } else {
                                     self.get_box_model(selector_cloned, &element);
                                 }
@@ -515,11 +516,11 @@ impl Stream for OnePage {
                                 };
                                 match &self.expect_page_message {
                                     PageMessage::GetBoxModel(_, _, _) => {
-                                        return Ok(Async::Ready(Some(PageMessage::GetBoxModel(
+                                        return Ok(Some(PageMessage::GetBoxModel(
                                             *selector,
                                             *backend_node_id,
                                             model_box,
-                                        ))));
+                                        )).into());
                                     }
                                     PageMessage::Screenshot(a, fmt, from_surface, c) => {
                                         self.capture_screenshot(
@@ -550,12 +551,12 @@ impl Stream for OnePage {
                                 if let PageMessage::Screenshot(_, format, from_surface, _) =
                                     &self.expect_page_message
                                 {
-                                    return Ok(Async::Ready(Some(PageMessage::Screenshot(
+                                    return Ok(Some(PageMessage::Screenshot(
                                         None,
                                         format.clone(),
                                         from_surface.clone(),
                                         Some(data_v8),
-                                    ))));
+                                    )).into());
                                 }
                             }
                             self.state = OnePageState::Consuming;
@@ -563,7 +564,7 @@ impl Stream for OnePage {
                     }
                     _ => {
                         trace!("receive message: {:?}", value);
-                        return Ok(Async::Ready(Some(PageMessage::MessageAvailable(value))));
+                        return Ok(Some(PageMessage::MessageAvailable(value)).into());
                     }
                 }
             } else {

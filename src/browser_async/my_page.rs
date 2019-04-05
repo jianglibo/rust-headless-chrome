@@ -7,7 +7,7 @@ use crate::browser_async::dev_tools_method_util::{
 };
 use crate::protocol::page::methods::{Navigate};
 use crate::protocol::target;
-use websocket::futures::{Async, Future, Poll, Stream};
+use websocket::futures::{Async, Future, Poll, Stream, IntoFuture};
 use log::*;
 use super::one_page::{OnePage};
 use super::page_message::{PageMessage};
@@ -18,49 +18,25 @@ use tokio::timer::{Interval};
 use tokio_timer::*;
 use tokio::prelude::stream::Select;
 
-#[derive(Debug)]
-struct FutureConsumeInterval {
-    interval: Interval
-}
 
-impl Future for FutureConsumeInterval {
-    type Item = ();
-    type Error = tokio_timer::Error;
-    fn poll(&mut self) -> Poll<(), Self::Error> {
-        loop {
-            if let Some(inst) = try_ready!(self.interval.poll()) {
-                info!("{:?}", inst);
-            } else {
-                info!("not ready yet!");
-            }
-        }
-    }
-}
-
-pub struct MyPage {
+pub struct FindNode {
     chrome_page: IntervalOnePage,
+    url: &'static str,
+    selector: &'static str,
 }
 
-
-impl Future for MyPage {
-    type Item = ();
+impl Future for FindNode {
+    type Item = Option<dom::NodeId>;
     type Error = failure::Error;
 
-    fn poll(&mut self) -> Poll<(), Self::Error> {
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.chrome_page.poll()) {
                 match value {
                     PageMessage::EnablePageDone => {
                         info!("page enabled.");
-                        self.chrome_page.one_page.navigate_to("https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/");
-                        // self.chrome_page.sleep(Duration::from_secs(10));
-                    },
-                    PageMessage::DocumentAvailable => {
-                        
-                    }
-                    PageMessage::Screenshot(selector,_, _, jpeg_data) => {
-                        fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
+                        self.chrome_page.one_page.navigate_to(self.url);
                     },
                     PageMessage::SecondsElapsed(seconds) => {
                         info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
@@ -68,14 +44,13 @@ impl Future for MyPage {
                     PageMessage::FrameNavigatedEvent(session_id, target_id, frame_navigated_event) => {
                         info!("frame event: {:?}", frame_navigated_event);
                         if let Some(frame_name) = frame_navigated_event.params.frame.name {
-                            info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxx frame name {}", frame_name);
                             if frame_name == "ddlogin-iframe" {
-                                // 82C4F7B7F89577C8A118D17F12B82EB1
-                                // self.chrome_page.one_page.get_frame_tree();
-                                self.chrome_page.one_page.capture_screenshot_by_selector("#ddlogin-iframe", page::ScreenshotFormat::JPEG(Some(100)), true);
+                                self.chrome_page.one_page.find_node(self.selector);
                             }
-                            
                         }
+                    }
+                    PageMessage::DomQuerySelector(selector, node_id_op) => {
+                        break Ok(node_id_op.into());
                     }
                     _ => {
                         info!("got unused page message {:?}", value);
@@ -88,6 +63,50 @@ impl Future for MyPage {
     }
 }
 
+// impl Future for FindNode {
+//     type Item = ();
+//     type Error = failure::Error;
+
+//     fn poll(&mut self) -> Poll<(), Self::Error> {
+//         loop {
+//             info!("my page loop ****************************");
+//             if let Some(value) = try_ready!(self.chrome_page.poll()) {
+//                 match value {
+//                     PageMessage::EnablePageDone => {
+//                         info!("page enabled.");
+//                         self.chrome_page.one_page.navigate_to(self.url);
+//                         // self.chrome_page.sleep(Duration::from_secs(10));
+//                     },
+//                     PageMessage::DocumentAvailable => {
+                        
+//                     }
+//                     PageMessage::Screenshot(selector,_, _, jpeg_data) => {
+//                         fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
+//                     },
+//                     PageMessage::SecondsElapsed(seconds) => {
+//                         info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
+//                     }
+//                     PageMessage::FrameNavigatedEvent(session_id, target_id, frame_navigated_event) => {
+//                         info!("frame event: {:?}", frame_navigated_event);
+//                         if let Some(frame_name) = frame_navigated_event.params.frame.name {
+//                             info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxx frame name {}", frame_name);
+//                             if frame_name == "ddlogin-iframe" {
+//                                 self.chrome_page.one_page.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::JPEG(Some(100)), true);
+//                             }
+                            
+//                         }
+//                     }
+//                     _ => {
+//                         info!("got unused page message {:?}", value);
+//                     }
+//                 }
+//             } else {
+//                 error!("got None, was stream ended?");
+//             }
+//         }
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,66 +114,51 @@ mod tests {
     use websocket::futures::{Future};
     use futures::{task};
 
-    // const ENTERY: &'static str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-    const ENTERY: &'static str = "https://en.wikipedia.org/wiki/WebKit";
-    // https://en.wikipedia.org/wiki/WebKit
-    // "#mw-content-text > div > table.infobox.vevent"
-
-    struct Count {
-        remaining: usize,
+    fn run_one<F>(f: F) -> Result<F::Item, F::Error>
+    where
+        F: IntoFuture,
+        F::Future: Send + 'static,
+        F::Item: Send + 'static,
+        F::Error: Send + 'static,
+    {
+            let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
+            runtime.block_on(f.into_future())
     }
 
-    impl Future for Count {
-        type Item = ();
-        type Error = ();
-
-        fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-            info!("got polled: remain {}", self.remaining);
-            while self.remaining > 0 {
-                self.remaining -= 1;
-
-                // Yield every 10 iterations
-                if self.remaining % 10 == 0 {
-                    task::current().notify();
-                    return Ok(Async::NotReady);
-                }
-            }
-            Ok(Async::Ready(()))
-        }
-    }
-
-    #[test]
-    fn test_yielding() {
-        ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
-        env_logger::init();
-        let ct = Count {remaining: 100};
-
-        let itv = Interval::new_interval(Duration::from_secs(10));
-        let itv_1 = Interval::new_interval(Duration::from_secs(20));
-
-        // let select2 = Select::new(itv, itv_1);
-        tokio::run(ct.map_err(|_| ()));
-    }
-
-
-    #[test]
-    fn t_by_enum() {
+    fn init_log() {
         ::std::env::set_var("RUST_LOG", "headless_chrome=info,browser_async=debug");
-        // ::std::env::set_var("RUST_LOG", "trace");
         env_logger::init();
-        // let entry_url = "https://en.wikipedia.org/wiki/WebKit";
-        // let entry_url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+    }
 
+    fn get_fixture_page() -> IntervalOnePage {
         let browser = ChromeBrowser::new();
         let page = OnePage::new(browser);
+        IntervalOnePage::new(page)
+    }
 
-        let interval_page = IntervalOnePage::new(Duration::from_secs(3), page);
-
-        let my_page = MyPage {
-            chrome_page: interval_page,
+    #[test]
+    fn t_get_node_id() {
+        init_log();
+        let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+        let mut selector = "#ddlogin-iframe #qrcode";
+        let my_page = FindNode {
+            chrome_page: get_fixture_page(),
+            url,
+            selector,
         };
+        // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
+        let result = run_one(my_page).unwrap();
+        assert!(result.is_none());
 
-        tokio::run(my_page.map_err(|_| ()));
+        selector = "#ddlogin-iframe";
+        let my_page = FindNode {
+            chrome_page: get_fixture_page(),
+            url,
+            selector,
+        };
+        // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
+        let result = run_one(my_page).unwrap();
+        assert!(result.is_some());
 
     }
 }

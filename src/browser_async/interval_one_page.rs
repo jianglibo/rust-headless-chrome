@@ -24,7 +24,7 @@ pub struct IntervalOnePage {
 }
 
 impl IntervalOnePage {
-    pub fn new(duration: Duration, one_page: OnePage) -> Self {
+    pub fn new(one_page: OnePage) -> Self {
         let interval_page_message = IntervalPageMessage::new();
         Self {
             interval_page_message,

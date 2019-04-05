@@ -67,6 +67,10 @@ pub enum ChromePageError {
     NoSession,
     #[fail(display = "there is no root node.")]
     NoRootNode,
+    #[fail(display = "selector {} return empty result.", selector)]
+    QuerySelectorNoResult {
+        selector: &'static str
+    },
 }
 
 #[derive(Debug)]

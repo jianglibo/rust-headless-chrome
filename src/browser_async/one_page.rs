@@ -449,7 +449,13 @@ impl Stream for OnePage {
                                 dom::methods::QuerySelectorReturnObject,
                             >(resp)
                             {
-                                self.describe_node(selector_cloned, v.node_id);
+                                if v.node_id > 0 {
+                                    self.describe_node(selector_cloned, v.node_id);
+                                    break Ok(Some(PageMessage::DomQuerySelector(selector_cloned, Some(v.node_id))).into());
+                                    // break Err(ChromePageError::QuerySelectorNoResult{selector: selector_cloned.unwrap()}.into());
+                                } else {
+                                    break Ok(Some(PageMessage::DomQuerySelector(selector_cloned, None)).into());
+                                }
                             }
                         }
                     }

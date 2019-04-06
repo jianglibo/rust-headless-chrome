@@ -8,8 +8,9 @@ pub enum PageMessage {
     NavigatingToTarget,
     DocumentAvailable,
     EnablePageDone,
-    FindNode(Option<&'static str>, Option<dom::Node>),
+    // FindNode(Option<&'static str>, Option<dom::Node>),
     DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),
+    DomDescribeNode(Option<&'static str>, Option<dom::Node>),
     FindElement(Option<&'static str>, Option<Element>),
     GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
     Screenshot(

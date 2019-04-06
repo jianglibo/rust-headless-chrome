@@ -114,6 +114,17 @@ pub mod events {
     }
 
     #[derive(Deserialize, Debug, Clone)]
+    pub struct FrameAttachedEvent {
+        pub params: FrameAttachedParams,
+    }
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FrameAttachedParams {
+        pub frame_id: String,
+        pub parent_frame_id: String,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FrameStoppedLoadingEvent {
         pub params: FrameStoppedLoadingParams,
     }

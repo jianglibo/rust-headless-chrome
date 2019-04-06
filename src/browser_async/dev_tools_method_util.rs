@@ -71,6 +71,10 @@ pub enum ChromePageError {
     QuerySelectorNoResult {
         selector: &'static str
     },
+    #[fail(display = "I had wait {} seconds.", seconds)]
+    WaitTimeout {
+       seconds: usize,
+    }
 }
 
 #[derive(Debug)]

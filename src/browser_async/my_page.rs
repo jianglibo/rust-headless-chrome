@@ -18,15 +18,13 @@ use tokio::timer::{Interval};
 use tokio_timer::*;
 use tokio::prelude::stream::Select;
 
-
-pub struct FindNode {
+pub struct LoadEventFired {
     chrome_page: IntervalOnePage,
     url: &'static str,
-    selector: &'static str,
 }
 
-impl Future for FindNode {
-    type Item = Option<dom::NodeId>;
+impl Future for LoadEventFired {
+    type Item = u32;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -39,18 +37,10 @@ impl Future for FindNode {
                         self.chrome_page.one_page.navigate_to(self.url);
                     },
                     PageMessage::SecondsElapsed(seconds) => {
-                        info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
-                    }
-                    PageMessage::FrameNavigatedEvent(session_id, target_id, frame_navigated_event) => {
-                        info!("frame event: {:?}", frame_navigated_event);
-                        if let Some(frame_name) = frame_navigated_event.params.frame.name {
-                            if frame_name == "ddlogin-iframe" {
-                                self.chrome_page.one_page.find_node(self.selector);
-                            }
+                        if seconds > 29 {
+                            break Err(ChromePageError::WaitTimeout{seconds: seconds}.into());
                         }
-                    }
-                    PageMessage::DomQuerySelector(selector, node_id_op) => {
-                        break Ok(node_id_op.into());
+                        info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
                     }
                     _ => {
                         info!("got unused page message {:?}", value);
@@ -63,11 +53,19 @@ impl Future for FindNode {
     }
 }
 
+
+// pub struct FindNode {
+//     chrome_page: IntervalOnePage,
+//     url: &'static str,
+//     selector: &'static str,
+//     root_node_id: Option<dom::NodeId>,
+// }
+
 // impl Future for FindNode {
-//     type Item = ();
+//     type Item = Option<dom::NodeId>;
 //     type Error = failure::Error;
 
-//     fn poll(&mut self) -> Poll<(), Self::Error> {
+//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
 //         loop {
 //             info!("my page loop ****************************");
 //             if let Some(value) = try_ready!(self.chrome_page.poll()) {
@@ -75,13 +73,6 @@ impl Future for FindNode {
 //                     PageMessage::EnablePageDone => {
 //                         info!("page enabled.");
 //                         self.chrome_page.one_page.navigate_to(self.url);
-//                         // self.chrome_page.sleep(Duration::from_secs(10));
-//                     },
-//                     PageMessage::DocumentAvailable => {
-                        
-//                     }
-//                     PageMessage::Screenshot(selector,_, _, jpeg_data) => {
-//                         fs::write("screenshot.jpg", &jpeg_data.unwrap()).unwrap();
 //                     },
 //                     PageMessage::SecondsElapsed(seconds) => {
 //                         info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
@@ -89,12 +80,57 @@ impl Future for FindNode {
 //                     PageMessage::FrameNavigatedEvent(session_id, target_id, frame_navigated_event) => {
 //                         info!("frame event: {:?}", frame_navigated_event);
 //                         if let Some(frame_name) = frame_navigated_event.params.frame.name {
-//                             info!("xxxxxxxxxxxxxxxxxxxxxxxxxxxxx frame name {}", frame_name);
 //                             if frame_name == "ddlogin-iframe" {
-//                                 self.chrome_page.one_page.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::JPEG(Some(100)), true);
+//                                 self.chrome_page.one_page.dom_query_selector(None, self.selector, false);
 //                             }
-                            
 //                         }
+//                     }
+//                     PageMessage::DomQuerySelector(selector, node_id_op) => {
+//                         break Ok(node_id_op.into());
+//                     }
+//                     _ => {
+//                         info!("got unused page message {:?}", value);
+//                     }
+//                 }
+//             } else {
+//                 error!("got None, was stream ended?");
+//             }
+//         }
+//     }
+// }
+
+// pub struct DescribeNode {
+//     chrome_page: IntervalOnePage,
+//     url: &'static str,
+//     selector: &'static str,
+// }
+
+// impl Future for DescribeNode {
+//     type Item = Option<dom::Node>;
+//     type Error = failure::Error;
+
+//     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+//         loop {
+//             info!("my page loop ****************************");
+//             if let Some(value) = try_ready!(self.chrome_page.poll()) {
+//                 match value {
+//                     PageMessage::EnablePageDone => {
+//                         info!("page enabled.");
+//                         self.chrome_page.one_page.navigate_to(self.url);
+//                     },
+//                     PageMessage::SecondsElapsed(seconds) => {
+//                         info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
+//                     }
+//                     PageMessage::FrameNavigatedEvent(session_id, target_id, frame_navigated_event) => {
+//                         info!("frame event: {:?}", frame_navigated_event);
+//                         if let Some(frame_name) = frame_navigated_event.params.frame.name {
+//                             if frame_name == "ddlogin-iframe" {
+//                                 self.chrome_page.one_page.dom_describe_node(Some(self.selector), None, false);
+//                             }
+//                         }
+//                     }
+//                     PageMessage::DomDescribeNode(selector, node) => {
+//                         break Ok(node.into());
 //                     }
 //                     _ => {
 //                         info!("got unused page message {:?}", value);
@@ -113,6 +149,7 @@ mod tests {
     use tokio;
     use websocket::futures::{Future};
     use futures::{task};
+    use std::collections::HashMap;
 
     fn run_one<F>(f: F) -> Result<F::Item, F::Error>
     where
@@ -126,7 +163,7 @@ mod tests {
     }
 
     fn init_log() {
-        ::std::env::set_var("RUST_LOG", "headless_chrome=info,browser_async=debug");
+        ::std::env::set_var("RUST_LOG", "headless_chrome=info,browser_async=trace");
         env_logger::init();
     }
 
@@ -136,29 +173,86 @@ mod tests {
         IntervalOnePage::new(page)
     }
 
+
     #[test]
-    fn t_get_node_id() {
+    fn t_load_event_fired() {
         init_log();
         let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-        let mut selector = "#ddlogin-iframe #qrcode";
-        let my_page = FindNode {
+        let my_page = LoadEventFired {
             chrome_page: get_fixture_page(),
             url,
-            selector,
         };
         // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
         let result = run_one(my_page).unwrap();
-        assert!(result.is_none());
-
-        selector = "#ddlogin-iframe";
-        let my_page = FindNode {
-            chrome_page: get_fixture_page(),
-            url,
-            selector,
-        };
-        // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
-        let result = run_one(my_page).unwrap();
-        assert!(result.is_some());
-
+        assert!(result > 0);
     }
+
+    // #[test]
+    // fn t_dom_query_selector() {
+    //     init_log();
+    //     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+    //     let mut selector = "#ddlogin-iframe #qrcode";
+    //     let my_page = FindNode {
+    //         chrome_page: get_fixture_page(),
+    //         url,
+    //         selector,
+    //         root_node_id: None,
+    //     };
+    //     // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
+    //     let result = run_one(my_page).unwrap();
+    //     assert!(result.is_none());
+
+    //     selector = "#ddlogin-iframe";
+    //     let my_page = FindNode {
+    //         chrome_page: get_fixture_page(),
+    //         url,
+    //         selector,
+    //         root_node_id: None,
+    //     };
+    //     // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
+    //     let result = run_one(my_page).unwrap();
+    //     assert!(result.is_some());
+    // }
+    // #[test]
+    // fn t_dom_describe_node() {
+    //     init_log();
+    //     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
+    //     let mut selector = "#ddlogin-iframe #qrcode";
+    //     let my_page = DescribeNode {
+    //         chrome_page: get_fixture_page(),
+    //         url,
+    //         selector,
+    //     };
+    //     // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
+    //     let result = run_one(my_page).unwrap();
+    //     assert!(result.is_none());
+
+    //     selector = "#ddlogin-iframe";
+    //     let my_page = DescribeNode {
+    //         chrome_page: get_fixture_page(),
+    //         url,
+    //         selector,
+    //     };
+    //     // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
+    //     let result = run_one(my_page).unwrap();
+    //     assert!(result.is_some());
+
+    //     let node = result.unwrap();
+
+    //     assert_eq!(node.node_id, 0); // describe node doesn't return node_id again.
+    //     assert!(node.backend_node_id > 0);
+    //     assert!(node.children.unwrap().len() == 0);
+    //     assert_eq!(node.parent_id, None);
+    //     assert_eq!(node.node_value, "");
+    //     assert_eq!(node.node_name, "IFRAME");
+    //     assert_eq!(node.node_type, 1);
+    //     assert_eq!(node.local_name, "iframe");
+    //     let attrs: HashMap<String, String> = node.attributes.unwrap();
+    //     assert_eq!(attrs.get("ddlogin-iframe"), None);
+
+    //     let content_document = node.content_document.unwrap();
+    //     assert_eq!(content_document.node_name, "#document");
+    //     assert!(content_document.backend_node_id > 0);
+
+    // }
 }

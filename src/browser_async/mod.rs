@@ -7,6 +7,7 @@ mod point_async;
 mod interval_page_message;
 mod interval_one_page;
 mod page_message;
+mod id_type;
 
 // pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 // use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};

@@ -1,5 +1,6 @@
 use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
+use super::one_page::{OnePage};
 use log::*;
 use std::fmt;
 
@@ -42,6 +43,11 @@ pub trait TaskId {
      fn get_task_id(&self) -> usize;
 }
 
+// pub trait RunInPage {
+//     fn execute(&self, page: &mut OnePage);
+// }
+
+
 #[derive(Debug)]
 pub enum TaskDescribe {
     QuerySelector(QuerySelector),
@@ -66,6 +72,17 @@ impl TaskId for TaskDescribe {
     }
 }
 
+// impl RunInPage for TaskDescribe {
+//     fn execute(&self, page: &mut OnePage) {
+//         match self {
+//             TaskDescribe::QuerySelector(qs) => {
+//                 page.dom_query_selector_by_selector_3(*self);
+//             },
+//             _ => (),
+//         }
+//     }
+// }
+
 
 #[derive(Debug)]
 pub struct QuerySelector {
@@ -73,7 +90,6 @@ pub struct QuerySelector {
         pub task_expect: TaskExpect,
         pub selector: &'static str,
 }
-
 
 // impl SelectorString for QuerySelector {
 //     fn get_selector(&self) -> Option<&'static str> {

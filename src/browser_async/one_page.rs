@@ -9,11 +9,11 @@ use crate::browser_async::point_async::Point;
 use crate::protocol::{self, dom, input, page, page::methods::Navigate, target};
 use log::*;
 use websocket::futures::{Async, Future, Poll, Stream};
-// use tokio::timer::{Interval, Timeout};
-// use std::time::{Duration, Instant};
 use failure::{Error, Fail};
 use super::page_message::{PageMessage, PageEventName, ChangingFrameTree, ChangingFrame, QuerySelector, TaskDescribe, TaskId, TaskExpect, SelectorString};
+use super::id_type as ids;
 use std::collections::HashMap;
+
 
 #[derive(Hash, Eq, PartialEq, Debug)]
 enum PageEvent {
@@ -36,14 +36,19 @@ pub enum OnePageState {
     Consuming,
 }
 
+/// why need a task_id? If invoked find_node('#a'), find_node('#b'), find_node('#c') at a time how can I distinguish which is which in the following loop? That's task_id for.
+/// Who drive the App to loop? They are tasks. For some reasons tasks execution must be delayed must waiting some events to happen, Store these tasks and execute lately.
+/// It's a must that we know how to play from a task_describe.
+
 pub struct OnePage {
     chrome_browser: ChromeBrowser,
     pub state: OnePageState,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
     root_node: Option<dom::Node>,
-    ongoing_tasks: HashMap<usize, TaskDescribe>,
-    padding_tasks: HashMap<PageEvent, Vec<TaskDescribe>>,
+    method_id_2_task_id: HashMap<ids::Method, ids::Task>,
+    task_id_2_task: HashMap<ids::Task, TaskDescribe>,
+    tasks_waiting_event: HashMap<PageEvent, Vec<ids::Method>>,
     pub changing_frame_tree: ChangingFrameTree,
     unique_number: AtomicUsize,
 }
@@ -78,8 +83,9 @@ impl OnePage {
             target_info: None,
             session_id: None,
             root_node: None,
-            ongoing_tasks: HashMap::new(),
-            padding_tasks: HashMap::new(),
+            method_id_2_task_id: HashMap::new(),
+            task_id_2_task: HashMap::new(),
+            tasks_waiting_event: HashMap::new(),
             changing_frame_tree: ChangingFrameTree::new(),
             unique_number: AtomicUsize::new(10000),
         }
@@ -131,7 +137,8 @@ impl OnePage {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn get_document(&mut self/*, then_find_node: Option<&'static str>*/) {
+    pub fn get_document(&mut self) {
+        let t_id = self.unique_number.fetch_add(1, Ordering::SeqCst);
         if self.root_node.is_none() {
             let (_, method_str, mid) = self
                 .create_msg_to_send_with_session_id(dom::methods::GetDocument {
@@ -139,7 +146,8 @@ impl OnePage {
                     pierce: Some(false),
                 })
                 .unwrap();
-            // self.state = OnePageState::WaitingGetDocument(mid.unwrap(), then_find_node);
+            self.task_id_2_task.insert(t_id, TaskDescribe::GetDocument(t_id));
+            self.method_id_2_task_id.entry(mid.unwrap()).or_insert(t_id);
             self.chrome_browser.send_message(method_str);
         }
     }
@@ -177,34 +185,49 @@ impl OnePage {
 
     // pass in an usize under 10000 or None.
     pub fn dom_query_selector_by_selector(&mut self, selector: &'static str, task_id: Option<usize>) {
+        let t_id = task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst));
         let td = QuerySelector {
             selector,
             task_expect: TaskExpect::NodeId,
-            task_id: task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst)),
+            task_id: t_id,
         };
-        self.dom_query_selector_by_selector_1(TaskDescribe::QuerySelector(td));
+        self.task_id_2_task.insert(td.task_id, TaskDescribe::QuerySelector(td));
+        self.dom_query_selector_by_selector_1(t_id);
     }
 
-    fn dom_query_selector_by_selector_1(&mut self, task_describe: TaskDescribe) {
-        if self.root_node.is_none() {
-            self.padding_tasks.entry(PageEvent::GetDocument).or_insert(vec![]).push(task_describe);
-            self.get_document();
-            // self.padding_tasks.get_mut(&PageEvent::GetDocument).unwrap().last().unwrap()
+    pub fn dom_query_selector_by_selector_1(&mut self, task_id: ids::Task) {
+        // When get a task_describe, we must enable to image out what to do.
+        if let Some(root_node) = &self.root_node {
+            self.dom_query_selector_extra(root_node.node_id, task_id);
         } else {
-            self.dom_query_selector_extra(self.root_node.as_ref().unwrap().node_id, task_describe)
+            self.tasks_waiting_event.entry(PageEvent::GetDocument).or_insert(vec![]).push(task_id);
+            self.get_document();
+        }
+    }
+
+    pub fn dom_query_selector_by_selector_2(&mut self, query_selector: QuerySelector) {
+        let t_id = query_selector.task_id;
+        self.task_id_2_task.insert(t_id, TaskDescribe::QuerySelector(query_selector));
+        if let Some(root_node) = &self.root_node {
+            self.dom_query_selector_extra(root_node.node_id, t_id);
+        } else {
+            error!("root node does't exists.");
         }
     }
 
     pub fn dom_query_selector(&mut self, ancestor: dom::NodeId, selector: &'static str) {
+        let t_id = self.unique_number.fetch_add(1, Ordering::SeqCst);
         let td = QuerySelector {
             selector,
             task_expect: TaskExpect::NodeId,
-            task_id: self.unique_number.fetch_add(1, Ordering::SeqCst),
+            task_id: t_id,
         };
-        self.dom_query_selector_extra(self.root_node.as_ref().unwrap().node_id, TaskDescribe::QuerySelector(td));
+        self.task_id_2_task.insert(td.task_id, TaskDescribe::QuerySelector(td));
+        self.dom_query_selector_extra(ancestor, t_id);
     }
 
-    fn dom_query_selector_extra(&mut self, ancestor: dom::NodeId, task_describe: TaskDescribe) {
+    fn dom_query_selector_extra(&mut self, ancestor: dom::NodeId, task_id: ids::Task) {
+        let task_describe = self.task_id_2_task.get(&task_id).unwrap();
             let (_, method_str, mid) = self
                 .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
                     node_id: ancestor,
@@ -212,9 +235,7 @@ impl OnePage {
                 })
                 .unwrap();
             self.chrome_browser.send_message(method_str);
-            self.ongoing_tasks.entry(mid.as_ref().cloned().unwrap()).or_insert(task_describe);
-            // self.ongoing_tasks.get(mid.as_ref().unwrap()).unwrap();
-
+            self.method_id_2_task_id.entry(mid.unwrap()).or_insert(task_describe.get_task_id());
     }
 
     pub fn get_frame_tree(&mut self) {
@@ -241,7 +262,9 @@ impl OnePage {
             task_expect: TaskExpect::Node,
             task_id: task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst)),
         };
-        self.dom_query_selector_by_selector_1(TaskDescribe::QuerySelector(td))
+        let task_id = td.task_id;
+        self.task_id_2_task.insert(td.task_id, TaskDescribe::QuerySelector(td));
+        self.dom_query_selector_by_selector_1(task_id);
     }
 
     pub fn dom_describe_node_extra(&mut self, node_id: dom::NodeId, task_describe: TaskDescribe) {
@@ -252,7 +275,7 @@ impl OnePage {
                 depth: Some(100),
             })
             .unwrap();
-        self.ongoing_tasks.entry(mid.unwrap()).or_insert(task_describe);
+        self.method_id_2_task_id.entry(mid.unwrap()).or_insert(task_describe.get_task_id());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -410,8 +433,49 @@ impl OnePage {
         self.state = OnePageState::WaitingScreenShot(mid.unwrap());
         self.chrome_browser.send_message(method_str);
     }
-}
 
+    /// getDocument always is a individual task.
+    pub fn handle_response(&mut self, resp: protocol::Response) -> Option<PageMessage> {
+        trace!("got message from target response. {:?}", resp);
+        let call_id = resp.call_id;
+
+
+        if let Ok(v) = protocol::parse_response::<
+                    dom::methods::GetDocumentReturnObject,
+        >(resp) {
+
+        } else {
+            info!("ignored response: {:?}", resp);
+        }
+        
+
+
+        if let Some(task_id) = self.method_id_2_task_id.get(&call_id) {
+            info!("got call_id {}, task_id {}", call_id, task_id);
+            info!("got response: {:?}", resp);
+            if let Some(TaskDescribe::GetDocument(_)) = self.task_id_2_task.get(task_id) {
+
+                let mut waiting_task_ids: Vec<_> = self.tasks_waiting_event.get_mut(&PageEvent::GetDocument).unwrap_or(&mut vec![]).drain(..)
+                .collect();
+
+                let mut waiting_tasks: Vec<_> = waiting_task_ids.iter().flat_map(|t_id| self.task_id_2_task.remove(&t_id)).collect();
+                
+                while let Some(task) = waiting_tasks.pop() {
+                    match task {
+                        TaskDescribe::QuerySelector(qs) => {
+                            self.dom_query_selector_by_selector_2(qs);
+                        }
+                        _ => ()
+                    }
+                }
+                // break Ok(Some())
+            } else {
+                trace!("skipping....................0");
+            }
+        }
+        None
+    }
+}
 
 // The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
 impl Stream for OnePage {
@@ -424,14 +488,14 @@ impl Stream for OnePage {
                 // info!("raw value: {:?}", value);
                 match &mut self.state {
                     OnePageState::WaitingPageCreate => {
-                        info!("*** WaitingPageCreate ***");
+                        trace!("*** WaitingPageCreate ***");
                         if let Some(target_info) = MethodUtil::is_page_event_create(value) {
                             self.target_info = Some(target_info);
                             self.attach_to_page();
                         }
                     }
                     OnePageState::WaitingPageAttach => {
-                        info!("*** WaitingPageAttach ***");
+                        trace!("*** WaitingPageAttach ***");
                         if let Some((session_id, target_info)) =
                             MethodUtil::is_page_attach_event(value)
                         {
@@ -441,19 +505,19 @@ impl Stream for OnePage {
                         }
                     }
                     OnePageState::WaitingPageEnable(mid) => { // The page enableing has no return value, so must use mid.
-                        info!("*** WaitingPageEnable ***");
+                        trace!("*** WaitingPageEnable ***");
                         if MethodUtil::match_chrome_response(value, mid).is_some() {
                             return Ok(Some(PageMessage::EnablePageDone).into());
                         }
                     }
                     OnePageState::WaitingFrameTree(mid) => {
-                        info!("*** WaitingFrameTree {:?} ***", mid);
+                        trace!("*** WaitingFrameTree {:?} ***", mid);
                         if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                             if let Ok(v) = protocol::parse_response::<
                                 page::methods::GetFrameTreeReturnObject,
                             >(resp)
                             {
-                                info!("----------------- got frames: {:?}", v);
+                                trace!("----------------- got frames: {:?}", v);
                                 return Ok(Some(PageMessage::GetFrameTree(v.frame_tree)).into());
                             }
                         }
@@ -497,7 +561,7 @@ impl Stream for OnePage {
                     //     }
                     // }
                     OnePageState::WaitingDescribeNode(maybe_selector, mid, node_id, invoke_next) => {
-                        info!("*** WaitingDescribeNode ***");
+                        trace!("*** WaitingDescribeNode ***");
                         if node_id == &0 {
                              break Ok(Some(PageMessage::DomDescribeNode(
                                     *maybe_selector,
@@ -524,7 +588,7 @@ impl Stream for OnePage {
                         }
                     }
                     OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
-                        info!("*** WaitingRemoteObject ***");
+                        trace!("*** WaitingRemoteObject ***");
                         if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                             if let Ok(v) = protocol::parse_response::<
                                 dom::methods::ResolveNodeReturnObject,
@@ -549,7 +613,7 @@ impl Stream for OnePage {
                         }
                     }
                     OnePageState::WaitingModelBox(selector, backend_node_id, mid) => {
-                        info!("*** WaitingModelBox ***");
+                        trace!("*** WaitingModelBox ***");
                         if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                             if let Ok(v) = protocol::parse_response::<
                                 dom::methods::GetBoxModelReturnObject,
@@ -582,15 +646,15 @@ impl Stream for OnePage {
                                 //     _ => (),
                                 // }
                             } else {
-                                info!("waiting for WaitingModelBox...1");
+                                trace!("waiting for WaitingModelBox...1");
                                 self.state = OnePageState::Consuming;
                             }
                         } else {
-                            info!("waiting for WaitingModelBox...2");
+                            trace!("waiting for WaitingModelBox...2");
                         }
                     }
                     OnePageState::WaitingScreenShot(mid) => {
-                        info!("*** WaitingScreenShot ***");
+                        trace!("*** WaitingScreenShot ***");
                         if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                             if let Ok(v) = protocol::parse_response::<
                                 page::methods::CaptureScreenshotReturnObject,
@@ -621,16 +685,9 @@ impl Stream for OnePage {
                         //     pub error: Option<RemoteError>,
                         // }
                         match value {
-                                protocol::Message::Response(browser_response) => {
-                                    info!("got chrome response. {:?}", browser_response);
-                                    let call_id = browser_response.call_id;
-
-                                    if let Some(task_describe) = self.ongoing_tasks.get(&call_id) {
-                                        if let TaskDescribe::GetDocument(task_id) = task_describe {
-                                            info!("got document....................1");
-                                        } else {
-                                            info!("skipping....................0");
-                                        }
+                                protocol::Message::Response(resp) => {
+                                    if let Some(page_message) = self.handle_response(resp) {
+                                        break Ok(Some(page_message).into());
                                     }
                                 }
                                 protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
@@ -640,14 +697,8 @@ impl Stream for OnePage {
                                     let message_field = &event_params.message;
                                     match protocol::parse_raw_message(&message_field) {
                                         Ok(protocol::Message::Response(resp)) => {
-                                            info!("got message from target response. {:?}", resp);
-                                            let call_id = resp.call_id;
-                                            if let Some(task_describe) = self.ongoing_tasks.get(&call_id) {
-                                                if let TaskDescribe::GetDocument(task_id) = task_describe {
-                                                    info!("got document....................1");
-                                                } else {
-                                                    info!("skipping....................0");
-                                                }
+                                            if let Some(page_message) = self.handle_response(resp) {
+                                                break Ok(Some(page_message).into());
                                             }
                                         }
                                         Ok(protocol::Message::Event(inner_event)) => {

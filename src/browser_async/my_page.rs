@@ -200,11 +200,6 @@ mod tests {
                 }
             }
 
-    fn t_enum_impl_trait() {
-
-    }
-
-
     #[test]
     fn t_load_event_fired() {
         init_log();
@@ -230,8 +225,8 @@ mod tests {
             root_node_id: None,
         };
         // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
-        let result = run_one(my_page).unwrap();
-        assert!(result.is_none());
+        // let result = run_one(my_page).unwrap();
+        // assert!(result.is_none());
 
         selector = "#ddlogin-iframe";
         let my_page = FindNode {

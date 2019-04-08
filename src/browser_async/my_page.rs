@@ -86,6 +86,7 @@ impl Future for FindNode {
                     PageMessage::SecondsElapsed(seconds) => {
                         info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.chrome_page.one_page.state);
                         if seconds > 39 {
+                            error!("time out {}", seconds);
                             panic!("time out 40 seconds.");
                         }
                     }

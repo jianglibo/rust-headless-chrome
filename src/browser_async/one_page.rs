@@ -438,17 +438,28 @@ impl OnePage {
     pub fn handle_response(&mut self, resp: protocol::Response) -> Option<PageMessage> {
         trace!("got message from target response. {:?}", resp);
         let call_id = resp.call_id;
+        // message: "{\"id\":6,\"result\":{\"root\":{\"nodeId\":1,\"backendNodeId\":3,\"nodeType\":9,\"nodeName\":\"#document\",\"localName\":\"\",\"nodeValue\":\"\",\"childNodeCount\":2,\"documentURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"baseURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"xmlVersion\":\"\"}}}"
+        if let Some(result_value) = &resp.result {
+            if let Some(result_str) = result_value.as_str() {
+                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(result_str) {
 
-
-        if let Ok(v) = protocol::parse_response::<
-                    dom::methods::GetDocumentReturnObject,
-        >(resp) {
-
+                } else {
+                    error!("parse result field failed. {:?}", resp);
+                }
+            } else {
+                error!("result field isn't a string. {:?}", resp);
+            }
         } else {
-            info!("ignored response: {:?}", resp);
+            error!("got response with no result field. {:?}", resp);
         }
-        
 
+        // if let Ok(v) = protocol::parse_response::<
+        //             dom::methods::GetDocumentReturnObject,
+        // >(resp) {
+
+        // } else {
+        //     info!("ignored response: {:?}", resp);
+        // }
 
         if let Some(task_id) = self.method_id_2_task_id.get(&call_id) {
             info!("got call_id {}, task_id {}", call_id, task_id);

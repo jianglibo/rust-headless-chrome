@@ -160,6 +160,8 @@ mod tests {
     use websocket::futures::{Future};
     use futures::{task};
     use std::collections::HashMap;
+    use std::collections::HashSet;
+    use std::borrow::Borrow;
 
     fn run_one<F>(f: F) -> Result<F::Item, F::Error>
     where
@@ -200,6 +202,28 @@ mod tests {
                     }
                 }
             }
+
+    #[test]
+    fn t_vec_to_set() {
+        let v = vec![1, 2, 3, 3, 4];
+        let s = v.into_iter().collect::<HashSet<_>>();
+        assert_eq!(s, [1,2,3,4].iter().cloned().collect());
+
+        let a = [&String::from("a"), &String::from("b"), &String::from("c")]; 
+        let b = ["a", "b", "c", "d"]; 
+
+        // assert_eq!(a, b);
+
+        // let c: &str = String::from("a").borrow();
+        // assert_eq!("a", c);
+
+        let ai = a.iter().map(|s|&s[..]).collect::<HashSet<_>>();
+        let bi = b.iter().cloned().collect::<HashSet<_>>();
+
+        assert!(ai.is_subset(&bi));
+        assert!(bi.is_superset(&ai));
+
+    }
 
     #[test]
     fn t_load_event_fired() {

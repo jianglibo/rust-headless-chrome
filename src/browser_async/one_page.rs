@@ -1,19 +1,24 @@
+use super::element_async::{BoxModel, Element, ElementQuad};
+use super::id_type as ids;
+use super::json_assistor;
+use super::page_message::{
+    ChangingFrame, ChangingFrameTree, PageEventName, PageMessage, QuerySelector, SelectorString,
+    TaskDescribe, TaskExpect, TaskId,
+};
 use crate::browser::tab::keys;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 use crate::browser_async::dev_tools_method_util::{
-    ChromePageError, MethodBeforSendResult, MethodDestination, MethodUtil
+    ChromePageError, MethodBeforSendResult, MethodDestination, MethodUtil,
 };
-use std::sync::atomic::{AtomicUsize, Ordering};
-use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::browser_async::point_async::Point;
 use crate::protocol::{self, dom, input, page, page::methods::Navigate, target};
-use log::*;
-use websocket::futures::{Async, Future, Poll, Stream};
 use failure::{Error, Fail};
-use super::page_message::{PageMessage, PageEventName, ChangingFrameTree, ChangingFrame, QuerySelector, TaskDescribe, TaskId, TaskExpect, SelectorString};
-use super::id_type as ids;
+use log::*;
+use std::borrow::Borrow;
 use std::collections::HashMap;
-
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use websocket::futures::{Async, Future, Poll, Stream};
 
 #[derive(Hash, Eq, PartialEq, Debug)]
 enum PageEvent {
@@ -63,13 +68,17 @@ impl OnePage {
     }
 
     pub fn is_frame_navigated(&self, frame_name: &'static str) -> Option<&page::Frame> {
-        let op = self.changing_frame_tree.child_changing_frames.values().find(|cv| {
-            if let ChangingFrame::Navigated(frame) = cv {
-                frame.name == Some(frame_name.into())
-            } else {
-                false
-            }
-        });
+        let op = self
+            .changing_frame_tree
+            .child_changing_frames
+            .values()
+            .find(|cv| {
+                if let ChangingFrame::Navigated(frame) = cv {
+                    frame.name == Some(frame_name.into())
+                } else {
+                    false
+                }
+            });
         if let Some(ChangingFrame::Navigated(frame)) = op {
             Some(frame)
         } else {
@@ -91,9 +100,7 @@ impl OnePage {
         }
     }
 
-    pub fn force_next_stage(&mut self) {
-
-    }
+    pub fn force_next_stage(&mut self) {}
 
     pub fn attach_to_page(&mut self) {
         let (_, method_str, _) = MethodUtil::create_msg_to_send(
@@ -146,7 +153,8 @@ impl OnePage {
                     pierce: Some(false),
                 })
                 .unwrap();
-            self.task_id_2_task.insert(t_id, TaskDescribe::GetDocument(t_id));
+            self.task_id_2_task
+                .insert(t_id, TaskDescribe::GetDocument(t_id));
             self.method_id_2_task_id.entry(mid.unwrap()).or_insert(t_id);
             self.chrome_browser.send_message(method_str);
         }
@@ -184,14 +192,19 @@ impl OnePage {
     }
 
     // pass in an usize under 10000 or None.
-    pub fn dom_query_selector_by_selector(&mut self, selector: &'static str, task_id: Option<usize>) {
+    pub fn dom_query_selector_by_selector(
+        &mut self,
+        selector: &'static str,
+        task_id: Option<usize>,
+    ) {
         let t_id = task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst));
         let td = QuerySelector {
             selector,
             task_expect: TaskExpect::NodeId,
             task_id: t_id,
         };
-        self.task_id_2_task.insert(td.task_id, TaskDescribe::QuerySelector(td));
+        self.task_id_2_task
+            .insert(td.task_id, TaskDescribe::QuerySelector(td));
         self.dom_query_selector_by_selector_1(t_id);
     }
 
@@ -200,14 +213,18 @@ impl OnePage {
         if let Some(root_node) = &self.root_node {
             self.dom_query_selector_extra(root_node.node_id, task_id);
         } else {
-            self.tasks_waiting_event.entry(PageEvent::GetDocument).or_insert(vec![]).push(task_id);
+            self.tasks_waiting_event
+                .entry(PageEvent::GetDocument)
+                .or_insert(vec![])
+                .push(task_id);
             self.get_document();
         }
     }
 
     pub fn dom_query_selector_by_selector_2(&mut self, query_selector: QuerySelector) {
         let t_id = query_selector.task_id;
-        self.task_id_2_task.insert(t_id, TaskDescribe::QuerySelector(query_selector));
+        self.task_id_2_task
+            .insert(t_id, TaskDescribe::QuerySelector(query_selector));
         if let Some(root_node) = &self.root_node {
             self.dom_query_selector_extra(root_node.node_id, t_id);
         } else {
@@ -222,20 +239,23 @@ impl OnePage {
             task_expect: TaskExpect::NodeId,
             task_id: t_id,
         };
-        self.task_id_2_task.insert(td.task_id, TaskDescribe::QuerySelector(td));
+        self.task_id_2_task
+            .insert(td.task_id, TaskDescribe::QuerySelector(td));
         self.dom_query_selector_extra(ancestor, t_id);
     }
 
     fn dom_query_selector_extra(&mut self, ancestor: dom::NodeId, task_id: ids::Task) {
         let task_describe = self.task_id_2_task.get(&task_id).unwrap();
-            let (_, method_str, mid) = self
-                .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
-                    node_id: ancestor,
-                    selector: task_describe.get_selector().unwrap(),
-                })
-                .unwrap();
-            self.chrome_browser.send_message(method_str);
-            self.method_id_2_task_id.entry(mid.unwrap()).or_insert(task_describe.get_task_id());
+        let (_, method_str, mid) = self
+            .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
+                node_id: ancestor,
+                selector: task_describe.get_selector().unwrap(),
+            })
+            .unwrap();
+        self.chrome_browser.send_message(method_str);
+        self.method_id_2_task_id
+            .entry(mid.unwrap())
+            .or_insert(task_describe.get_task_id());
     }
 
     pub fn get_frame_tree(&mut self) {
@@ -256,14 +276,19 @@ impl OnePage {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn dom_describe_node_by_selector(&mut self, selector: &'static str, task_id: Option<usize>) {
+    pub fn dom_describe_node_by_selector(
+        &mut self,
+        selector: &'static str,
+        task_id: Option<usize>,
+    ) {
         let td = QuerySelector {
             selector,
             task_expect: TaskExpect::Node,
             task_id: task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst)),
         };
         let task_id = td.task_id;
-        self.task_id_2_task.insert(td.task_id, TaskDescribe::QuerySelector(td));
+        self.task_id_2_task
+            .insert(td.task_id, TaskDescribe::QuerySelector(td));
         self.dom_query_selector_by_selector_1(task_id);
     }
 
@@ -275,7 +300,9 @@ impl OnePage {
                 depth: Some(100),
             })
             .unwrap();
-        self.method_id_2_task_id.entry(mid.unwrap()).or_insert(task_describe.get_task_id());
+        self.method_id_2_task_id
+            .entry(mid.unwrap())
+            .or_insert(task_describe.get_task_id());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -434,55 +461,50 @@ impl OnePage {
         self.chrome_browser.send_message(method_str);
     }
 
-    /// getDocument always is a individual task.
+    /// pick out some special tasks like getDocument.
     pub fn handle_response(&mut self, resp: protocol::Response) -> Option<PageMessage> {
         trace!("got message from target response. {:?}", resp);
         let call_id = resp.call_id;
+        let matched_task = self
+            .method_id_2_task_id
+            .get(&call_id)
+            .and_then(|task_id| self.task_id_2_task.get(task_id))
+            .or({
+                error!("not matching task_id to call_id {}.", call_id);
+                None
+            });
+
         // message: "{\"id\":6,\"result\":{\"root\":{\"nodeId\":1,\"backendNodeId\":3,\"nodeType\":9,\"nodeName\":\"#document\",\"localName\":\"\",\"nodeValue\":\"\",\"childNodeCount\":2,\"documentURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"baseURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"xmlVersion\":\"\"}}}"
-        if let Some(result_value) = &resp.result {
-            if let Some(result_str) = result_value.as_str() {
-                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(result_str) {
-
-                } else {
-                    error!("parse result field failed. {:?}", resp);
-                }
-            } else {
-                error!("result field isn't a string. {:?}", resp);
-            }
-        } else {
-            error!("got response with no result field. {:?}", resp);
-        }
-
-        // if let Ok(v) = protocol::parse_response::<
-        //             dom::methods::GetDocumentReturnObject,
-        // >(resp) {
-
-        // } else {
-        //     info!("ignored response: {:?}", resp);
+        // if json_assistor::response_result_field_has_properties(&resp, "root", vec!["nodeId", "backendNodeId"]) {
+        //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
         // }
 
-        if let Some(task_id) = self.method_id_2_task_id.get(&call_id) {
-            info!("got call_id {}, task_id {}", call_id, task_id);
-            info!("got response: {:?}", resp);
-            if let Some(TaskDescribe::GetDocument(_)) = self.task_id_2_task.get(task_id) {
-
-                let mut waiting_task_ids: Vec<_> = self.tasks_waiting_event.get_mut(&PageEvent::GetDocument).unwrap_or(&mut vec![]).drain(..)
+        // info!("got call_id {}, task_id {}", call_id, task_id);
+        // info!("got response: {:?}", resp);
+        if let Some(TaskDescribe::GetDocument(_)) = matched_task {
+            let mut waiting_task_ids: Vec<_> = self
+                .tasks_waiting_event
+                .get_mut(&PageEvent::GetDocument)
+                .unwrap_or(&mut vec![])
+                .drain(..)
                 .collect();
 
-                let mut waiting_tasks: Vec<_> = waiting_task_ids.iter().flat_map(|t_id| self.task_id_2_task.remove(&t_id)).collect();
-                
-                while let Some(task) = waiting_tasks.pop() {
-                    match task {
-                        TaskDescribe::QuerySelector(qs) => {
-                            self.dom_query_selector_by_selector_2(qs);
-                        }
-                        _ => ()
+            let mut waiting_tasks: Vec<_> = waiting_task_ids
+                .iter()
+                .flat_map(|t_id| self.task_id_2_task.remove(&t_id))
+                .collect();
+
+            while let Some(task) = waiting_tasks.pop() {
+                match task {
+                    TaskDescribe::QuerySelector(qs) => {
+                        self.dom_query_selector_by_selector_2(qs);
                     }
+                    _ => (),
                 }
-                // break Ok(Some())
-            } else {
-                trace!("skipping....................0");
             }
+        // break Ok(Some())
+        } else {
+            trace!("skipping....................0");
         }
         None
     }
@@ -515,7 +537,8 @@ impl Stream for OnePage {
                             self.page_enable();
                         }
                     }
-                    OnePageState::WaitingPageEnable(mid) => { // The page enableing has no return value, so must use mid.
+                    OnePageState::WaitingPageEnable(mid) => {
+                        // The page enableing has no return value, so must use mid.
                         trace!("*** WaitingPageEnable ***");
                         if MethodUtil::match_chrome_response(value, mid).is_some() {
                             return Ok(Some(PageMessage::EnablePageDone).into());
@@ -571,14 +594,17 @@ impl Stream for OnePage {
                     //         }
                     //     }
                     // }
-                    OnePageState::WaitingDescribeNode(maybe_selector, mid, node_id, invoke_next) => {
+                    OnePageState::WaitingDescribeNode(
+                        maybe_selector,
+                        mid,
+                        node_id,
+                        invoke_next,
+                    ) => {
                         trace!("*** WaitingDescribeNode ***");
                         if node_id == &0 {
-                             break Ok(Some(PageMessage::DomDescribeNode(
-                                    *maybe_selector,
-                                    None,
-                                )).into());
-
+                            break Ok(
+                                Some(PageMessage::DomDescribeNode(*maybe_selector, None)).into()
+                            );
                         }
                         if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                             trace!("----------got describe Node resp: {:?}", resp);
@@ -594,7 +620,8 @@ impl Stream for OnePage {
                                 break Ok(Some(PageMessage::DomDescribeNode(
                                     selector_cloned_1,
                                     Some(v.node),
-                                )).into());
+                                ))
+                                .into());
                             }
                         }
                     }
@@ -610,14 +637,14 @@ impl Stream for OnePage {
                                     remote_object_id: v.object.object_id.unwrap().clone(),
                                     backend_node_id: *backend_node_id,
                                 };
-                                // if let PageMessage::FindElement(_, _) = self.expect_page_message {
-                                //     return Ok(Some(PageMessage::FindElement(
-                                //         selector_cloned,
-                                //         Some(element),
-                                //     )).into());
-                                // } else {
-                                //     self.get_box_model(selector_cloned, &element);
-                                // }
+                            // if let PageMessage::FindElement(_, _) = self.expect_page_message {
+                            //     return Ok(Some(PageMessage::FindElement(
+                            //         selector_cloned,
+                            //         Some(element),
+                            //     )).into());
+                            // } else {
+                            //     self.get_box_model(selector_cloned, &element);
+                            // }
                             } else {
                                 self.state = OnePageState::Consuming;
                             }
@@ -639,23 +666,23 @@ impl Stream for OnePage {
                                     width: raw_model.width,
                                     height: raw_model.height,
                                 };
-                                // match &self.expect_page_message {
-                                //     PageMessage::GetBoxModel(_, _, _) => {
-                                //         return Ok(Some(PageMessage::GetBoxModel(
-                                //             *selector,
-                                //             *backend_node_id,
-                                //             model_box,
-                                //         )).into());
-                                //     }
-                                //     PageMessage::Screenshot(a, fmt, from_surface, c) => {
-                                //         self.capture_screenshot(
-                                //             fmt.clone(),
-                                //             Some(model_box.content_viewport()),
-                                //             from_surface.clone(),
-                                //         );
-                                //     }
-                                //     _ => (),
-                                // }
+                            // match &self.expect_page_message {
+                            //     PageMessage::GetBoxModel(_, _, _) => {
+                            //         return Ok(Some(PageMessage::GetBoxModel(
+                            //             *selector,
+                            //             *backend_node_id,
+                            //             model_box,
+                            //         )).into());
+                            //     }
+                            //     PageMessage::Screenshot(a, fmt, from_surface, c) => {
+                            //         self.capture_screenshot(
+                            //             fmt.clone(),
+                            //             Some(model_box.content_viewport()),
+                            //             from_surface.clone(),
+                            //         );
+                            //     }
+                            //     _ => (),
+                            // }
                             } else {
                                 trace!("waiting for WaitingModelBox...1");
                                 self.state = OnePageState::Consuming;
@@ -696,54 +723,77 @@ impl Stream for OnePage {
                         //     pub error: Option<RemoteError>,
                         // }
                         match value {
-                                protocol::Message::Response(resp) => {
-                                    if let Some(page_message) = self.handle_response(resp) {
-                                        break Ok(Some(page_message).into());
-                                    }
-                                }
-                                protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
-                                    target_message_event,
-                                )) => {
-                                    let event_params = &target_message_event.params;
-                                    let message_field = &event_params.message;
-                                    match protocol::parse_raw_message(&message_field) {
-                                        Ok(protocol::Message::Response(resp)) => {
-                                            if let Some(page_message) = self.handle_response(resp) {
-                                                break Ok(Some(page_message).into());
-                                            }
-                                        }
-                                        Ok(protocol::Message::Event(inner_event)) => {
-                                            match inner_event {
-                                                protocol::Event::FrameNavigated(frame_navigated_event) => {
-                                                    let frame_id = frame_navigated_event.params.frame.id.clone();
-                                                    let parent_id = frame_navigated_event.params.frame.parent_id.clone();
-                                                    let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
-                                                    if parent_id.is_none() {
-                                                        self.changing_frame_tree.changing_frame.replace(changing_frame);
-                                                    } else {
-                                                        self.changing_frame_tree.child_changing_frames.insert(frame_id, changing_frame);
-                                                        // entry(frame_id).and_modify(|v| *v = changing_frame).or_insert(changing_frame);
-                                                    }
-                                                    break Ok(Some(PageMessage::PageEvent(PageEventName::frameNavigated)).into())
-                                                }
-                                                protocol::Event::TargetInfoChanged(target_info_changed) => {
-                                                    break Ok(Some(PageMessage::TargetInfoChanged(target_info_changed.params.target_info)).into())
-                                                }
-                                                _ => {
-                                                    error!("unprocessed inner event: {:?}", inner_event);
-                                                }
-                                            }
-                                        }
-                                        _ => {
-                                            error!("unprocessed {:?}", target_message_event);
-                                        }
-
-                                    }
-                                }
-                                other => {
-                                    error!("got unknown message1: {:?}", other);
+                            protocol::Message::Response(resp) => {
+                                if let Some(page_message) = self.handle_response(resp) {
+                                    break Ok(Some(page_message).into());
                                 }
                             }
+                            protocol::Message::Event(
+                                protocol::Event::ReceivedMessageFromTarget(target_message_event),
+                            ) => {
+                                let event_params = &target_message_event.params;
+                                let message_field = &event_params.message;
+                                match protocol::parse_raw_message(&message_field) {
+                                    Ok(protocol::Message::Response(resp)) => {
+                                        if let Some(page_message) = self.handle_response(resp) {
+                                            break Ok(Some(page_message).into());
+                                        }
+                                    }
+                                    Ok(protocol::Message::Event(inner_event)) => {
+                                        match inner_event {
+                                            protocol::Event::FrameNavigated(
+                                                frame_navigated_event,
+                                            ) => {
+                                                let frame_id =
+                                                    frame_navigated_event.params.frame.id.clone();
+                                                let parent_id = frame_navigated_event
+                                                    .params
+                                                    .frame
+                                                    .parent_id
+                                                    .clone();
+                                                let changing_frame = ChangingFrame::Navigated(
+                                                    frame_navigated_event.params.frame,
+                                                );
+                                                if parent_id.is_none() {
+                                                    self.changing_frame_tree
+                                                        .changing_frame
+                                                        .replace(changing_frame);
+                                                } else {
+                                                    self.changing_frame_tree
+                                                        .child_changing_frames
+                                                        .insert(frame_id, changing_frame);
+                                                    // entry(frame_id).and_modify(|v| *v = changing_frame).or_insert(changing_frame);
+                                                }
+                                                break Ok(Some(PageMessage::PageEvent(
+                                                    PageEventName::frameNavigated,
+                                                ))
+                                                .into());
+                                            }
+                                            protocol::Event::TargetInfoChanged(
+                                                target_info_changed,
+                                            ) => {
+                                                break Ok(Some(PageMessage::TargetInfoChanged(
+                                                    target_info_changed.params.target_info,
+                                                ))
+                                                .into());
+                                            }
+                                            _ => {
+                                                error!(
+                                                    "unprocessed inner event: {:?}",
+                                                    inner_event
+                                                );
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        error!("unprocessed {:?}", target_message_event);
+                                    }
+                                }
+                            }
+                            other => {
+                                error!("got unknown message1: {:?}", other);
+                            }
+                        }
                         // trace!("receive message: {:?}", value);
                         // return Ok(Some(PageMessage::MessageAvailable(value)).into());
                     }
@@ -759,6 +809,6 @@ impl Stream for OnePage {
 // Page.frameAttached -> Page.frameStartedLoading(44) -> Page.frameNavigated(48) -> Page.domContentEventFired(64) -> Page.loadEventFired(131) -> Page.frameStoppedLoading(132)
 
 // target_id and browser_context_id keep unchanged.
-// Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams { 
+// Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams {
 // target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))
 // target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "https://pc", url: "https://pc", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))

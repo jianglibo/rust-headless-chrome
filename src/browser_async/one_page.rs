@@ -2,8 +2,7 @@ use super::element_async::{BoxModel, Element, ElementQuad};
 use super::id_type as ids;
 use super::json_assistor;
 use super::page_message::{
-    ChangingFrame, ChangingFrameTree, PageEventName, PageMessage, QuerySelector, SelectorString,
-    TaskDescribe, TaskExpect, TaskId,
+    ChangingFrame, ChangingFrameTree, PageEventName, PageMessage, QuerySelector, TaskDescribe
 };
 use crate::browser::tab::keys;
 use crate::browser_async::chrome_browser::ChromeBrowser;
@@ -54,6 +53,7 @@ pub struct OnePage {
     method_id_2_task_id: HashMap<ids::Method, ids::Task>,
     task_id_2_task: HashMap<ids::Task, TaskDescribe>,
     tasks_waiting_event: HashMap<PageEvent, Vec<ids::Method>>,
+    waiting_tasks: HashMap<ids::Task, Vec<ids::Task>>,
     pub changing_frame_tree: ChangingFrameTree,
     unique_number: AtomicUsize,
 }
@@ -192,15 +192,15 @@ impl OnePage {
     }
 
     // pass in an usize under 10000 or None.
-    pub fn dom_query_selector_by_selector(
+    pub fn dom_query_selector_by_selector (
         &mut self,
         selector: &'static str,
         task_id: Option<usize>,
-    ) {
+    ) -> ids::Task {
         let t_id = task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst));
         let td = QuerySelector {
             selector,
-            task_expect: TaskExpect::NodeId,
+            node_id: None,
             task_id: t_id,
         };
         self.task_id_2_task
@@ -303,6 +303,20 @@ impl OnePage {
         self.method_id_2_task_id
             .entry(mid.unwrap())
             .or_insert(task_describe.get_task_id());
+        self.chrome_browser.send_message(method_str);
+    }
+
+    fn dom_describe_node_extra_1(&mut self, node_id: dom::NodeId, task_id: ids::Task) {
+        let (_, method_str, mid) = self
+            .create_msg_to_send_with_session_id(dom::methods::DescribeNode {
+                node_id: Some(node_id),
+                backend_node_id: None,
+                depth: Some(100),
+            })
+            .unwrap();
+        self.method_id_2_task_id
+            .entry(mid.unwrap())
+            .or_insert(task_id);
         self.chrome_browser.send_message(method_str);
     }
 
@@ -481,7 +495,14 @@ impl OnePage {
 
         // info!("got call_id {}, task_id {}", call_id, task_id);
         // info!("got response: {:?}", resp);
-        if let Some(TaskDescribe::GetDocument(_)) = matched_task {
+        match matched_task {
+            Some(TaskDescribe::GetDocument(_)) => {
+            // it must be a GetDocumentReturnObject. if not then something must go wrong.
+            if let Ok(node) = serde_json::from_value::<dom::methods::GetDocumentReturnObject>(resp.result.unwrap()) {
+                self.root_node = Some(node.root);
+            } else {
+                panic!("GetDocument failed.");
+            }
             let mut waiting_task_ids: Vec<_> = self
                 .tasks_waiting_event
                 .get_mut(&PageEvent::GetDocument)
@@ -502,9 +523,32 @@ impl OnePage {
                     _ => (),
                 }
             }
-        // break Ok(Some())
-        } else {
+        }
+        Some(TaskDescribe::QuerySelector(query_selector)) => {
+            // we know this is a response to querySelector but don't know it's a QuerySelectorReturnObject or a DescribeNodeReturnObject response.
+            if json_assistor::response_result_field_has_properties(&resp, "root", vec!["nodeId", "backendNodeId"]) {
+            //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
+            }
+
+            if let Ok(node) = serde_json::from_value::<dom::methods::QuerySelectorReturnObject>(resp.result.unwrap()) {
+                if let TaskExpect::NodeId = &query_selector.task_expect {
+                        trace!("node_id");
+                        return Some(PageMessage::NodeIdComing(node.node_id, query_selector.task_id));
+                    }
+                    else {
+                        trace!("got node_id, but task expect more than id.");
+                        self.dom_describe_node_extra_1(node.node_id, query_selector.task_id);
+                    }
+            } else {
+                panic!("GetDocument failed.");
+            }
+        }
+        Some(task_describe) => {
+            info!("got task_describe: {:?}", task_describe);
+        }
+        _ => {
             trace!("skipping....................0");
+        }
         }
         None
     }

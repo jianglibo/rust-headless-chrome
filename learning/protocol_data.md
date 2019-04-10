@@ -14,3 +14,12 @@ http://localhost:9222/json
 ```
 
 git pull https://github.com/atroche/rust-headless-chrome.git
+
+## About invoke methods.
+
+When invoke a method on target the result comes later, But the result contains no information about respone except a matching call id. So we can guess the response or save the information on call id before invoke the method.
+
+## About chained method call.
+
+If archive task c need invoke b first, and b need a be called first how can we let things get done?
+we should save a link, a_id -> b_id -> c_id, when a is done b will be called.

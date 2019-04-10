@@ -1,6 +1,7 @@
 use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use super::one_page::{OnePage};
+use super::id_type as ids;
 use log::*;
 use std::fmt;
 
@@ -27,89 +28,44 @@ impl ChangingFrameTree {
     }
 }
 
-#[derive(Debug)]
-pub enum TaskExpect {
-    NodeId,
-    Node,
-    Element,
-    ScreenShot,
-}
-
-pub trait SelectorString {
-     fn get_selector(&self) -> Option<&'static str>;
-}
-
-pub trait TaskId {
-     fn get_task_id(&self) -> usize;
-}
-
-// pub trait RunInPage {
-//     fn execute(&self, page: &mut OnePage);
+// pub trait SelectorString {
+//      fn get_selector(&self) -> Option<&'static str>;
 // }
 
+// pub trait TaskId {
+//      fn get_task_id(&self) -> usize;
+// }
 
 #[derive(Debug)]
 pub enum TaskDescribe {
     QuerySelector(QuerySelector),
-    GetDocument(usize)
+    GetDocument(ids::Task)
 }
 
-impl SelectorString for TaskDescribe {
-    fn get_selector(&self) -> Option<&'static str> {
-        match self {
-            TaskDescribe::QuerySelector(qs) => Some(qs.selector),
-            _ => None,
-        }
-    }
-}
-
-impl TaskId for TaskDescribe {
-    fn get_task_id(&self) -> usize {
-        match self {
-            TaskDescribe::QuerySelector(qs) => qs.task_id,
-            TaskDescribe::GetDocument(tid) => *tid,
-        }
-    }
-}
-
-// impl RunInPage for TaskDescribe {
-//     fn execute(&self, page: &mut OnePage) {
+// impl SelectorString for TaskDescribe {
+//     fn get_selector(&self) -> Option<&'static str> {
 //         match self {
-//             TaskDescribe::QuerySelector(qs) => {
-//                 page.dom_query_selector_by_selector_3(*self);
-//             },
-//             _ => (),
+//             TaskDescribe::QuerySelector(qs) => Some(qs.selector),
+//             _ => None,
 //         }
 //     }
 // }
 
+// impl TaskId for TaskDescribe {
+//     fn get_task_id(&self) -> usize {
+//         match self {
+//             TaskDescribe::QuerySelector(qs) => qs.task_id,
+//             TaskDescribe::GetDocument(tid) => *tid,
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct QuerySelector {
         pub task_id: usize,
-        pub task_expect: TaskExpect,
+        pub node_id: Option<dom::NodeId>,
         pub selector: &'static str,
 }
-
-// impl SelectorString for QuerySelector {
-//     fn get_selector(&self) -> Option<&'static str> {
-//         Some(self.selector)
-//     }
-// }
-
-// impl TaskId for QuerySelector {
-//     fn get_task_id(&self) -> usize {
-//         self.task_id
-//     }
-// }
-
-// pub struct GetDocument(usize);
-
-// impl TaskId for GetDocument {
-//     fn get_task_id(&self) -> usize {
-//         self.0
-//     }
-// }
 
 #[derive(Debug)]
 pub enum PageEventName {
@@ -132,8 +88,8 @@ pub enum PageMessage {
     EnablePageDone,
     PageEvent(PageEventName),
     TargetInfoChanged(target::TargetInfo),
-    NodeIdComing(dom::NodeId, usize),
-    NodeComing(dom::Node, usize),
+    NodeIdComing(dom::NodeId, ids::Task),
+    NodeComing(dom::Node, ids::Task),
     // FindNode(Option<&'static str>, Option<dom::Node>),
     // DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),
     DomDescribeNode(Option<&'static str>, Option<dom::Node>),

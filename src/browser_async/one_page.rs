@@ -610,18 +610,18 @@ impl Stream for OnePage {
                             return Ok(Some(PageMessage::EnablePageDone).into());
                         }
                     }
-                    OnePageState::WaitingFrameTree(mid) => {
-                        trace!("*** WaitingFrameTree {:?} ***", mid);
-                        if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
-                            if let Ok(v) = protocol::parse_response::<
-                                page::methods::GetFrameTreeReturnObject,
-                            >(resp)
-                            {
-                                trace!("----------------- got frames: {:?}", v);
-                                return Ok(Some(PageMessage::GetFrameTree(v.frame_tree)).into());
-                            }
-                        }
-                    }
+                    // OnePageState::WaitingFrameTree(mid) => {
+                    //     trace!("*** WaitingFrameTree {:?} ***", mid);
+                    //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                    //         if let Ok(v) = protocol::parse_response::<
+                    //             page::methods::GetFrameTreeReturnObject,
+                    //         >(resp)
+                    //         {
+                    //             trace!("----------------- got frames: {:?}", v);
+                    //             return Ok(Some(PageMessage::GetFrameTree(v.frame_tree)).into());
+                    //         }
+                    //     }
+                    // }
                     // OnePageState::WaitingGetDocument(mid, ref next_find_node) => {
                     //     info!("*** WaitingGetDocument ***");
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
@@ -660,126 +660,118 @@ impl Stream for OnePage {
                     //         }
                     //     }
                     // }
-                    OnePageState::WaitingDescribeNode(
-                        maybe_selector,
-                        mid,
-                        node_id,
-                        invoke_next,
-                    ) => {
-                        trace!("*** WaitingDescribeNode ***");
-                        if node_id == &0 {
-                            break Ok(
-                                Some(PageMessage::DomDescribeNode(*maybe_selector, None)).into()
-                            );
-                        }
-                        if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
-                            trace!("----------got describe Node resp: {:?}", resp);
-                            if let Ok(v) = protocol::parse_response::<
-                                dom::methods::DescribeNodeReturnObject,
-                            >(resp)
-                            {
-                                let selector_cloned = maybe_selector.clone();
-                                let selector_cloned_1 = maybe_selector.clone();
-                                if *invoke_next {
-                                    self.find_element(selector_cloned, v.node.backend_node_id);
-                                }
-                                break Ok(Some(PageMessage::DomDescribeNode(
-                                    selector_cloned_1,
-                                    Some(v.node),
-                                ))
-                                .into());
-                            }
-                        }
-                    }
-                    OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
-                        trace!("*** WaitingRemoteObject ***");
-                        if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
-                            if let Ok(v) = protocol::parse_response::<
-                                dom::methods::ResolveNodeReturnObject,
-                            >(resp)
-                            {
-                                let selector_cloned = selector.clone();
-                                let element = Element {
-                                    remote_object_id: v.object.object_id.unwrap().clone(),
-                                    backend_node_id: *backend_node_id,
-                                };
-                            // if let PageMessage::FindElement(_, _) = self.expect_page_message {
-                            //     return Ok(Some(PageMessage::FindElement(
-                            //         selector_cloned,
-                            //         Some(element),
-                            //     )).into());
-                            // } else {
-                            //     self.get_box_model(selector_cloned, &element);
-                            // }
-                            } else {
-                                self.state = OnePageState::Consuming;
-                            }
-                        }
-                    }
-                    OnePageState::WaitingModelBox(selector, backend_node_id, mid) => {
-                        trace!("*** WaitingModelBox ***");
-                        if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
-                            if let Ok(v) = protocol::parse_response::<
-                                dom::methods::GetBoxModelReturnObject,
-                            >(resp)
-                            {
-                                let raw_model = v.model;
-                                let model_box = BoxModel {
-                                    content: ElementQuad::from_raw_points(&raw_model.content),
-                                    padding: ElementQuad::from_raw_points(&raw_model.padding),
-                                    border: ElementQuad::from_raw_points(&raw_model.border),
-                                    margin: ElementQuad::from_raw_points(&raw_model.margin),
-                                    width: raw_model.width,
-                                    height: raw_model.height,
-                                };
-                            // match &self.expect_page_message {
-                            //     PageMessage::GetBoxModel(_, _, _) => {
-                            //         return Ok(Some(PageMessage::GetBoxModel(
-                            //             *selector,
-                            //             *backend_node_id,
-                            //             model_box,
-                            //         )).into());
-                            //     }
-                            //     PageMessage::Screenshot(a, fmt, from_surface, c) => {
-                            //         self.capture_screenshot(
-                            //             fmt.clone(),
-                            //             Some(model_box.content_viewport()),
-                            //             from_surface.clone(),
-                            //         );
-                            //     }
-                            //     _ => (),
-                            // }
-                            } else {
-                                trace!("waiting for WaitingModelBox...1");
-                                self.state = OnePageState::Consuming;
-                            }
-                        } else {
-                            trace!("waiting for WaitingModelBox...2");
-                        }
-                    }
-                    OnePageState::WaitingScreenShot(mid) => {
-                        trace!("*** WaitingScreenShot ***");
-                        if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
-                            if let Ok(v) = protocol::parse_response::<
-                                page::methods::CaptureScreenshotReturnObject,
-                            >(resp)
-                            {
-                                self.state = OnePageState::Consuming;
-                                let data_v8 = base64::decode(&v.data).unwrap();
-                                // if let PageMessage::Screenshot(_, format, from_surface, _) =
-                                //     &self.expect_page_message
-                                // {
-                                //     return Ok(Some(PageMessage::Screenshot(
-                                //         None,
-                                //         format.clone(),
-                                //         from_surface.clone(),
-                                //         Some(data_v8),
-                                //     )).into());
-                                // }
-                            }
-                            self.state = OnePageState::Consuming;
-                        }
-                    }
+                    // OnePageState::WaitingDescribeNode(
+                    //     maybe_selector,
+                    //     mid,
+                    //     node_id,
+                    //     invoke_next,
+                    // ) => {
+                    //     trace!("*** WaitingDescribeNode ***");
+                    //     if node_id == &0 {
+                    //         break Ok(
+                    //             Some(PageMessage::DomDescribeNode(*maybe_selector, None)).into()
+                    //         );
+                    //     }
+                    //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                    //         trace!("----------got describe Node resp: {:?}", resp);
+                    //         if let Ok(v) = protocol::parse_response::<
+                    //             dom::methods::DescribeNodeReturnObject,
+                    //         >(resp)
+                    //         {
+                    //             let selector_cloned = maybe_selector.clone();
+                    //             let selector_cloned_1 = maybe_selector.clone();
+                    //             if *invoke_next {
+                    //                 self.find_element(selector_cloned, v.node.backend_node_id);
+                    //             }
+                    //             break Ok(Some(PageMessage::DomDescribeNode(
+                    //                 selector_cloned_1,
+                    //                 Some(v.node),
+                    //             ))
+                    //             .into());
+                    //         }
+                    //     }
+                    // }
+                    // OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
+                    //     trace!("*** WaitingRemoteObject ***");
+                    //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                    //         if let Ok(v) = protocol::parse_response::<
+                    //             dom::methods::ResolveNodeReturnObject,
+                    //         >(resp)
+                    //         {
+                    //             let selector_cloned = selector.clone();
+                    //             let element = Element {
+                    //                 remote_object_id: v.object.object_id.unwrap().clone(),
+                    //                 backend_node_id: *backend_node_id,
+                    //             };
+                    //         } else {
+                    //             self.state = OnePageState::Consuming;
+                    //         }
+                    //     }
+                    // }
+                    // OnePageState::WaitingModelBox(selector, backend_node_id, mid) => {
+                    //     trace!("*** WaitingModelBox ***");
+                    //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                    //         if let Ok(v) = protocol::parse_response::<
+                    //             dom::methods::GetBoxModelReturnObject,
+                    //         >(resp)
+                    //         {
+                    //             let raw_model = v.model;
+                    //             let model_box = BoxModel {
+                    //                 content: ElementQuad::from_raw_points(&raw_model.content),
+                    //                 padding: ElementQuad::from_raw_points(&raw_model.padding),
+                    //                 border: ElementQuad::from_raw_points(&raw_model.border),
+                    //                 margin: ElementQuad::from_raw_points(&raw_model.margin),
+                    //                 width: raw_model.width,
+                    //                 height: raw_model.height,
+                    //             };
+                    //         // match &self.expect_page_message {
+                    //         //     PageMessage::GetBoxModel(_, _, _) => {
+                    //         //         return Ok(Some(PageMessage::GetBoxModel(
+                    //         //             *selector,
+                    //         //             *backend_node_id,
+                    //         //             model_box,
+                    //         //         )).into());
+                    //         //     }
+                    //         //     PageMessage::Screenshot(a, fmt, from_surface, c) => {
+                    //         //         self.capture_screenshot(
+                    //         //             fmt.clone(),
+                    //         //             Some(model_box.content_viewport()),
+                    //         //             from_surface.clone(),
+                    //         //         );
+                    //         //     }
+                    //         //     _ => (),
+                    //         // }
+                    //         } else {
+                    //             trace!("waiting for WaitingModelBox...1");
+                    //             self.state = OnePageState::Consuming;
+                    //         }
+                    //     } else {
+                    //         trace!("waiting for WaitingModelBox...2");
+                    //     }
+                    // }
+                    // OnePageState::WaitingScreenShot(mid) => {
+                    //     trace!("*** WaitingScreenShot ***");
+                    //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
+                    //         if let Ok(v) = protocol::parse_response::<
+                    //             page::methods::CaptureScreenshotReturnObject,
+                    //         >(resp)
+                    //         {
+                    //             self.state = OnePageState::Consuming;
+                    //             let data_v8 = base64::decode(&v.data).unwrap();
+                    //             // if let PageMessage::Screenshot(_, format, from_surface, _) =
+                    //             //     &self.expect_page_message
+                    //             // {
+                    //             //     return Ok(Some(PageMessage::Screenshot(
+                    //             //         None,
+                    //             //         format.clone(),
+                    //             //         from_surface.clone(),
+                    //             //         Some(data_v8),
+                    //             //     )).into());
+                    //             // }
+                    //         }
+                    //         self.state = OnePageState::Consuming;
+                    //     }
+                    // }
                     _ => {
                         // #[derive(Deserialize, Debug, PartialEq, Clone)]
                         // pub struct Response {

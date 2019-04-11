@@ -90,12 +90,14 @@ impl Future for FindNode {
                             panic!("time out 40 seconds.");
                         }
                     }
-                    PageMessage::PageEvent(page_event_name) => {
+                    // PageMessage::PageEvent(PageEventName::loadEventFired) => {
+                    PageMessage::PageEvent(_) => {
                         if let Some(_) = self.chrome_page.one_page.is_frame_navigated("ddlogin-iframe") {
                             self.chrome_page.one_page.dom_query_selector_by_selector(self.selector, Some(5));
                         }
                     }
-                    PageMessage::NodeIdComing(node_id, task_id) => {
+                    PageMessage::NodeIdComing(node_id, task) => {
+                        info!("task done: {:?}", task);
                         break Ok(Some(node_id).into());
                     }
                     _ => {

@@ -2,6 +2,7 @@ use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use super::one_page::{OnePage};
 use super::id_type as ids;
+use super::task_describe as tasks;
 use log::*;
 use std::fmt;
 
@@ -36,11 +37,7 @@ impl ChangingFrameTree {
 //      fn get_task_id(&self) -> usize;
 // }
 
-#[derive(Debug)]
-pub enum TaskDescribe {
-    QuerySelector(QuerySelector),
-    GetDocument(ids::Task)
-}
+
 
 // impl SelectorString for TaskDescribe {
 //     fn get_selector(&self) -> Option<&'static str> {
@@ -60,12 +57,7 @@ pub enum TaskDescribe {
 //     }
 // }
 
-#[derive(Debug)]
-pub struct QuerySelector {
-        pub task_id: usize,
-        pub node_id: Option<dom::NodeId>,
-        pub selector: &'static str,
-}
+
 
 #[derive(Debug)]
 pub enum PageEventName {
@@ -88,7 +80,7 @@ pub enum PageMessage {
     EnablePageDone,
     PageEvent(PageEventName),
     TargetInfoChanged(target::TargetInfo),
-    NodeIdComing(dom::NodeId, ids::Task),
+    NodeIdComing(dom::NodeId, tasks::TaskDescribe),
     NodeComing(dom::Node, ids::Task),
     // FindNode(Option<&'static str>, Option<dom::Node>),
     // DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),

@@ -1,9 +1,8 @@
 use super::element_async::{BoxModel, Element, ElementQuad};
 use super::id_type as ids;
 use super::json_assistor;
-use super::page_message::{
-    ChangingFrame, ChangingFrameTree, PageEventName, PageMessage, QuerySelector, TaskDescribe
-};
+use super::page_message::{ChangingFrame, ChangingFrameTree, PageEventName, PageMessage};
+use super::task_describe as tasks;
 use crate::browser::tab::keys;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 use crate::browser_async::dev_tools_method_util::{
@@ -51,9 +50,9 @@ pub struct OnePage {
     session_id: Option<String>,
     root_node: Option<dom::Node>,
     method_id_2_task_id: HashMap<ids::Method, ids::Task>,
-    task_id_2_task: HashMap<ids::Task, TaskDescribe>,
-    tasks_waiting_event: HashMap<PageEvent, Vec<ids::Method>>,
-    waiting_tasks: HashMap<ids::Task, Vec<ids::Task>>,
+    task_id_2_task: HashMap<ids::Task, tasks::TaskDescribe>,
+    // tasks_waiting_event: HashMap<PageEvent, Vec<ids::Method>>,
+    waiting_for_me: HashMap<ids::Task, Vec<ids::Task>>,
     pub changing_frame_tree: ChangingFrameTree,
     unique_number: AtomicUsize,
 }
@@ -94,7 +93,8 @@ impl OnePage {
             root_node: None,
             method_id_2_task_id: HashMap::new(),
             task_id_2_task: HashMap::new(),
-            tasks_waiting_event: HashMap::new(),
+            // tasks_waiting_event: HashMap::new(),
+            waiting_for_me: HashMap::new(),
             changing_frame_tree: ChangingFrameTree::new(),
             unique_number: AtomicUsize::new(10000),
         }
@@ -144,9 +144,14 @@ impl OnePage {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn get_document(&mut self) {
-        let t_id = self.unique_number.fetch_add(1, Ordering::SeqCst);
-        if self.root_node.is_none() {
+    pub fn get_document(
+        &mut self,
+        manual_task_id: Option<ids::Task>,
+    ) -> (Option<ids::Task>, Option<dom::NodeId>) {
+        if let Some(root_node) = &self.root_node {
+            (None, Some(root_node.node_id))
+        } else {
+            let this_id = manual_task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst));
             let (_, method_str, mid) = self
                 .create_msg_to_send_with_session_id(dom::methods::GetDocument {
                     depth: Some(0),
@@ -154,9 +159,10 @@ impl OnePage {
                 })
                 .unwrap();
             self.task_id_2_task
-                .insert(t_id, TaskDescribe::GetDocument(t_id));
-            self.method_id_2_task_id.entry(mid.unwrap()).or_insert(t_id);
+                .insert(this_id, tasks::TaskDescribe::GetDocument(this_id));
+            self.method_id_2_task_id.entry(mid.unwrap()).or_insert(this_id);
             self.chrome_browser.send_message(method_str);
+            (Some(this_id), None)
         }
     }
 
@@ -192,70 +198,127 @@ impl OnePage {
     }
 
     // pass in an usize under 10000 or None.
-    pub fn dom_query_selector_by_selector (
+    pub fn dom_query_selector_by_selector(
         &mut self,
         selector: &'static str,
-        task_id: Option<usize>,
-    ) -> ids::Task {
-        let t_id = task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst));
-        let td = QuerySelector {
+        manual_task_id: Option<usize>,
+    ) -> (Option<ids::Task>, Option<dom::NodeId>) {
+        let (this_task_id, is_manual) = manual_task_id.map_or_else(||(self.unique_number.fetch_add(1, Ordering::SeqCst), false),|mid|(mid, true));
+        let mut qs = tasks::QuerySelector {
             selector,
+            is_manual,
             node_id: None,
-            task_id: t_id,
+            task_id: this_task_id,
         };
-        self.task_id_2_task
-            .insert(td.task_id, TaskDescribe::QuerySelector(td));
-        self.dom_query_selector_by_selector_1(t_id);
-    }
-
-    pub fn dom_query_selector_by_selector_1(&mut self, task_id: ids::Task) {
-        // When get a task_describe, we must enable to image out what to do.
-        if let Some(root_node) = &self.root_node {
-            self.dom_query_selector_extra(root_node.node_id, task_id);
-        } else {
-            self.tasks_waiting_event
-                .entry(PageEvent::GetDocument)
-                .or_insert(vec![])
-                .push(task_id);
-            self.get_document();
+        match self.get_document(None) {
+            (Some(task_id), _) => {
+                // if root node is not ready, will return a task_id.
+                self.task_id_2_task
+                    .insert(qs.task_id, tasks::TaskDescribe::QuerySelector(qs));
+                self.waiting_for_me
+                    .entry(this_task_id)
+                    .or_insert(vec![])
+                    .push(task_id);
+            }
+            (_, Some(node_id)) => {
+                // self.dom_query_selector_extra(node_id, t_id);
+                qs.node_id = Some(node_id);
+                self.dom_query_selector(tasks::TaskDescribe::QuerySelector(qs));
+            }
+            _ => {
+                error!("get_document return impossible value combination.");
+            }
         }
+        (Some(this_task_id), None)
     }
 
-    pub fn dom_query_selector_by_selector_2(&mut self, query_selector: QuerySelector) {
-        let t_id = query_selector.task_id;
-        self.task_id_2_task
-            .insert(t_id, TaskDescribe::QuerySelector(query_selector));
-        if let Some(root_node) = &self.root_node {
-            self.dom_query_selector_extra(root_node.node_id, t_id);
-        } else {
-            error!("root node does't exists.");
-        }
-    }
-
-    pub fn dom_query_selector(&mut self, ancestor: dom::NodeId, selector: &'static str) {
-        let t_id = self.unique_number.fetch_add(1, Ordering::SeqCst);
-        let td = QuerySelector {
+    fn dom_query_selector(&mut self, task: tasks::TaskDescribe) {
+        if let tasks::TaskDescribe::QuerySelector(tasks::QuerySelector {
+            task_id,
+            is_manual,
+            node_id: Some(node_id_value),
             selector,
-            task_expect: TaskExpect::NodeId,
-            task_id: t_id,
-        };
-        self.task_id_2_task
-            .insert(td.task_id, TaskDescribe::QuerySelector(td));
-        self.dom_query_selector_extra(ancestor, t_id);
+        }) = task
+        {
+            let (_, method_str, mid) = self
+                .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
+                    node_id: node_id_value,
+                    selector: selector,
+                })
+                .unwrap();
+            self.method_id_2_task_id
+                .entry(mid.unwrap())
+                .or_insert(task_id);
+            self.task_id_2_task.insert(task_id, task);
+            self.chrome_browser.send_message(method_str);
+        } else {
+            error!("it's not a query selector task.");
+            panic!("it's not a query selector task.");
+        }
     }
 
-    fn dom_query_selector_extra(&mut self, ancestor: dom::NodeId, task_id: ids::Task) {
-        let task_describe = self.task_id_2_task.get(&task_id).unwrap();
-        let (_, method_str, mid) = self
-            .create_msg_to_send_with_session_id(dom::methods::QuerySelector {
-                node_id: ancestor,
-                selector: task_describe.get_selector().unwrap(),
-            })
-            .unwrap();
-        self.chrome_browser.send_message(method_str);
-        self.method_id_2_task_id
-            .entry(mid.unwrap())
-            .or_insert(task_describe.get_task_id());
+    pub fn dom_describe_node_by_selector(
+        &mut self,
+        selector: &'static str,
+        manual_task_id: Option<usize>,
+    ) {
+        let (this_task_id, is_manual) = manual_task_id.map_or_else(||(self.unique_number.fetch_add(1, Ordering::SeqCst), false),|mid|(mid, true));
+        // let this_task_id =
+        //     manual_task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst));
+        let mut describe_node = tasks::DescribeNode {
+            selector,
+            is_manual,
+            node_id: None,
+            backend_node_id: None,
+            task_id: this_task_id,
+        };
+        // because node_id is unknown, get it by selector provided.
+        match self.dom_query_selector_by_selector(selector, None) {
+            (Some(task_id), None) => {
+                self.task_id_2_task.insert(
+                    this_task_id,
+                    tasks::TaskDescribe::DescribeNode(describe_node),
+                );
+
+                self.waiting_for_me
+                    .entry(task_id)
+                    .or_insert(vec![])
+                    .push(this_task_id);
+            }
+            (_, Some(node_id)) => {
+                describe_node.node_id = Some(node_id);
+                self.dom_describe_node(tasks::TaskDescribe::DescribeNode(describe_node));
+            }
+            _ => {
+                error!("dom_query_selector_by_selector return impossible value.");
+            }
+        }
+    }
+
+    pub fn dom_describe_node(&mut self, task: tasks::TaskDescribe) {
+        if let tasks::TaskDescribe::DescribeNode(tasks::DescribeNode {
+            task_id,
+            node_id,
+            is_manual,
+            backend_node_id,
+            selector,
+        }) = task
+        {
+            let (_, method_str, mid) = self
+                .create_msg_to_send_with_session_id(dom::methods::DescribeNode {
+                    node_id: node_id,
+                    backend_node_id: backend_node_id,
+                    depth: Some(100),
+                })
+                .unwrap();
+            self.method_id_2_task_id
+                .entry(mid.unwrap())
+                .or_insert(task_id);
+            self.task_id_2_task.insert(task_id, task);
+            self.chrome_browser.send_message(method_str);
+        } else {
+            error!("not a node_describe.")
+        }
     }
 
     pub fn get_frame_tree(&mut self) {
@@ -273,50 +336,6 @@ impl OnePage {
             })
             .unwrap();
         self.state = OnePageState::WaitingRemoteObject(backend_node_id, selector, mid.unwrap());
-        self.chrome_browser.send_message(method_str);
-    }
-
-    pub fn dom_describe_node_by_selector(
-        &mut self,
-        selector: &'static str,
-        task_id: Option<usize>,
-    ) {
-        let td = QuerySelector {
-            selector,
-            task_expect: TaskExpect::Node,
-            task_id: task_id.unwrap_or(self.unique_number.fetch_add(1, Ordering::SeqCst)),
-        };
-        let task_id = td.task_id;
-        self.task_id_2_task
-            .insert(td.task_id, TaskDescribe::QuerySelector(td));
-        self.dom_query_selector_by_selector_1(task_id);
-    }
-
-    pub fn dom_describe_node_extra(&mut self, node_id: dom::NodeId, task_describe: TaskDescribe) {
-        let (_, method_str, mid) = self
-            .create_msg_to_send_with_session_id(dom::methods::DescribeNode {
-                node_id: Some(node_id),
-                backend_node_id: None,
-                depth: Some(100),
-            })
-            .unwrap();
-        self.method_id_2_task_id
-            .entry(mid.unwrap())
-            .or_insert(task_describe.get_task_id());
-        self.chrome_browser.send_message(method_str);
-    }
-
-    fn dom_describe_node_extra_1(&mut self, node_id: dom::NodeId, task_id: ids::Task) {
-        let (_, method_str, mid) = self
-            .create_msg_to_send_with_session_id(dom::methods::DescribeNode {
-                node_id: Some(node_id),
-                backend_node_id: None,
-                depth: Some(100),
-            })
-            .unwrap();
-        self.method_id_2_task_id
-            .entry(mid.unwrap())
-            .or_insert(task_id);
         self.chrome_browser.send_message(method_str);
     }
 
@@ -475,14 +494,40 @@ impl OnePage {
         self.chrome_browser.send_message(method_str);
     }
 
-    /// pick out some special tasks like getDocument.
+    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+        // Take out all tasks waiting for me.
+        let mut waiting_task_ids: Vec<_> = self
+            .waiting_for_me
+            .get_mut(&task_id)
+            .unwrap_or(&mut vec![])
+            .drain(..)
+            .collect();
+
+        // Remove task_id task pair.
+        let mut waiting_tasks: Vec<_> = waiting_task_ids
+            .iter()
+            .flat_map(|t_id| self.task_id_2_task.remove(&t_id))
+            .collect();
+
+        while let Some(mut task) = waiting_tasks.pop() {
+            match &mut task {
+                tasks::TaskDescribe::QuerySelector(query_selector) => {
+                    query_selector.node_id = Some(node_id);
+                    self.dom_query_selector(task);
+                }
+                _ => (),
+            }
+        }
+    }
+
     pub fn handle_response(&mut self, resp: protocol::Response) -> Option<PageMessage> {
         trace!("got message from target response. {:?}", resp);
         let call_id = resp.call_id;
-        let matched_task = self
+        // remove method id and task from page scope hashmap.
+        let maybe_matched_task = self
             .method_id_2_task_id
-            .get(&call_id)
-            .and_then(|task_id| self.task_id_2_task.get(task_id))
+            .remove(&call_id)
+            .and_then(|task_id| self.task_id_2_task.remove(&task_id))
             .or({
                 error!("not matching task_id to call_id {}.", call_id);
                 None
@@ -493,62 +538,39 @@ impl OnePage {
         //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
         // }
 
-        // info!("got call_id {}, task_id {}", call_id, task_id);
-        // info!("got response: {:?}", resp);
-        match matched_task {
-            Some(TaskDescribe::GetDocument(_)) => {
-            // it must be a GetDocumentReturnObject. if not then something must go wrong.
-            if let Ok(node) = serde_json::from_value::<dom::methods::GetDocumentReturnObject>(resp.result.unwrap()) {
-                self.root_node = Some(node.root);
-            } else {
-                panic!("GetDocument failed.");
-            }
-            let mut waiting_task_ids: Vec<_> = self
-                .tasks_waiting_event
-                .get_mut(&PageEvent::GetDocument)
-                .unwrap_or(&mut vec![])
-                .drain(..)
-                .collect();
-
-            let mut waiting_tasks: Vec<_> = waiting_task_ids
-                .iter()
-                .flat_map(|t_id| self.task_id_2_task.remove(&t_id))
-                .collect();
-
-            while let Some(task) = waiting_tasks.pop() {
-                match task {
-                    TaskDescribe::QuerySelector(qs) => {
-                        self.dom_query_selector_by_selector_2(qs);
+        if let Some(task) = maybe_matched_task {
+            match &task {
+                tasks::TaskDescribe::GetDocument(task_id) => {
+                    // it must be a GetDocumentReturnObject or else something must go wrong.
+                    if let Ok(node) = serde_json::from_value::<dom::methods::GetDocumentReturnObject>(
+                        resp.result.unwrap(),
+                    ) {
+                        let node_id = node.root.node_id;
+                        self.feed_on_node_id(*task_id, node_id);
+                        self.root_node.replace(node.root);
+                    } else {
+                        panic!("GetDocument failed.");
                     }
-                    _ => (),
+                }
+                tasks::TaskDescribe::QuerySelector(query_selector) => {
+                    if let Ok(node) = serde_json::from_value::<
+                        dom::methods::QuerySelectorReturnObject,
+                    >(resp.result.unwrap())
+                    {
+                        self.feed_on_node_id(query_selector.task_id, node.node_id);
+                        if query_selector.is_manual {
+                            return Some(PageMessage::NodeIdComing(node.node_id, task));
+                        }
+                    } else {
+                        panic!("QuerySelector failed.");
+                    }
+                }
+                task_describe => {
+                    info!("got task_describe: {:?}", task_describe);
                 }
             }
-        }
-        Some(TaskDescribe::QuerySelector(query_selector)) => {
-            // we know this is a response to querySelector but don't know it's a QuerySelectorReturnObject or a DescribeNodeReturnObject response.
-            if json_assistor::response_result_field_has_properties(&resp, "root", vec!["nodeId", "backendNodeId"]) {
-            //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
-            }
-
-            if let Ok(node) = serde_json::from_value::<dom::methods::QuerySelectorReturnObject>(resp.result.unwrap()) {
-                if let TaskExpect::NodeId = &query_selector.task_expect {
-                        trace!("node_id");
-                        return Some(PageMessage::NodeIdComing(node.node_id, query_selector.task_id));
-                    }
-                    else {
-                        trace!("got node_id, but task expect more than id.");
-                        self.dom_describe_node_extra_1(node.node_id, query_selector.task_id);
-                    }
-            } else {
-                panic!("GetDocument failed.");
-            }
-        }
-        Some(task_describe) => {
-            info!("got task_describe: {:?}", task_describe);
-        }
-        _ => {
-            trace!("skipping....................0");
-        }
+        } else {
+            error!("method id {:?} has no task matched.", call_id);
         }
         None
     }

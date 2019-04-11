@@ -9,6 +9,7 @@ mod interval_one_page;
 mod page_message;
 mod id_type;
 mod json_assistor;
+mod task_describe;
 
 // pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 // use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};

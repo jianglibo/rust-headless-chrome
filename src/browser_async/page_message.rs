@@ -81,7 +81,7 @@ pub enum PageMessage {
     PageEvent(PageEventName),
     TargetInfoChanged(target::TargetInfo),
     NodeIdComing(dom::NodeId, tasks::TaskDescribe),
-    NodeComing(dom::Node, ids::Task),
+    NodeComing(dom::Node, tasks::TaskDescribe),
     // FindNode(Option<&'static str>, Option<dom::Node>),
     // DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),
     DomDescribeNode(Option<&'static str>, Option<dom::Node>),

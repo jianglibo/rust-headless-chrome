@@ -1,15 +1,14 @@
-mod dev_tools_method_util;
-mod chrome_browser;
-mod my_page;
-mod one_page;
-mod element_async;
-mod point_async;
-mod interval_page_message;
-mod interval_one_page;
-mod page_message;
-mod id_type;
-mod json_assistor;
-mod task_describe;
+pub mod dev_tools_method_util;
+pub mod chrome_browser;
+pub mod one_page;
+pub mod element_async;
+pub mod point_async;
+pub mod interval_page_message;
+pub mod interval_one_page;
+pub mod page_message;
+pub mod id_type;
+pub mod json_assistor;
+pub mod task_describe;
 
 // pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 // use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};

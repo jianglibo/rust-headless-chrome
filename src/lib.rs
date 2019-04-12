@@ -22,7 +22,7 @@ pub mod browser;
 pub mod protocol;
 pub mod util;
 
-mod browser_async;
+pub mod browser_async;
 
 
 pub use browser::{Browser, LaunchOptionsBuilder, Tab};

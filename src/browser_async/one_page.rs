@@ -494,7 +494,7 @@ impl OnePage {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+    fn get_waiting_tasks(&mut self, task_id: ids::Task) -> Vec<tasks::TaskDescribe> {
         // Take out all tasks waiting for me.
         let mut waiting_task_ids: Vec<_> = self
             .waiting_for_me
@@ -504,16 +504,23 @@ impl OnePage {
             .collect();
 
         // Remove task_id task pair.
-        let mut waiting_tasks: Vec<_> = waiting_task_ids
+        waiting_task_ids
             .iter()
             .flat_map(|t_id| self.task_id_2_task.remove(&t_id))
-            .collect();
+            .collect()
+    }
 
+    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+        let mut waiting_tasks = self.get_waiting_tasks(task_id);
         while let Some(mut task) = waiting_tasks.pop() {
             match &mut task {
                 tasks::TaskDescribe::QuerySelector(query_selector) => {
                     query_selector.node_id = Some(node_id);
                     self.dom_query_selector(task);
+                }
+                tasks::TaskDescribe::DescribeNode(describe_node) => {
+                    describe_node.node_id = Some(node_id);
+                    self.dom_describe_node(task);
                 }
                 _ => (),
             }
@@ -560,6 +567,19 @@ impl OnePage {
                         self.feed_on_node_id(query_selector.task_id, node.node_id);
                         if query_selector.is_manual {
                             return Some(PageMessage::NodeIdComing(node.node_id, task));
+                        }
+                    } else {
+                        panic!("QuerySelector failed.");
+                    }
+                }
+                tasks::TaskDescribe::DescribeNode(describe_node) => {
+                    if let Ok(node) = serde_json::from_value::<
+                        dom::methods::DescribeNodeReturnObject,
+                    >(resp.result.unwrap())
+                    {
+                        // self.feed_on_node(describe_node.task_id, node.node);
+                        if describe_node.is_manual {
+                            return Some(PageMessage::NodeComing(node.node, task));
                         }
                     } else {
                         panic!("QuerySelector failed.");

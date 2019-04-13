@@ -11,14 +11,10 @@ use log::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use crate::protocol::{self};
+use super::tab::Tab;
 
 const DEFAULT_TAB_NAME: &'static str = "_default_tab_";
 
-#[derive(Debug)]
-struct Tab {
-    chrome_session: Arc<Mutex<ChromeDebugSession>>,
-    target_info: protocol::target::TargetInfo,
-}
 
 struct Wrapper {
     pub chrome_debug_session: Arc<Mutex<ChromeDebugSession>>,
@@ -72,6 +68,9 @@ impl DebugSession {
             wrapper: Wrapper { chrome_debug_session: arc_cds},
             session_id: None,
         }
+    }
+    pub fn get_tab_by_id(&self, tab_id: String) -> Option<&Tab> {
+        self.tabs.values().find(|t| t.target_info.target_id == tab_id)
     }
     pub fn navigate_to(&mut self, url: &str, timeout_seconds: usize) {
         self.chrome_debug_session.lock().unwrap().navigate_to(url);

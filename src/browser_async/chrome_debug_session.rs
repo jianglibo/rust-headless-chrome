@@ -27,7 +27,7 @@ enum PageEvent {
 pub enum OnePageState {
     WaitingPageCreate,
     WaitingPageAttach,
-    WaitingPageEnable(usize),
+    WaitingPageEnable(usize, String),
     WaitingFrameTree(usize),
     // AfterInvokeNavigate,
     WaitingGetDocument(usize, Option<&'static str>),
@@ -43,6 +43,7 @@ pub enum OnePageState {
 /// Who drive the App to loop? They are tasks. For some reasons tasks execution must be delayed must waiting some events to happen, Store these tasks and execute lately.
 /// It's a must that we know how to play from a task_describe.
 
+#[derive(Debug)]
 pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
     pub state: OnePageState,
@@ -127,11 +128,11 @@ impl ChromeDebugSession {
         )
     }
 
-    pub fn page_enable(&mut self) {
+    pub fn page_enable(&mut self, target_id: String) {
         let (_, method_str, mid) = self
             .create_msg_to_send_with_session_id(page::methods::Enable {})
             .unwrap();
-        self.state = OnePageState::WaitingPageEnable(mid.unwrap());
+        self.state = OnePageState::WaitingPageEnable(mid.unwrap(), target_id);
         self.chrome_browser.send_message(method_str);
     }
 
@@ -608,8 +609,9 @@ impl Stream for ChromeDebugSession {
                     OnePageState::WaitingPageCreate => {
                         trace!("*** WaitingPageCreate ***");
                         if let Some(target_info) = MethodUtil::is_page_event_create(value) {
-                            self.target_info = Some(target_info);
+                            // self.target_info = Some(target_info);
                             self.attach_to_page();
+                            return Ok(Some(PageMessage::PageCreated(target_info, None)).into());
                         }
                     }
                     OnePageState::WaitingPageAttach => {
@@ -617,16 +619,17 @@ impl Stream for ChromeDebugSession {
                         if let Some((session_id, target_info)) =
                             MethodUtil::is_page_attach_event(value)
                         {
-                            self.session_id = Some(session_id);
-                            self.target_info = Some(target_info);
-                            self.page_enable();
+                            self.session_id = Some(session_id.clone());
+                            self.target_info = Some(target_info.clone());
+                            self.page_enable(target_info.target_id.clone());
+                            return Ok(Some(PageMessage::PageAttached(target_info, session_id.into())).into());
                         }
                     }
-                    OnePageState::WaitingPageEnable(mid) => {
+                    OnePageState::WaitingPageEnable(mid, target_id) => {
                         // The page enableing has no return value, so must use mid.
                         trace!("*** WaitingPageEnable ***");
                         if MethodUtil::match_chrome_response(value, mid).is_some() {
-                            return Ok(Some(PageMessage::EnablePageDone).into());
+                            return Ok(Some(PageMessage::EnablePageDone(target_id.to_string())).into());
                         }
                     }
                     // OnePageState::WaitingFrameTree(mid) => {

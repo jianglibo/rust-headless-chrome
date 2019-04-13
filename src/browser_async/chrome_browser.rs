@@ -68,6 +68,12 @@ pub struct ChromeBrowser {
     last_be_polled: Instant,
 }
 
+impl std::fmt::Debug for ChromeBrowser {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "ChromeBrowser {:?}, {:?}", self.state, self.last_be_polled)
+    }
+}
+
 impl ChromeBrowser {
     pub fn new() -> Self {
         Self {

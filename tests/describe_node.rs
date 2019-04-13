@@ -29,7 +29,7 @@ impl Future for FindNode {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    PageMessage::EnablePageDone => {
+                    PageMessage::EnablePageDone(target_id) => {
                         info!("page enabled.");
                         self.debug_session.chrome_debug_session.navigate_to(self.url);
                     },

@@ -3,6 +3,7 @@ use crate::protocol::{self, dom, page, target};
 use super::chrome_debug_session::{ChromeDebugSession};
 use super::id_type as ids;
 use super::task_describe as tasks;
+use super::dev_tools_method_util::{SessionId};
 use log::*;
 use std::fmt;
 
@@ -77,8 +78,10 @@ pub enum PageEventName {
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
 pub enum PageMessage {
-    EnablePageDone,
+    EnablePageDone(String),
     PageEvent(PageEventName),
+    PageCreated(target::TargetInfo, Option<&'static str>),
+    PageAttached(target::TargetInfo, SessionId),
     TargetInfoChanged(target::TargetInfo),
     NodeIdComing(dom::NodeId, tasks::TaskDescribe),
     NodeComing(dom::Node, tasks::TaskDescribe),

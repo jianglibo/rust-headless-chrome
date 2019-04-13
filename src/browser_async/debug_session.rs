@@ -4,9 +4,34 @@ use super::chrome_debug_session::{ChromeDebugSession};
 use super::page_message::{PageMessage};
 use super::chrome_browser::{ChromeBrowser};
 use super::interval_page_message::{IntervalPageMessage};
+use super::dev_tools_method_util::{SessionId};
 use failure::{self};
 use std::default::Default;
 use log::*;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use crate::protocol::{self};
+
+const DEFAULT_TAB_NAME: &'static str = "_default_tab_";
+
+#[derive(Debug)]
+struct Tab {
+    chrome_session: Arc<Mutex<ChromeDebugSession>>,
+    target_info: protocol::target::TargetInfo,
+}
+
+struct Wrapper {
+    pub chrome_debug_session: Arc<Mutex<ChromeDebugSession>>,
+}
+
+impl Stream for Wrapper {
+    type Item = PageMessage;
+    type Error = failure::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        self.chrome_debug_session.lock().unwrap().poll()
+    }
+}
 
 /// An adapter for merging the output of two streams.
 ///
@@ -17,9 +42,12 @@ use log::*;
 #[must_use = "streams do nothing unless polled"]
 pub struct DebugSession {
     interval_page_message: IntervalPageMessage,
-    pub chrome_debug_session: ChromeDebugSession,
+    pub chrome_debug_session: Arc<Mutex<ChromeDebugSession>>,
     seconds_from_start: usize,
     flag: bool,
+    tabs: HashMap<&'static str, Tab>,
+    wrapper: Wrapper,
+    session_id: Option<SessionId>,
 }
 
 impl Default for DebugSession {
@@ -34,15 +62,19 @@ impl Default for DebugSession {
 impl DebugSession {
     pub fn new(chrome_debug_session: ChromeDebugSession) -> Self {
         let interval_page_message = IntervalPageMessage::new();
+        let arc_cds = Arc::new(Mutex::new(chrome_debug_session));
         Self {
             interval_page_message,
-            chrome_debug_session,
+            chrome_debug_session: arc_cds.clone(),
             seconds_from_start: 0,
             flag: false,
+            tabs: HashMap::new(),
+            wrapper: Wrapper { chrome_debug_session: arc_cds},
+            session_id: None,
         }
     }
     pub fn navigate_to(&mut self, url: &str, timeout_seconds: usize) {
-        self.chrome_debug_session.navigate_to(url);
+        self.chrome_debug_session.lock().unwrap().navigate_to(url);
     }
 
     pub fn send_page_message(&mut self, item: PageMessage) -> Poll<Option<PageMessage>, failure::Error> {
@@ -52,6 +84,18 @@ impl DebugSession {
                 self.seconds_from_start += 1;
                 return Ok(Some(PageMessage::SecondsElapsed(self.seconds_from_start)).into());
             },
+            PageMessage::PageCreated(target_info, page_name) => {
+                self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), Tab{target_info: target_info.clone(), chrome_session: Arc::clone(&self.chrome_debug_session)});
+            }
+            PageMessage::PageAttached(target_info, session_id) => {
+                if let Some(s_id) = &self.session_id {
+                    if s_id != session_id {
+                        error!("got 2 different session id. is it possible?");
+                    }
+                } else {
+                    self.session_id = Some(session_id.clone());
+                }
+            }
             _ => ()
         }
         return Ok(Some(item).into());
@@ -64,13 +108,13 @@ impl Stream for DebugSession {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let (a, b) = if self.flag {
-            (&mut self.chrome_debug_session as &mut Stream<Item=_, Error=_>,
-             &mut self.interval_page_message as &mut Stream<Item=_, Error=_>)
-        } else {
-            (&mut self.interval_page_message as &mut Stream<Item=_, Error=_>,
-             &mut self.chrome_debug_session as &mut Stream<Item=_, Error=_>)
-        };
+            let (a, b) = if self.flag {
+                (&mut self.wrapper as &mut Stream<Item=_, Error=_>,
+                &mut self.interval_page_message as &mut Stream<Item=_, Error=_>)
+            } else {
+                (&mut self.interval_page_message as &mut Stream<Item=_, Error=_>,
+                &mut self.wrapper as &mut Stream<Item=_, Error=_>)
+            };
         self.flag = !self.flag;
         let a_done = match a.poll()? {
             Async::Ready(Some(item)) => return self.send_page_message(item),

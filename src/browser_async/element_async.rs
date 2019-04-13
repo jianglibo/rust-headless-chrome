@@ -6,7 +6,7 @@ use crate::protocol::dom;
 use crate::protocol::page;
 use crate::protocol::runtime;
 use std::collections::HashMap;
-use crate::browser_async::one_page::OnePage;
+use crate::browser_async::chrome_debug_session::ChromeDebugSession;
 
 #[derive(Debug, Copy, Clone)]
 pub struct ElementQuad {

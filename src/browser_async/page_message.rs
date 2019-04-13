@@ -1,6 +1,6 @@
 use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
-use super::one_page::{OnePage};
+use super::chrome_debug_session::{ChromeDebugSession};
 use super::id_type as ids;
 use super::task_describe as tasks;
 use log::*;

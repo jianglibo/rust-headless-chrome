@@ -127,7 +127,7 @@ impl Stream for ChromeBrowser {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
                                 let parsed_message = protocol::parse_raw_message(&msg);
-                                info!("got message (every message): {:?}", parsed_message);
+                                trace!("got message (every message): {:?}", parsed_message);
                                 return Ok(Async::Ready(Some(parsed_message.unwrap())));
                             } else {
                                 error!("got unknown message: {:?}", message);
@@ -170,7 +170,7 @@ impl Stream for ChromeBrowser {
                             self.state = BrowserState::Receiving;
                         },
                         Ok(Async::NotReady) => {
-                            info!("sending not ready.");
+                            trace!("sending not ready.");
                             return Ok(Async::NotReady);
                         },
                         Err(e) => {

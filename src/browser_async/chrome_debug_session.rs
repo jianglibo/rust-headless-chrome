@@ -43,7 +43,7 @@ pub enum OnePageState {
 /// Who drive the App to loop? They are tasks. For some reasons tasks execution must be delayed must waiting some events to happen, Store these tasks and execute lately.
 /// It's a must that we know how to play from a task_describe.
 
-pub struct OnePage {
+pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
     pub state: OnePageState,
     target_info: Option<protocol::target::TargetInfo>,
@@ -51,13 +51,12 @@ pub struct OnePage {
     root_node: Option<dom::Node>,
     method_id_2_task_id: HashMap<ids::Method, ids::Task>,
     task_id_2_task: HashMap<ids::Task, tasks::TaskDescribe>,
-    // tasks_waiting_event: HashMap<PageEvent, Vec<ids::Method>>,
     waiting_for_me: HashMap<ids::Task, Vec<ids::Task>>,
     pub changing_frame_tree: ChangingFrameTree,
     unique_number: AtomicUsize,
 }
 
-impl OnePage {
+impl ChromeDebugSession {
     pub fn is_main_frame_navigated(&self) -> bool {
         if let Some(ChangingFrame::Navigated(_)) = &self.changing_frame_tree.changing_frame {
             true
@@ -597,7 +596,7 @@ impl OnePage {
 }
 
 // The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
-impl Stream for OnePage {
+impl Stream for ChromeDebugSession {
     type Item = PageMessage;
     type Error = failure::Error;
 

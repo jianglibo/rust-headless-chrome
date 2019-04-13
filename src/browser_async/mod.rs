@@ -1,10 +1,10 @@
 pub mod dev_tools_method_util;
 pub mod chrome_browser;
-pub mod one_page;
+pub mod chrome_debug_session;
 pub mod element_async;
 pub mod point_async;
 pub mod interval_page_message;
-pub mod interval_one_page;
+pub mod debug_session;
 pub mod page_message;
 pub mod id_type;
 pub mod json_assistor;

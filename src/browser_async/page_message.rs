@@ -6,8 +6,9 @@ use super::task_describe as tasks;
 use super::dev_tools_method_util::{SessionId};
 use log::*;
 use std::fmt;
+use std::default::Default;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChangingFrame {
     Attached(String, String),
     StartLoading(String),
@@ -19,6 +20,12 @@ pub enum ChangingFrame {
 pub struct ChangingFrameTree {
     pub changing_frame: Option<ChangingFrame>,
     pub child_changing_frames: ::std::collections::HashMap<String, ChangingFrame>,
+}
+
+impl Default for ChangingFrameTree {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChangingFrameTree {
@@ -76,33 +83,33 @@ pub enum PageEventName {
 }
 
 // just wait for things happen. don't care who caused happen.
-#[derive(Debug)]
-pub enum PageMessage {
-    EnablePageDone(String),
-    PageEvent(PageEventName),
-    PageCreated(target::TargetInfo, Option<&'static str>),
-    PageAttached(target::TargetInfo, SessionId),
-    TargetInfoChanged(target::TargetInfo),
-    NodeIdComing(dom::NodeId, tasks::TaskDescribe),
-    NodeComing(dom::Node, tasks::TaskDescribe),
-    // FindNode(Option<&'static str>, Option<dom::Node>),
-    // DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),
-    DomDescribeNode(Option<&'static str>, Option<dom::Node>),
-    FindElement(Option<&'static str>, Option<Element>),
-    GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
-    Screenshot(
-        Option<&'static str>,
-        page::ScreenshotFormat,
-        bool,
-        Option<Vec<u8>>,
-    ),
-    MessageAvailable(protocol::Message),
-    // FrameNavigatedEvent(String, String, protocol::page::events::FrameNavigatedEvent),
-    GetFrameTree(protocol::page::methods::FrameTree),
-    // TargetInfoChanged(protocol::target::events::TargetInfoChangedEvent),
-    Interval,
-    SecondsElapsed(usize),
-}
+// #[derive(Debug)]
+// pub enum PageMessage {
+//     EnablePageDone(String),
+//     PageEvent(PageEventName),
+//     PageCreated(target::TargetInfo, Option<&'static str>),
+//     PageAttached(target::TargetInfo, SessionId),
+//     TargetInfoChanged(target::TargetInfo),
+//     NodeIdComing(dom::NodeId, tasks::TaskDescribe),
+//     NodeComing(dom::Node, tasks::TaskDescribe),
+//     // FindNode(Option<&'static str>, Option<dom::Node>),
+//     // DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),
+//     DomDescribeNode(Option<&'static str>, Option<dom::Node>),
+//     FindElement(Option<&'static str>, Option<Element>),
+//     GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
+//     Screenshot(
+//         Option<&'static str>,
+//         page::ScreenshotFormat,
+//         bool,
+//         Option<Vec<u8>>,
+//     ),
+//     MessageAvailable(protocol::Message),
+//     // FrameNavigatedEvent(String, String, protocol::page::events::FrameNavigatedEvent),
+//     GetFrameTree(protocol::page::methods::FrameTree),
+//     // TargetInfoChanged(protocol::target::events::TargetInfoChangedEvent),
+//     Interval,
+//     SecondsElapsed(usize),
+// }
 
 // impl fmt::Debug for PageMessage {
 //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

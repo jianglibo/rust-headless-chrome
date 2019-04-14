@@ -1,8 +1,9 @@
 use futures::{Poll, Async};
-use websocket::futures::{Future, Stream, Fuse};
+use websocket::futures::{Stream};
 use tokio::timer::{Interval};
-use super::page_message::{PageMessage};
-use std::time::{Duration, Instant};
+// use super::page_message::{PageMessage};
+use super::task_describe::TaskDescribe;
+use std::time::{Duration};
 
 #[derive(Debug)]
 pub struct IntervalPageMessage {
@@ -18,13 +19,13 @@ impl IntervalPageMessage {
 }
 
 impl Stream for IntervalPageMessage {
-    type Item = PageMessage;
+    type Item = TaskDescribe;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             if let Some(_) = try_ready!(self.interval.poll()) {
-                return Ok(Async::Ready(Some(PageMessage::Interval)));
+                return Ok(Async::Ready(Some(TaskDescribe::Interval)));
             }
         }
     }

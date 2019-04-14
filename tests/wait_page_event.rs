@@ -6,7 +6,7 @@ extern crate tokio_timer;
 
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
-use headless_chrome::browser_async::page_message::{PageMessage};
+use headless_chrome::browser_async::task_describe::{TaskDescribe};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use std::default::Default;
 use tokio;
@@ -26,15 +26,16 @@ impl Future for LoadEventFired {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    PageMessage::EnablePageDone(target_id) => {
+                    TaskDescribe::PageEnable(task_id, target_id) => {
                         info!("page enabled.");
-                        // self.debug_session.chrome_debug_session.navigate_to(self.url);
+                        let tab = self.debug_session.get_tab_by_id(target_id.unwrap());
+                        tab.unwrap().navigate_to(self.url);
                     },
-                    PageMessage::SecondsElapsed(seconds) => {
+                    TaskDescribe::SecondsElapsed(seconds) => {
                         // if seconds > 39 {
                         //     break Ok(self.debug_session.chrome_debug_session.changing_frame_tree.child_changing_frames.len().into())
                         // }
-                        info!("seconds elapsed: {}, page stuck in: {:?} ", seconds, self.debug_session.session_state());
+                        info!("seconds elapsed: {} ", seconds);
                     }
                     _ => {
                         info!("got unused page message {:?}", value);
@@ -49,7 +50,7 @@ impl Future for LoadEventFired {
 
 #[test]
 fn t_load_event_fired() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,browser_async=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,wait_page_event=trace");
     env_logger::init();
 
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";

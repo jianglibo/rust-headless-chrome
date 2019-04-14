@@ -8,22 +8,21 @@ use std::fmt;
 pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 
 pub use crate::browser::process::LaunchOptionsBuilder;
-use crate::browser::process::{Process};
+use crate::browser::process::Process;
 pub use crate::browser::tab::Tab;
 use futures::AsyncSink;
-use websocket;
+use std::default::Default;
+use std::time::{Duration, Instant};
 use websocket::futures::{Async, Future, Poll, Sink, Stream};
 use websocket::message::OwnedMessage;
 use websocket::r#async::client::{Client, ClientNew};
 use websocket::r#async::TcpStream;
 use websocket::ClientBuilder;
-use std::time::{Duration, Instant};
+
 
 use crate::protocol::target;
 
-use crate::browser_async::dev_tools_method_util::{
-    MethodUtil,MethodDestination,
-};
+use crate::browser_async::dev_tools_method_util::{MethodDestination, MethodUtil};
 
 type WsClient = Client<TcpStream>;
 
@@ -39,24 +38,12 @@ enum BrowserState {
 impl fmt::Debug for BrowserState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            BrowserState::Connecting(_) => {
-                write!(f, "connecting")
-            }
-            BrowserState::Unconnected => {
-                write!(f, "Unconnected")
-            }
-            BrowserState::EnableDiscover => {
-                write!(f, "EnableDiscover")
-            }
-            BrowserState::Receiving => {
-                write!(f, "Receiving")
-            }
-            BrowserState::StartSend(content) => {
-                write!(f, "start sending: {}", content)
-            }
-            BrowserState::Sending => {
-                write!(f, "Sending")
-            }
+            BrowserState::Connecting(_) => write!(f, "connecting"),
+            BrowserState::Unconnected => write!(f, "Unconnected"),
+            BrowserState::EnableDiscover => write!(f, "EnableDiscover"),
+            BrowserState::Receiving => write!(f, "Receiving"),
+            BrowserState::StartSend(content) => write!(f, "start sending: {}", content),
+            BrowserState::Sending => write!(f, "Sending"),
         }
     }
 }
@@ -70,7 +57,17 @@ pub struct ChromeBrowser {
 
 impl std::fmt::Debug for ChromeBrowser {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "ChromeBrowser {:?}, {:?}", self.state, self.last_be_polled)
+        write!(
+            f,
+            "ChromeBrowser {:?}, {:?}",
+            self.state, self.last_be_polled
+        )
+    }
+}
+
+impl Default for ChromeBrowser {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -125,7 +122,12 @@ impl Stream for ChromeBrowser {
                 }
                 BrowserState::EnableDiscover => {
                     trace!("enter enable discover state.");
-                    let (_, md, _) = MethodUtil::create_msg_to_send(target::methods::SetDiscoverTargets { discover: true }, MethodDestination::Browser,None).unwrap();
+                    let (_, md, _) = MethodUtil::create_msg_to_send(
+                        target::methods::SetDiscoverTargets { discover: true },
+                        MethodDestination::Browser,
+                        None,
+                    )
+                    .unwrap();
                     self.state = BrowserState::StartSend(md);
                 }
                 BrowserState::Receiving => {
@@ -153,32 +155,37 @@ impl Stream for ChromeBrowser {
                             return Err(e.into());
                         }
                     }
-                },
+                }
                 BrowserState::StartSend(message_to_send) => {
                     trace!("enter start send.");
-                    match self.ws_client.as_mut().unwrap().start_send(OwnedMessage::Text(message_to_send.clone())) {
+                    match self
+                        .ws_client
+                        .as_mut()
+                        .unwrap()
+                        .start_send(OwnedMessage::Text(message_to_send.clone()))
+                    {
                         Ok(AsyncSink::Ready) => {
                             self.state = BrowserState::Sending;
-                        },
+                        }
                         Ok(AsyncSink::NotReady(_)) => {
                             return Ok(Async::NotReady);
-                        },
+                        }
                         Err(e) => {
                             return Err(e.into());
                         }
                     }
-                },
+                }
                 BrowserState::Sending => {
                     trace!("enter sending.");
                     match self.ws_client.as_mut().unwrap().poll_complete() {
                         Ok(Async::Ready(_)) => {
                             info!("switch to receiving state.");
                             self.state = BrowserState::Receiving;
-                        },
+                        }
                         Ok(Async::NotReady) => {
                             trace!("sending not ready.");
                             return Ok(Async::NotReady);
-                        },
+                        }
                         Err(e) => {
                             error!("{:?}", e);
                             return Err(e.into());

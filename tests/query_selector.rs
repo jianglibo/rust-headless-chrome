@@ -8,7 +8,7 @@ use headless_chrome::protocol::{dom};
 
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
-use headless_chrome::browser_async::page_message::{PageMessage};
+use headless_chrome::browser_async::task_describe::{TaskDescribe};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use tokio;
 use std::default::Default;
@@ -29,27 +29,27 @@ impl Future for FindNode {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    PageMessage::EnablePageDone(target_id) => {
+                    TaskDescribe::PageEnable(task_id, target_id) => {
                         info!("page enabled.");
                         // self.debug_session.chrome_debug_session.navigate_to(self.url);
                     },
-                    PageMessage::SecondsElapsed(seconds) => {
-                        info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.debug_session.session_state());
+                    TaskDescribe::SecondsElapsed(seconds) => {
+                        info!("seconds elipsed: {} ", seconds);
                         if seconds > 39 {
                             error!("time out {}", seconds);
                             panic!("time out 40 seconds.");
                         }
                     }
-                    // PageMessage::PageEvent(PageEventName::loadEventFired) => {
-                    PageMessage::PageEvent(_) => {
+                    // TaskDescribe::PageEvent(PageEventName::loadEventFired) => {
+                    TaskDescribe::PageEvent(_) => {
                         // if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
                         //     self.debug_session.chrome_debug_session.dom_query_selector_by_selector(self.selector, Some(5));
                         // }
                     }
-                    PageMessage::NodeIdComing(node_id, task) => {
-                        info!("task done: {:?}", task);
-                        break Ok(Some(node_id).into());
-                    }
+                    // TaskDescribe::NodeIdComing(node_id, task) => {
+                    //     info!("task done: {:?}", task);
+                    //     break Ok(Some(node_id).into());
+                    // }
                     _ => {
                         info!("got unused page message {:?}", value);
                     }

@@ -2,9 +2,9 @@ use crate::protocol;
 use crate::protocol::target;
 use failure;
 use log::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use serde_json;
 
+use serde_json;
+use std::sync::atomic::{AtomicUsize, Ordering};
 pub type MethodBeforSendResult = Result<(usize, String, Option<usize>), failure::Error>;
 
 pub static GLOBAL_METHOD_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -49,9 +49,7 @@ impl std::convert::From<futures::sync::mpsc::SendError<websocket::message::Owned
     }
 }
 
-impl std::convert::From<websocket::result::WebSocketError>
-    for ChannelBridgeError
-{
+impl std::convert::From<websocket::result::WebSocketError> for ChannelBridgeError {
     fn from(t: websocket::result::WebSocketError) -> Self {
         ChannelBridgeError::Ws(t)
     }
@@ -68,13 +66,9 @@ pub enum ChromePageError {
     #[fail(display = "there is no root node.")]
     NoRootNode,
     #[fail(display = "selector {} return empty result.", selector)]
-    QuerySelectorNoResult {
-        selector: &'static str
-    },
+    QuerySelectorNoResult { selector: &'static str },
     #[fail(display = "I had wait {} seconds.", seconds)]
-    WaitTimeout {
-       seconds: usize,
-    }
+    WaitTimeout { seconds: usize },
 }
 
 #[derive(Debug)]
@@ -84,9 +78,12 @@ impl MethodUtil {
 
     // protocol::Response has three field, call_id => id, result, error
     // protocol::Message maybe is an Event, a response, event wrapped a response.
-    pub fn match_chrome_response(message: protocol::Message, mid: &usize) -> Option<protocol::Response> {
+    pub fn match_chrome_response(
+        message: protocol::Message,
+        mid: usize,
+    ) -> Option<protocol::Response> {
         if let Some(resp) = Self::get_chrome_response(message) {
-            if &resp.call_id == mid {
+            if resp.call_id == mid {
                 trace!("got response, call_id: {:?}", mid);
                 return Some(resp);
             } else {
@@ -98,47 +95,52 @@ impl MethodUtil {
         None
     }
     pub fn get_chrome_response(message: protocol::Message) -> Option<protocol::Response> {
-            match message {
-                protocol::Message::Response(browser_response) => {
-                    info!("got chrome response. {:?}", browser_response);
-                    return Some(browser_response);
-                }
-                protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
-                    target_message_event,
-                )) => {
-                    let message_field = &target_message_event.params.message;
-                    if let Ok(protocol::Message::Response(resp)) =
-                        protocol::parse_raw_message(&message_field)
-                    {
-                        info!("got message from target response. {:?}", resp);
-                        return Some(resp);
-                    } else {
-                        error!("got unknown message0: {:?}", target_message_event);
-                    }
-                }
-                other => {
-                    error!("got unknown message1: {:?}", other);
-                }
+        match message {
+            protocol::Message::Response(browser_response) => {
+                info!("got chrome response. {:?}", browser_response);
+                return Some(browser_response);
             }
-            None
+            protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
+                target_message_event,
+            )) => {
+                let message_field = &target_message_event.params.message;
+                if let Ok(protocol::Message::Response(resp)) =
+                    protocol::parse_raw_message(&message_field)
+                {
+                    info!("got message from target response. {:?}", resp);
+                    return Some(resp);
+                } else {
+                    error!("got unknown message0: {:?}", target_message_event);
+                }
+
+            }
+            other => {
+                error!("got unknown message1: {:?}", other);
+            }
+        }
+        None
     }
 
-    pub fn is_received_message_from_target_event<'a>(message: &'a protocol::Message) -> Option<&'a protocol::target::events::ReceivedMessageFromTargetParams> {
-            match message {
-                protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
-                    target_message_event,
-                )) => {
-                    return Some(&target_message_event.params);
-                }
-                other => {
-                    info!("got ignored event message: {:?}", other);
-                }
+    pub fn is_received_message_from_target_event<'a>(
+        message: &'a protocol::Message,
+    ) -> Option<&'a protocol::target::events::ReceivedMessageFromTargetParams> {
+        match message {
+            protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
+                target_message_event,
+            )) => {
+                return Some(&target_message_event.params);
             }
-            None
+            other => {
+                info!("got ignored event message: {:?}", other);
+            }
+        }
+        None
     }
     //{ session_id: "5566C53458FD05F52B70FD9F07336F5D", target_id: "224A448D4698866E1FA56CBBD0455384", message: "{\"method\":\"Page.loadEventFired\",\"params\":{\"timestamp\":345434.504916}}" } }
 
-    pub fn is_page_load_event_fired<'a>(message: &'a protocol::Message) -> Option<&'a protocol::target::events::ReceivedMessageFromTargetParams> {
+    pub fn is_page_load_event_fired<'a>(
+        message: &'a protocol::Message,
+    ) -> Option<&'a protocol::target::events::ReceivedMessageFromTargetParams> {
         if let Some(mg) = Self::is_received_message_from_target_event(&message) {
             if let Ok(inner_msg) = Self::parse_target_message_event(&mg.message) {
                 match inner_msg {
@@ -149,20 +151,23 @@ impl MethodUtil {
                             }
                         }
                     }
-                    _ => ()
+                    _ => (),
                 }
             }
         }
         None
     }
 
-    pub fn parse_target_message_event(raw_message: &str) -> Result<serde_json::Value, failure::Error> {
+    pub fn parse_target_message_event(
+        raw_message: &str,
+    ) -> Result<serde_json::Value, failure::Error> {
         Ok(serde_json::from_str::<serde_json::Value>(raw_message)?)
     }
 
-    pub fn is_page_event_create(message: protocol::Message) -> Option<protocol::target::TargetInfo> {
-        if let protocol::Message::Event(any_event_from_server) = message
-        {
+    pub fn is_page_event_create(
+        message: protocol::Message,
+    ) -> Option<protocol::target::TargetInfo> {
+        if let protocol::Message::Event(any_event_from_server) = message {
             if let protocol::Event::TargetCreated(target_created_event) = any_event_from_server {
                 let target_type = &(target_created_event.params.target_info.target_type);
                 match target_type {
@@ -180,40 +185,40 @@ impl MethodUtil {
         None
     }
 
-    pub fn is_page_attach_event(message: protocol::Message) -> Option<(String, protocol::target::TargetInfo)> {
-                if let protocol::Message::Event(any_event_from_server) = message
-        {
+    pub fn is_page_attach_event(
+        message: protocol::Message,
+    ) -> Option<(String, protocol::target::TargetInfo)> {
+        if let protocol::Message::Event(any_event_from_server) = message {
+            if let protocol::Event::AttachedToTarget(event) = any_event_from_server {
+                let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
+                    event.params;
+                let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
 
-        if let protocol::Event::AttachedToTarget(event) = any_event_from_server
-        {
-            let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
-                event.params;
-            let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
-
-            match target_info.target_type {
-                protocol::target::TargetType::Page => {
-                    info!(
-                        "got attach to page event and sessionId: {}",
-                        attach_to_target_params.session_id
-                    );
-                    return Some((attach_to_target_params.session_id, target_info));
+                match target_info.target_type {
+                    protocol::target::TargetType::Page => {
+                        info!(
+                            "got attach to page event and sessionId: {}",
+                            attach_to_target_params.session_id
+                        );
+                        return Some((attach_to_target_params.session_id, target_info));
+                    }
+                    _ => (),
                 }
-                _ => (),
+
             }
         }
-        }
+
         None
     }
-    pub fn create_msg_to_send_with_session_id<C>(method: C, session_id: &Option<SessionId>) -> MethodBeforSendResult
+    pub fn create_msg_to_send_with_session_id<C>(
+        method: C,
+        session_id: &Option<SessionId>,
+    ) -> MethodBeforSendResult
     where
         C: protocol::Method + serde::Serialize,
     {
         if let Some(s_id) = session_id {
-            Self::create_msg_to_send(
-                method,
-                MethodDestination::Target(s_id.clone().into()),
-                None,
-            )
+            Self::create_msg_to_send(method, MethodDestination::Target(s_id.clone().into()), None)
         } else {
             error!("no session_id exists.");
             panic!("no session_id exists.");
@@ -252,62 +257,60 @@ impl MethodUtil {
     }
 }
 
-    // pub fn get_chrome_event(owned_message: &OwnedMessage) -> Option<protocol::Event> {
-    //     if let Some(protocol::Message::Event(browser_event)) =
-    //         Self::get_any_message_from_chrome(owned_message)
-    //     {
-    //         info!("parsed chrome message: {:?}", browser_event);
-    //         match browser_event {
-    //             protocol::Event::ReceivedMessageFromTarget(target_message_event) => {
-    //                 let session_id: SessionId = target_message_event.params.session_id.into();
-    //                 let raw_message = target_message_event.params.message;
+// pub fn get_chrome_event(owned_message: &OwnedMessage) -> Option<protocol::Event> {
+//     if let Some(protocol::Message::Event(browser_event)) =
+//         Self::get_any_message_from_chrome(owned_message)
+//     {
+//         info!("parsed chrome message: {:?}", browser_event);
+//         match browser_event {
+//             protocol::Event::ReceivedMessageFromTarget(target_message_event) => {
+//                 let session_id: SessionId = target_message_event.params.session_id.into();
+//                 let raw_message = target_message_event.params.message;
 
-    //                 if let Ok(target_message) = protocol::parse_raw_message(&raw_message) {
-    //                     match target_message {
-    //                         protocol::Message::Event(target_event) => {
-    //                             info!("get event {:?}", target_event);
-    //                             return Some(target_event);
-    //                         }
-    //                         protocol::Message::Response(resp) => {
-    //                             return None;
-    //                         }
-    //                         protocol::Message::ConnectionShutdown => None,
-    //                     }
-    //                 } else {
-    //                     trace!(
-    //                         "Message from target isn't recognised: {:?}",
-    //                         &raw_message[..30]
-    //                     );
-    //                     return None;
-    //                 }
-    //             }
-    //             _ => Some(browser_event),
-    //         }
-    //     } else {
-    //         None
-    //     }
-    // }
-    // protocol::Message cover all possible messages from chrome.
-    // #[allow(clippy::single_match_else)]
-    // fn get_any_message_from_chrome(owned_message: &OwnedMessage) -> Option<protocol::Message> {
-    //     match owned_message {
-    //         OwnedMessage::Text(msg) => {
-    //             if let Ok(m) = protocol::parse_raw_message(&msg) {
-    //                 trace!("got protocol message catch all: {:?}", msg);
-    //                 return Some(m);
-    //             } else {
-    //                 error!("got unparsable message from chrome. {}", msg);
-    //             }
-    //         }
-    //         _ => {
-    //             error!("got None text message from chrome. {:?}", owned_message);
-    //             ()
-    //         }
-    //     };
-    //     None
-    // }
-
-
+//                 if let Ok(target_message) = protocol::parse_raw_message(&raw_message) {
+//                     match target_message {
+//                         protocol::Message::Event(target_event) => {
+//                             info!("get event {:?}", target_event);
+//                             return Some(target_event);
+//                         }
+//                         protocol::Message::Response(resp) => {
+//                             return None;
+//                         }
+//                         protocol::Message::ConnectionShutdown => None,
+//                     }
+//                 } else {
+//                     trace!(
+//                         "Message from target isn't recognised: {:?}",
+//                         &raw_message[..30]
+//                     );
+//                     return None;
+//                 }
+//             }
+//             _ => Some(browser_event),
+//         }
+//     } else {
+//         None
+//     }
+// }
+// protocol::Message cover all possible messages from chrome.
+// #[allow(clippy::single_match_else)]
+// fn get_any_message_from_chrome(owned_message: &OwnedMessage) -> Option<protocol::Message> {
+//     match owned_message {
+//         OwnedMessage::Text(msg) => {
+//             if let Ok(m) = protocol::parse_raw_message(&msg) {
+//                 trace!("got protocol message catch all: {:?}", msg);
+//                 return Some(m);
+//             } else {
+//                 error!("got unparsable message from chrome. {}", msg);
+//             }
+//         }
+//         _ => {
+//             error!("got None text message from chrome. {:?}", owned_message);
+//             ()
+//         }
+//     };
+//     None
+// }
 
 // #[derive(Debug)]
 // pub struct ChromePage {

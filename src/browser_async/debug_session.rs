@@ -1,17 +1,17 @@
-use futures::{Poll, Async};
-use websocket::futures::{Stream};
-use super::chrome_debug_session::{ChromeDebugSession, ChromeSessionState};
-use super::page_message::{PageMessage};
-use super::chrome_browser::{ChromeBrowser};
-use super::interval_page_message::{IntervalPageMessage};
-use super::dev_tools_method_util::{SessionId};
-use failure::{self};
-use std::default::Default;
+use super::chrome_browser::ChromeBrowser;
+use super::chrome_debug_session::ChromeDebugSession;
+use super::dev_tools_method_util::SessionId;
+use super::interval_page_message::IntervalPageMessage;
+use super::tab::Tab;
+use super::task_describe::TaskDescribe;
+use crate::protocol;
+use failure;
+use futures::{Async, Poll};
 use log::*;
 use std::collections::HashMap;
+use std::default::Default;
+use websocket::futures::Stream;
 use std::sync::{Arc, Mutex};
-use crate::protocol::{self};
-use super::tab::Tab;
 
 const DEFAULT_TAB_NAME: &'static str = "_default_tab_";
 
@@ -21,7 +21,7 @@ struct Wrapper {
 }
 
 impl Stream for Wrapper {
-    type Item = PageMessage;
+    type Item = TaskDescribe;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -64,35 +64,62 @@ impl DebugSession {
             seconds_from_start: 0,
             flag: false,
             tabs: HashMap::new(),
-            wrapper: Wrapper { chrome_debug_session: arc_cds},
+            wrapper: Wrapper {
+                chrome_debug_session: arc_cds,
+            },
         }
     }
     pub fn get_tab_by_id(&mut self, tab_id: String) -> Option<&mut Tab> {
-        self.tabs.values_mut().find(|t| t.target_info.target_id == tab_id)
+        self.tabs
+            .values_mut()
+            .find(|t| t.target_info.target_id == tab_id)
     }
 
-    pub fn session_state(&self) -> String {
-        format!("{:?}", &self.chrome_debug_session.lock().unwrap().state)
-    }
+    // pub fn session_state(&self) -> String {
+    //     format!("{:?}", &self.chrome_debug_session.lock().unwrap().state)
+    // }
 
-    pub fn send_page_message(&mut self, item: PageMessage) -> Poll<Option<PageMessage>, failure::Error> {
+    pub fn send_page_message(
+        &mut self,
+        item: TaskDescribe,
+    ) -> Poll<Option<TaskDescribe>, failure::Error> {
         info!("{:?}", item);
         match &item {
-            PageMessage::Interval => {
+            TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
-                return Ok(Some(PageMessage::SecondsElapsed(self.seconds_from_start)).into());
-            },
-            PageMessage::PageCreated(target_info, page_name) => {
-                self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), Tab::new(target_info.clone(), Arc::clone(&self.chrome_debug_session)));
+                return Ok(Some(TaskDescribe::SecondsElapsed(self.seconds_from_start)).into());
             }
-            PageMessage::PageAttached(target_info, session_id) => {
+            TaskDescribe::PageCreated(target_info, page_name) => {
+                trace!(
+                    "receive page created event: {:?}, {:?}",
+                    target_info,
+                    page_name
+                );
+                let mut tab = Tab::new(target_info.clone(), Arc::clone(&self.chrome_debug_session));
+                tab.attach_to_page();
+                self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), tab);
+            }
+            TaskDescribe::PageAttached(target_info, session_id) => {
+                trace!(
+                    "receive page attached event: {:?}, {:?}",
+                    target_info,
+                    session_id.clone()
+                );
                 if let Some(tab) = self.get_tab_by_id(target_info.target_id.clone()) {
-                    tab.session_id.replace(session_id.clone().into());
+                    tab.session_id.replace(session_id.clone());
+                    tab.page_enable();
                 } else {
                     error!("got attach event, but cannot find target.");
                 }
             }
-            _ => ()
+            TaskDescribe::FrameNavigated(target_id, changing_frame) => {
+                if let Some(tab) = self.get_tab_by_id(target_id.clone()) {
+                    tab.frame_navigated(changing_frame.clone());
+                } else {
+                    error!("got frame navigated event, but cannot find target.");
+                }
+            }
+            _ => (),
         }
         return Ok(Some(item).into());
     }
@@ -100,17 +127,21 @@ impl DebugSession {
 
 
 impl Stream for DebugSession {
-    type Item = PageMessage;
+    type Item = TaskDescribe;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-            let (a, b) = if self.flag {
-                (&mut self.wrapper as &mut Stream<Item=_, Error=_>,
-                &mut self.interval_page_message as &mut Stream<Item=_, Error=_>)
-            } else {
-                (&mut self.interval_page_message as &mut Stream<Item=_, Error=_>,
-                &mut self.wrapper as &mut Stream<Item=_, Error=_>)
-            };
+        let (a, b) = if self.flag {
+            (
+                &mut self.wrapper as &mut Stream<Item = _, Error = _>,
+                &mut self.interval_page_message as &mut Stream<Item = _, Error = _>,
+            )
+        } else {
+            (
+                &mut self.interval_page_message as &mut Stream<Item = _, Error = _>,
+                &mut self.wrapper as &mut Stream<Item = _, Error = _>,
+            )
+        };
         self.flag = !self.flag;
         let a_done = match a.poll()? {
             Async::Ready(Some(item)) => return self.send_page_message(item),

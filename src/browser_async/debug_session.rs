@@ -1,6 +1,6 @@
 use futures::{Poll, Async};
 use websocket::futures::{Stream};
-use super::chrome_debug_session::{ChromeDebugSession};
+use super::chrome_debug_session::{ChromeDebugSession, ChromeSessionState};
 use super::page_message::{PageMessage};
 use super::chrome_browser::{ChromeBrowser};
 use super::interval_page_message::{IntervalPageMessage};
@@ -69,6 +69,10 @@ impl DebugSession {
     }
     pub fn get_tab_by_id(&mut self, tab_id: String) -> Option<&mut Tab> {
         self.tabs.values_mut().find(|t| t.target_info.target_id == tab_id)
+    }
+
+    pub fn session_state(&self) -> String {
+        format!("{:?}", &self.chrome_debug_session.lock().unwrap().state)
     }
 
     pub fn send_page_message(&mut self, item: PageMessage) -> Poll<Option<PageMessage>, failure::Error> {

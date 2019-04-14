@@ -26,15 +26,15 @@ impl Future for LoadEventFired {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    PageMessage::EnablePageDone => {
+                    PageMessage::EnablePageDone(target_id) => {
                         info!("page enabled.");
-                        self.debug_session.chrome_debug_session.navigate_to(self.url);
+                        // self.debug_session.chrome_debug_session.navigate_to(self.url);
                     },
                     PageMessage::SecondsElapsed(seconds) => {
-                        if seconds > 39 {
-                            break Ok(self.debug_session.chrome_debug_session.changing_frame_tree.child_changing_frames.len().into())
-                        }
-                        info!("seconds elapsed: {}, page stuck in: {:?} ", seconds, self.debug_session.chrome_debug_session.state);
+                        // if seconds > 39 {
+                        //     break Ok(self.debug_session.chrome_debug_session.changing_frame_tree.child_changing_frames.len().into())
+                        // }
+                        info!("seconds elapsed: {}, page stuck in: {:?} ", seconds, self.debug_session.session_state());
                     }
                     _ => {
                         info!("got unused page message {:?}", value);

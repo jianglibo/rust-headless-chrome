@@ -24,7 +24,7 @@ enum PageEvent {
 }
 
 #[derive(Debug)]
-pub enum OnePageState {
+pub enum ChromeSessionState {
     WaitingPageCreate,
     WaitingPageAttach,
     WaitingPageEnable(usize, String),
@@ -46,7 +46,7 @@ pub enum OnePageState {
 #[derive(Debug)]
 pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
-    pub state: OnePageState,
+    pub state: ChromeSessionState,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
     root_node: Option<dom::Node>,
@@ -87,7 +87,7 @@ impl ChromeDebugSession {
     pub fn new(chrome_browser: ChromeBrowser) -> Self {
         Self {
             chrome_browser,
-            state: OnePageState::WaitingPageCreate,
+            state: ChromeSessionState::WaitingPageCreate,
             target_info: None,
             session_id: None,
             root_node: None,
@@ -112,7 +112,7 @@ impl ChromeDebugSession {
             None,
         )
         .unwrap();
-        self.state = OnePageState::WaitingPageAttach; // change state first.
+        self.state = ChromeSessionState::WaitingPageAttach; // change state first.
         self.chrome_browser.send_message(method_str);
     }
 
@@ -132,7 +132,7 @@ impl ChromeDebugSession {
         let (_, method_str, mid) = self
             .create_msg_to_send_with_session_id(page::methods::Enable {})
             .unwrap();
-        self.state = OnePageState::WaitingPageEnable(mid.unwrap(), target_id);
+        self.state = ChromeSessionState::WaitingPageEnable(mid.unwrap(), target_id);
         self.chrome_browser.send_message(method_str);
     }
 
@@ -140,7 +140,7 @@ impl ChromeDebugSession {
     //     let (_, method_str, _) = self
     //         .create_msg_to_send_with_session_id(Navigate { url })
     //         .unwrap();
-    //     self.state = OnePageState::Consuming;
+    //     self.state = ChromeSessionState::Consuming;
     //     self.send_message(method_str);
     // }
 
@@ -217,7 +217,7 @@ impl ChromeDebugSession {
             })
             .unwrap();
 
-        self.state = OnePageState::WaitingModelBox(selector, element.backend_node_id, mid.unwrap());
+        self.state = ChromeSessionState::WaitingModelBox(selector, element.backend_node_id, mid.unwrap());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -349,7 +349,7 @@ impl ChromeDebugSession {
         let (_, method_str, mid) = self
             .create_msg_to_send_with_session_id(page::methods::GetFrameTree {})
             .unwrap();
-        self.state = OnePageState::WaitingFrameTree(mid.unwrap());
+        self.state = ChromeSessionState::WaitingFrameTree(mid.unwrap());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -359,7 +359,7 @@ impl ChromeDebugSession {
                 backend_node_id: Some(backend_node_id),
             })
             .unwrap();
-        self.state = OnePageState::WaitingRemoteObject(backend_node_id, selector, mid.unwrap());
+        self.state = ChromeSessionState::WaitingRemoteObject(backend_node_id, selector, mid.unwrap());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -514,7 +514,7 @@ impl ChromeDebugSession {
                 from_surface,
             })
             .unwrap();
-        self.state = OnePageState::WaitingScreenShot(mid.unwrap());
+        self.state = ChromeSessionState::WaitingScreenShot(mid.unwrap());
         self.chrome_browser.send_message(method_str);
     }
 
@@ -630,7 +630,7 @@ impl Stream for ChromeDebugSession {
             if let Some(value) = try_ready!(self.chrome_browser.poll()) {
                 // info!("raw value: {:?}", value);
                 match &mut self.state {
-                    OnePageState::WaitingPageCreate => {
+                    ChromeSessionState::WaitingPageCreate => {
                         trace!("*** WaitingPageCreate ***");
                         if let Some(target_info) = MethodUtil::is_page_event_create(value) {
                             // self.target_info = Some(target_info);
@@ -638,7 +638,7 @@ impl Stream for ChromeDebugSession {
                             return Ok(Some(PageMessage::PageCreated(target_info, None)).into());
                         }
                     }
-                    OnePageState::WaitingPageAttach => {
+                    ChromeSessionState::WaitingPageAttach => {
                         trace!("*** WaitingPageAttach ***");
                         if let Some((session_id, target_info)) =
                             MethodUtil::is_page_attach_event(value)
@@ -649,14 +649,14 @@ impl Stream for ChromeDebugSession {
                             return Ok(Some(PageMessage::PageAttached(target_info, session_id.into())).into());
                         }
                     }
-                    OnePageState::WaitingPageEnable(mid, target_id) => {
+                    ChromeSessionState::WaitingPageEnable(mid, target_id) => {
                         // The page enableing has no return value, so must use mid.
                         trace!("*** WaitingPageEnable ***");
                         if MethodUtil::match_chrome_response(value, mid).is_some() {
                             return Ok(Some(PageMessage::EnablePageDone(target_id.to_string())).into());
                         }
                     }
-                    // OnePageState::WaitingFrameTree(mid) => {
+                    // ChromeSessionState::WaitingFrameTree(mid) => {
                     //     trace!("*** WaitingFrameTree {:?} ***", mid);
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                     //         if let Ok(v) = protocol::parse_response::<
@@ -668,7 +668,7 @@ impl Stream for ChromeDebugSession {
                     //         }
                     //     }
                     // }
-                    // OnePageState::WaitingGetDocument(mid, ref next_find_node) => {
+                    // ChromeSessionState::WaitingGetDocument(mid, ref next_find_node) => {
                     //     info!("*** WaitingGetDocument ***");
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                     //         if let Ok(c) = protocol::parse_response::<
@@ -687,7 +687,7 @@ impl Stream for ChromeDebugSession {
                     //         }
                     //     }
                     // }
-                    // OnePageState::WaitingDomQuerySelector(selector, mid, invoke_next) => {
+                    // ChromeSessionState::WaitingDomQuerySelector(selector, mid, invoke_next) => {
                     //     info!("*** WaitingNode {:?} ***", mid);
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                     //         let selector_cloned = selector.clone();
@@ -706,7 +706,7 @@ impl Stream for ChromeDebugSession {
                     //         }
                     //     }
                     // }
-                    // OnePageState::WaitingDescribeNode(
+                    // ChromeSessionState::WaitingDescribeNode(
                     //     maybe_selector,
                     //     mid,
                     //     node_id,
@@ -737,7 +737,7 @@ impl Stream for ChromeDebugSession {
                     //         }
                     //     }
                     // }
-                    // OnePageState::WaitingRemoteObject(backend_node_id, selector, mid) => {
+                    // ChromeSessionState::WaitingRemoteObject(backend_node_id, selector, mid) => {
                     //     trace!("*** WaitingRemoteObject ***");
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                     //         if let Ok(v) = protocol::parse_response::<
@@ -750,11 +750,11 @@ impl Stream for ChromeDebugSession {
                     //                 backend_node_id: *backend_node_id,
                     //             };
                     //         } else {
-                    //             self.state = OnePageState::Consuming;
+                    //             self.state = ChromeSessionState::Consuming;
                     //         }
                     //     }
                     // }
-                    // OnePageState::WaitingModelBox(selector, backend_node_id, mid) => {
+                    // ChromeSessionState::WaitingModelBox(selector, backend_node_id, mid) => {
                     //     trace!("*** WaitingModelBox ***");
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                     //         if let Ok(v) = protocol::parse_response::<
@@ -789,20 +789,20 @@ impl Stream for ChromeDebugSession {
                     //         // }
                     //         } else {
                     //             trace!("waiting for WaitingModelBox...1");
-                    //             self.state = OnePageState::Consuming;
+                    //             self.state = ChromeSessionState::Consuming;
                     //         }
                     //     } else {
                     //         trace!("waiting for WaitingModelBox...2");
                     //     }
                     // }
-                    // OnePageState::WaitingScreenShot(mid) => {
+                    // ChromeSessionState::WaitingScreenShot(mid) => {
                     //     trace!("*** WaitingScreenShot ***");
                     //     if let Some(resp) = MethodUtil::match_chrome_response(value, mid) {
                     //         if let Ok(v) = protocol::parse_response::<
                     //             page::methods::CaptureScreenshotReturnObject,
                     //         >(resp)
                     //         {
-                    //             self.state = OnePageState::Consuming;
+                    //             self.state = ChromeSessionState::Consuming;
                     //             let data_v8 = base64::decode(&v.data).unwrap();
                     //             // if let PageMessage::Screenshot(_, format, from_surface, _) =
                     //             //     &self.expect_page_message
@@ -815,7 +815,7 @@ impl Stream for ChromeDebugSession {
                     //             //     )).into());
                     //             // }
                     //         }
-                    //         self.state = OnePageState::Consuming;
+                    //         self.state = ChromeSessionState::Consuming;
                     //     }
                     // }
                     _ => {

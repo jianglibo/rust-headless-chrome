@@ -29,12 +29,12 @@ impl Future for FindNode {
             info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    PageMessage::EnablePageDone => {
+                    PageMessage::EnablePageDone(target_id) => {
                         info!("page enabled.");
-                        self.debug_session.chrome_debug_session.navigate_to(self.url);
+                        // self.debug_session.chrome_debug_session.navigate_to(self.url);
                     },
                     PageMessage::SecondsElapsed(seconds) => {
-                        info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.debug_session.chrome_debug_session.state);
+                        info!("seconds elipsed: {}, page stuck in: {:?} ", seconds, self.debug_session.session_state());
                         if seconds > 39 {
                             error!("time out {}", seconds);
                             panic!("time out 40 seconds.");
@@ -42,9 +42,9 @@ impl Future for FindNode {
                     }
                     // PageMessage::PageEvent(PageEventName::loadEventFired) => {
                     PageMessage::PageEvent(_) => {
-                        if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
-                            self.debug_session.chrome_debug_session.dom_query_selector_by_selector(self.selector, Some(5));
-                        }
+                        // if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
+                        //     self.debug_session.chrome_debug_session.dom_query_selector_by_selector(self.selector, Some(5));
+                        // }
                     }
                     PageMessage::NodeIdComing(node_id, task) => {
                         info!("task done: {:?}", task);

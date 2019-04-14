@@ -31,10 +31,11 @@ impl Future for FindNode {
                 match value {
                     PageMessage::EnablePageDone(target_id) => {
                         info!("page enabled.");
-                        self.debug_session.chrome_debug_session.navigate_to(self.url);
+                        let tab = self.debug_session.get_tab_by_id(target_id);
+                        tab.unwrap().navigate_to(self.url);
                     },
                     PageMessage::SecondsElapsed(seconds) => {
-                        info!("seconds elapsed: {}, page stuck in: {:?} ", seconds, self.debug_session.chrome_debug_session.state);
+                        info!("seconds elapsed: {}, page stuck in: {:?} ", seconds, self.debug_session.session_state());
                         if seconds > 39 {
                             error!("time out {}", seconds);
                             panic!("time out 40 seconds.");
@@ -42,9 +43,9 @@ impl Future for FindNode {
                     }
                     // PageMessage::PageEvent(PageEventName::loadEventFired) => {
                     PageMessage::PageEvent(_) => {
-                        if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
-                            self.debug_session.chrome_debug_session.dom_describe_node_by_selector(self.selector, Some(5));
-                        }
+                        // if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
+                        //     self.debug_session.chrome_debug_session.dom_describe_node_by_selector(self.selector, Some(5));
+                        // }
                     }
                     PageMessage::NodeComing(node, task) => {
                         info!("got node:: {:?}", node);

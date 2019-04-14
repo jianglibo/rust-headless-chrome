@@ -136,11 +136,15 @@ impl ChromeDebugSession {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn navigate_to(&mut self, url: &str) {
-        let (_, method_str, _) = self
-            .create_msg_to_send_with_session_id(Navigate { url })
-            .unwrap();
-        self.state = OnePageState::Consuming;
+    // pub fn navigate_to(&mut self, url: &str) {
+    //     let (_, method_str, _) = self
+    //         .create_msg_to_send_with_session_id(Navigate { url })
+    //         .unwrap();
+    //     self.state = OnePageState::Consuming;
+    //     self.send_message(method_str);
+    // }
+
+    pub fn send_message(&mut self, method_str: String) {
         self.chrome_browser.send_message(method_str);
     }
 
@@ -164,6 +168,26 @@ impl ChromeDebugSession {
             self.chrome_browser.send_message(method_str);
             (Some(this_id), None)
         }
+    }
+
+    pub fn add_task(&mut self, task_id: ids::Task, task: tasks::TaskDescribe) {
+        self.task_id_2_task.insert(task_id, task);
+    }
+
+    pub fn add_method_task_map(&mut self, mid: usize, task_id: ids::Task) {
+        self.method_id_2_task_id.entry(mid).or_insert(task_id);
+    }
+
+    pub fn add_task_and_method_map(&mut self, mid: usize, task_id: usize, task: tasks::TaskDescribe) {
+        self.add_method_task_map(mid, task_id);
+        self.add_task(task_id, task);
+    }
+
+    pub fn add_waiting_task(&mut self, this_task_id: usize, task_id: usize) {
+        self.waiting_for_me
+                    .entry(this_task_id)
+                    .or_insert(vec![])
+                    .push(task_id);
     }
 
     // fn wait_page_load_event_fired(&mut self, value: protocol::Message) {

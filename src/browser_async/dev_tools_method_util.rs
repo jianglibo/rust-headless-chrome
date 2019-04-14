@@ -204,6 +204,22 @@ impl MethodUtil {
         }
         None
     }
+    pub fn create_msg_to_send_with_session_id<C>(method: C, session_id: &Option<SessionId>) -> MethodBeforSendResult
+    where
+        C: protocol::Method + serde::Serialize,
+    {
+        if let Some(s_id) = session_id {
+            Self::create_msg_to_send(
+                method,
+                MethodDestination::Target(s_id.clone().into()),
+                None,
+            )
+        } else {
+            error!("no session_id exists.");
+            panic!("no session_id exists.");
+        }
+    }
+
 
     // if you take self, you consume youself.
     pub fn create_msg_to_send<C>(

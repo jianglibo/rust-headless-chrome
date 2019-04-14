@@ -43,7 +43,6 @@ pub struct DebugSession {
     flag: bool,
     tabs: HashMap<&'static str, Tab>,
     wrapper: Wrapper,
-    session_id: Option<SessionId>,
 }
 
 impl Default for DebugSession {
@@ -66,14 +65,10 @@ impl DebugSession {
             flag: false,
             tabs: HashMap::new(),
             wrapper: Wrapper { chrome_debug_session: arc_cds},
-            session_id: None,
         }
     }
-    pub fn get_tab_by_id(&self, tab_id: String) -> Option<&Tab> {
-        self.tabs.values().find(|t| t.target_info.target_id == tab_id)
-    }
-    pub fn navigate_to(&mut self, url: &str, timeout_seconds: usize) {
-        self.chrome_debug_session.lock().unwrap().navigate_to(url);
+    pub fn get_tab_by_id(&mut self, tab_id: String) -> Option<&mut Tab> {
+        self.tabs.values_mut().find(|t| t.target_info.target_id == tab_id)
     }
 
     pub fn send_page_message(&mut self, item: PageMessage) -> Poll<Option<PageMessage>, failure::Error> {
@@ -84,15 +79,13 @@ impl DebugSession {
                 return Ok(Some(PageMessage::SecondsElapsed(self.seconds_from_start)).into());
             },
             PageMessage::PageCreated(target_info, page_name) => {
-                self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), Tab{target_info: target_info.clone(), chrome_session: Arc::clone(&self.chrome_debug_session)});
+                self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), Tab::new(target_info.clone(), Arc::clone(&self.chrome_debug_session)));
             }
             PageMessage::PageAttached(target_info, session_id) => {
-                if let Some(s_id) = &self.session_id {
-                    if s_id != session_id {
-                        error!("got 2 different session id. is it possible?");
-                    }
+                if let Some(tab) = self.get_tab_by_id(target_info.target_id.clone()) {
+                    tab.session_id.replace(session_id.clone().into());
                 } else {
-                    self.session_id = Some(session_id.clone());
+                    error!("got attach event, but cannot find target.");
                 }
             }
             _ => ()

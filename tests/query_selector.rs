@@ -10,6 +10,7 @@ use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
 use headless_chrome::browser_async::task_describe::{TaskDescribe};
 use headless_chrome::browser_async::debug_session::{DebugSession};
+use headless_chrome::browser_async::page_message::{ChangingFrame};
 use tokio;
 use std::default::Default;
 
@@ -18,38 +19,45 @@ struct FindNode {
     debug_session: DebugSession,
     url: &'static str,
     selector: &'static str,
+    found_node_id: Option<dom::NodeId>,
 }
 
 impl Future for FindNode {
-    type Item = Option<dom::NodeId>;
+    type Item = ();
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    TaskDescribe::PageEnable(task_id, target_id) => {
+                    TaskDescribe::PageEnable(_task_id, target_id) => {
                         info!("page enabled.");
-                        // self.debug_session.chrome_debug_session.navigate_to(self.url);
+                        assert!(target_id.is_some());
+                        let tab = self.debug_session.get_tab_by_id_mut(target_id.unwrap());
+                        assert!(tab.is_some());
+                        let tab = tab.unwrap();
+                        tab.navigate_to(self.url);
                     },
-                    TaskDescribe::SecondsElapsed(seconds) => {
-                        info!("seconds elipsed: {} ", seconds);
-                        if seconds > 39 {
-                            error!("time out {}", seconds);
-                            panic!("time out 40 seconds.");
+                    TaskDescribe::FrameNavigated(_target_id, changing_frame) => {
+                        info!("got frame: {:?}", changing_frame);
+                        if let ChangingFrame::Navigated(frame) = changing_frame {
+                            if frame.name == Some("ddlogin-iframe".into()) {
+                                if let Some(tab) = self.debug_session.main_tab_mut() {
+                                    tab.dom_query_selector_by_selector(self.selector, Some(100));
+                                }
+                            }
                         }
                     }
-                    // TaskDescribe::PageEvent(PageEventName::loadEventFired) => {
-                    TaskDescribe::PageEvent(_) => {
-                        // if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
-                        //     self.debug_session.chrome_debug_session.dom_query_selector_by_selector(self.selector, Some(5));
-                        // }
+                    TaskDescribe::QuerySelector(query_selector) => {
+                        self.found_node_id = query_selector.found_node_id;
                     }
-                    // TaskDescribe::NodeIdComing(node_id, task) => {
-                    //     info!("task done: {:?}", task);
-                    //     break Ok(Some(node_id).into());
-                    // }
+                    TaskDescribe::SecondsElapsed(seconds) => {
+                        info!("seconds elapsed: {} ", seconds);
+                        if seconds > 19 {
+                            assert!(self.found_node_id.is_some());
+                            break Ok(().into())
+                        }
+                    }
                     _ => {
                         info!("got unused page message {:?}", value);
                     }
@@ -61,6 +69,7 @@ impl Future for FindNode {
     }
 }
 
+// [2019-04-15T08:12:35Z ERROR headless_chrome::browser_async::chrome_debug_session] unprocessed ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "B1B0F5851D30241BC39BE00415D4F43A", target_id: "C9CB934D0B4C63978622ED5F01D6B829", message: "{\"method\":\"DOM.setChildNodes\",\"params\":{\"parentId\":1,\"nodes\":[{\"nodeId\":2,\"parentId\":1,\"backendNodeId\":5,\"nodeType\":10,\"nodeName\":\"html\",\"localName\":\"\",\"nodeValue\":\"\",\"publicId\":\"\",\"systemId\":\"\"},{\"nodeId\":3,\"parentId\":1,\"backendNodeId\":6,\"nodeType\":1,\"nodeName\":\"HTML\",\"localName\":\"html\",\"nodeValue\":\"\",\"childNodeCount\":2,\"attributes\":[],\"frameId\":\"C9CB934D0B4C63978622ED5F01D6B829\"}]}}" } }
 
 #[test]
 fn t_dom_query_selector() {
@@ -72,6 +81,7 @@ fn t_dom_query_selector() {
         debug_session: Default::default(),
         url,
         selector,
+        found_node_id: None,
     };
 
     selector = "#ddlogin-iframe";
@@ -79,8 +89,8 @@ fn t_dom_query_selector() {
         debug_session: Default::default(),
         url,
         selector,
+        found_node_id: None,
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    let result = runtime.block_on(my_page.into_future()).unwrap();
-    assert!(result.is_some());
+    runtime.block_on(my_page.into_future()).unwrap();
 }

@@ -1,0 +1,271 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'headless_chrome'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "headless_chrome",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'print_to_pdf'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=print_to_pdf",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "print_to_pdf",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'print_to_pdf'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=print_to_pdf",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "print_to_pdf",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'query_wikipedia'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=query_wikipedia",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "query_wikipedia",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'query_wikipedia'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=query_wikipedia",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "query_wikipedia",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'take_screenshot'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=take_screenshot",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "take_screenshot",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'take_screenshot'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=take_screenshot",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "take_screenshot",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'coverage'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=coverage",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "coverage",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'describe_node'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=describe_node",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "describe_node",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'extension'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=extension",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "extension",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'logging'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=logging",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "logging",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'query_selector'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=query_selector",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "query_selector",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'simple'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=simple",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "simple",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'wait_page_event'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=wait_page_event",
+                    "--package=headless_chrome"
+                ],
+                "filter": {
+                    "name": "wait_page_event",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

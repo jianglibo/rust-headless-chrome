@@ -8,6 +8,7 @@ use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
 use headless_chrome::browser_async::task_describe::{TaskDescribe};
 use headless_chrome::browser_async::debug_session::{DebugSession};
+use headless_chrome::browser_async::page_message::{ChangingFrame};
 use std::default::Default;
 use tokio;
 
@@ -15,27 +16,56 @@ use tokio;
 struct LoadEventFired {
     debug_session: DebugSession,
     url: &'static str,
+    root_node: Option<u16>,
 }
 
 impl Future for LoadEventFired {
-    type Item = usize;
+    type Item = ();
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    TaskDescribe::PageEnable(task_id, target_id) => {
+                    TaskDescribe::PageEnable(_task_id, target_id) => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id(target_id.unwrap());
+                        let tab = self.debug_session.get_tab_by_id_mut(target_id.unwrap());
                         tab.unwrap().navigate_to(self.url);
                     },
+                    TaskDescribe::FrameNavigated(_target_id, changing_frame) => {
+                        info!("got frame: {:?}", changing_frame);
+                        if let Some(tab) = self.debug_session.main_tab_mut() {
+                            if tab.is_main_frame_navigated() {
+                                tab.get_document(Some(100));
+                            }
+                        }
+
+                        if let ChangingFrame::Navigated(frame) = changing_frame {
+                            if frame.name == Some("ddlogin-iframe".into()) {
+                                
+                            }
+                        }
+                    }
+                    TaskDescribe::GetDocument(_task_id, _target_id, node) => {
+                        let tab = self.debug_session.main_tab_mut().unwrap();
+                        assert!(tab.root_node.is_some());
+                        assert!(node.is_some());
+                        self.root_node = Some(node.as_ref().unwrap().node_id);
+                        assert_eq!(tab.root_node.as_ref().unwrap().node_id, node.unwrap().node_id);
+                    }
                     TaskDescribe::SecondsElapsed(seconds) => {
-                        // if seconds > 39 {
-                        //     break Ok(self.debug_session.chrome_debug_session.changing_frame_tree.child_changing_frames.len().into())
-                        // }
-                        info!("seconds elapsed: {} ", seconds);
+                        if seconds > 29 {
+                            let tab = self.debug_session.main_tab().unwrap();
+                            assert_eq!(tab.frame_tree().count(), 7);
+                            if let Some(ChangingFrame::Navigated(frame)) = tab.main_frame() {
+                                assert_eq!(tab.target_info.target_id, frame.id);
+                            } else {
+                                assert!(false);
+                            }
+
+                            assert!(self.root_node.is_some());
+                            break Ok(().into())
+                        }
                     }
                     _ => {
                         info!("got unused page message {:?}", value);
@@ -57,12 +87,13 @@ fn t_load_event_fired() {
     let my_page = LoadEventFired {
         debug_session: Default::default(),
         url,
+        root_node: None,
     };
     // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
     // let result = run_one(my_page).unwrap();
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    let result = runtime.block_on(my_page.into_future()).unwrap();
-    assert_eq!(result, 7);
+    runtime.block_on(my_page.into_future()).unwrap();
+    // assert!(my_page.root_node.is_some());
 }
 
 // enum Thing {

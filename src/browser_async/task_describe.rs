@@ -7,7 +7,7 @@ use super::dev_tools_method_util::{SessionId};
 pub enum TaskDescribe {
     QuerySelector(QuerySelector),
     DescribeNode(DescribeNode),
-    GetDocument(ids::Task, Option<dom::NodeId>),
+    GetDocument(ids::Task, Option<target::TargetId>, Option<dom::Node>),
     PageEnable(ids::Task, Option<String>),
     Interval,
     PageEvent(PageEventName),
@@ -31,6 +31,7 @@ pub struct QuerySelector {
 #[derive(Debug)]
 pub struct DescribeNode {
         pub task_id: usize,
+        pub session_id: Option<SessionId>,
         pub is_manual: bool,
         pub node_id: Option<dom::NodeId>,
         pub backend_node_id: Option<dom::NodeId>,

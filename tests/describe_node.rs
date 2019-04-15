@@ -26,12 +26,11 @@ impl Future for FindNode {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            info!("my page loop ****************************");
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
                     TaskDescribe::PageEnable(task_id, target_id) => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id(target_id.unwrap());
+                        let tab = self.debug_session.get_tab_by_id_mut(target_id.unwrap());
                         tab.unwrap().navigate_to(self.url);
                     },
                     TaskDescribe::SecondsElapsed(seconds) => {

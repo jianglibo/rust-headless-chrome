@@ -91,11 +91,11 @@ impl ChromeDebugSession {
         self.add_task(task_id, task);
     }
 
-    pub fn add_waiting_task(&mut self, this_task_id: usize, task_id: usize) {
+    pub fn add_waiting_task(&mut self, this_task_id: usize, waiting_task_id: usize) {
         self.waiting_for_me
             .entry(this_task_id)
             .or_insert(vec![])
-            .push(task_id);
+            .push(waiting_task_id);
     }
 
 
@@ -115,22 +115,45 @@ impl ChromeDebugSession {
             .collect()
     }
 
-    // pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
-    //     let mut waiting_tasks = self.get_waiting_tasks(task_id);
-    //     while let Some(mut task) = waiting_tasks.pop() {
-    //         match &mut task {
-    //             tasks::TaskDescribe::QuerySelector(query_selector) => {
-    //                 query_selector.node_id = Some(node_id);
-    //                 self.dom_query_selector(task);
-    //             }
-    //             tasks::TaskDescribe::DescribeNode(describe_node) => {
-    //                 describe_node.node_id = Some(node_id);
-    //                 self.dom_describe_node(task);
-    //             }
-    //             _ => (),
-    //         }
-    //     }
-    // }
+    pub fn dom_describe_node(&mut self, task: tasks::TaskDescribe) {
+        if let tasks::TaskDescribe::DescribeNode(tasks::DescribeNode {
+            task_id,
+            node_id,
+            is_manual,
+            backend_node_id,
+            selector,
+            session_id,
+        }) = &task
+        {
+            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(dom::methods::DescribeNode {
+                    node_id: *node_id,
+                    backend_node_id: *backend_node_id,
+                    depth: Some(100),
+                }, &session_id)
+                .unwrap();
+            self.add_task_and_method_map(mid.unwrap(), task_id.clone(), task);
+            self.chrome_browser.send_message(method_str);
+        } else {
+            error!("not a node_describe.")
+        }
+    }
+
+    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+        let mut waiting_tasks = self.get_waiting_tasks(task_id);
+        while let Some(mut task) = waiting_tasks.pop() {
+            match &mut task {
+                tasks::TaskDescribe::QuerySelector(query_selector) => {
+                    query_selector.node_id = Some(node_id);
+                    self.dom_query_selector(task);
+                }
+                tasks::TaskDescribe::DescribeNode(describe_node) => {
+                    describe_node.node_id = Some(node_id);
+                    self.dom_describe_node(task);
+                }
+                _ => (),
+            }
+        }
+    }
 
     pub fn handle_response(
         &mut self,
@@ -155,21 +178,21 @@ impl ChromeDebugSession {
         //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
         // }
 
-        if let Some(task) = maybe_matched_task {
-            match &task {
-                TaskDescribe::GetDocument(task_id, _) => {
+        if let Some(mut task) = maybe_matched_task {
+            match &mut task {
+                TaskDescribe::GetDocument(task_id, _, _) => {
                     // it must be a GetDocumentReturnObject or else something must go wrong.
                     if let Ok(get_document_return_object) =
                         serde_json::from_value::<dom::methods::GetDocumentReturnObject>(
                             resp.result.unwrap(),
                         )
                     {
-                        // let node_id = node.root.node_id;
-                        // self.feed_on_node_id(*task_id, node_id);
-                        // self.root_node.replace(node.root);
+                        let node_id = get_document_return_object.root.node_id;
+                        self.feed_on_node_id(*task_id, node_id);
                         return Some(TaskDescribe::GetDocument(
                             *task_id,
-                            Some(get_document_return_object.root.node_id),
+                            target_id,
+                            Some(get_document_return_object.root),
                         ));
                     } else {
                         panic!("GetDocument failed.");
@@ -184,10 +207,10 @@ impl ChromeDebugSession {
                             resp.result.unwrap(),
                         )
                     {
-                        // self.feed_on_node_id(query_selector.task_id, node.node_id);
+                        self.feed_on_node_id(query_selector.task_id, query_select_return_object.node_id);
                         if query_selector.is_manual {
+                            query_selector.found_node_id.replace(query_select_return_object.node_id);
                             return Some(task);
-                            // return Some(TaskDescribe::QuerySelector(*query_selector));
                         }
                     } else {
                         panic!("QuerySelector failed.");
@@ -318,7 +341,7 @@ impl Stream for ChromeDebugSession {
                                 }
                             }
                             _ => {
-                                error!("unprocessed {:?}", target_message_event);
+                                error!("unprocessed ** {:?}", message_field);
                             }
                         }
                     }
@@ -699,32 +722,6 @@ impl Stream for ChromeDebugSession {
 //         _ => {
 //             error!("dom_query_selector_by_selector return impossible value.");
 //         }
-//     }
-// }
-
-// pub fn dom_describe_node(&mut self, task: tasks::TaskDescribe) {
-//     if let tasks::TaskDescribe::DescribeNode(tasks::DescribeNode {
-//         task_id,
-//         node_id,
-//         is_manual,
-//         backend_node_id,
-//         selector,
-//     }) = task
-//     {
-//         let (_, method_str, mid) = self
-//             .create_msg_to_send_with_session_id(dom::methods::DescribeNode {
-//                 node_id: node_id,
-//                 backend_node_id: backend_node_id,
-//                 depth: Some(100),
-//             })
-//             .unwrap();
-//         self.method_id_2_task_id
-//             .entry(mid.unwrap())
-//             .or_insert(task_id);
-//         self.task_id_2_task.insert(task_id, task);
-//         self.chrome_browser.send_message(method_str);
-//     } else {
-//         error!("not a node_describe.")
 //     }
 // }
 

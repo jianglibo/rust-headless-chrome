@@ -16,8 +16,9 @@ pub struct Tab {
     chrome_session: Arc<Mutex<ChromeDebugSession>>,
     pub target_info: protocol::target::TargetInfo,
     pub session_id: Option<SessionId>,
-    root_node: Option<dom::Node>,
+    pub root_node: Option<dom::Node>,
     pub changing_frame_tree: ChangingFrameTree,
+    get_document_task_id: Option<ids::Task>,
 }
 
 impl Tab {
@@ -31,6 +32,7 @@ impl Tab {
             session_id: None,
             root_node: None,
             changing_frame_tree: Default::default(),
+            get_document_task_id: None,
         }
     }
     pub fn navigate_to(&mut self, url: &str) {
@@ -42,7 +44,15 @@ impl Tab {
         self.chrome_session.lock().unwrap().send_message(method_str);
     }
 
-    pub fn frame_navigated(&mut self, changing_frame: ChangingFrame) {
+    pub fn frame_tree(&self) -> &ChangingFrameTree {
+        &self.changing_frame_tree
+    }
+
+    pub fn main_frame(&self) -> Option<&ChangingFrame> {
+        self.changing_frame_tree.changing_frame.as_ref()
+    }
+
+    pub fn _frame_navigated(&mut self, changing_frame: ChangingFrame) {
         if let ChangingFrame::Navigated(frame) = &changing_frame {
             let frame_id = frame.id.clone();
             let parent_id = frame.parent_id.clone();
@@ -105,7 +115,7 @@ impl Tab {
             self.chrome_session.lock().unwrap().add_task_and_method_map(
                 mid.unwrap(),
                 this_id,
-                tasks::TaskDescribe::GetDocument(this_id, None),
+                tasks::TaskDescribe::GetDocument(this_id, None, None),
             );
             self.chrome_session.lock().unwrap().send_message(method_str);
             (Some(this_id), None)
@@ -127,8 +137,7 @@ impl Tab {
             task_id: this_task_id,
         };
         match self.get_document(None) {
-            (Some(task_id), _) => {
-                // if root node is not ready, will return a task_id.
+            (Some(get_document_task_id), _) => {
                 self.chrome_session
                     .lock()
                     .unwrap()
@@ -136,10 +145,9 @@ impl Tab {
                 self.chrome_session
                     .lock()
                     .unwrap()
-                    .add_waiting_task(this_task_id, task_id);
+                    .add_waiting_task(get_document_task_id, this_task_id);
             }
             (_, Some(node_id)) => {
-                // self.dom_query_selector_extra(node_id, t_id);
                 qs.node_id = Some(node_id);
                 self.chrome_session
                     .lock()

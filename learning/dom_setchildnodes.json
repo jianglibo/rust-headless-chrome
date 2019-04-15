@@ -1,0 +1,25 @@
+{
+  "params": {
+    "session_id": "B1B0F5851D30241BC39BE00415D4F43A",
+    "target_id": "C9CB934D0B4C63978622ED5F01D6B829",
+    "message": {
+      "method": "DOM.setChildNodes",
+      "params": {
+        "parentId": 6,
+        "nodes": [
+          {
+            "nodeId": 11,
+            "parentId": 6,
+            "backendNodeId": 14,
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "localName": "div",
+            "nodeValue": "",
+            "childNodeCount": 3,
+            "attributes": []
+          }
+        ]
+      }
+    }
+  }
+}

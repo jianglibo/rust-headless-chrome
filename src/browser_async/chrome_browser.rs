@@ -96,7 +96,7 @@ impl Stream for ChromeBrowser {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.last_be_polled = Instant::now();
         loop {
-            trace!("browser loop {:?}", self.state);
+            // trace!("browser loop {:?}", self.state);
             match &mut self.state {
                 BrowserState::Unconnected => {
                     trace!("enter unconnected state.");
@@ -147,7 +147,7 @@ impl Stream for ChromeBrowser {
                         }
                         Ok(Async::NotReady) => {
                             // if return not ready, when to pull again is job of underlying. is out of our controls.
-                            trace!("enter receiving not NotReady");
+                            // trace!("enter receiving not NotReady");
                             return Ok(Async::NotReady);
                         }
                         Err(e) => {

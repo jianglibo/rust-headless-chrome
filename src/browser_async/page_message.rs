@@ -7,6 +7,7 @@ use super::dev_tools_method_util::{SessionId};
 use log::*;
 use std::fmt;
 use std::default::Default;
+use std::convert::TryInto;
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
@@ -34,6 +35,10 @@ impl ChangingFrameTree {
             changing_frame: None,
             child_changing_frames: ::std::collections::HashMap::new(),
         }
+    }
+
+    pub fn count(&self) -> usize {
+        self.child_changing_frames.len()
     }
 }
 

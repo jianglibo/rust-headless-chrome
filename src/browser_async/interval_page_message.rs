@@ -25,7 +25,7 @@ impl Stream for IntervalPageMessage {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             if let Some(_) = try_ready!(self.interval.poll()) {
-                return Ok(Async::Ready(Some(TaskDescribe::Interval)));
+                return Ok(Some(TaskDescribe::Interval).into());
             }
         }
     }

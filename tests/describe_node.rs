@@ -8,7 +8,7 @@ use headless_chrome::protocol::{dom};
 
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
-use headless_chrome::browser_async::task_describe::{TaskDescribe};
+use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use std::default::Default;
 use tokio;
@@ -28,25 +28,25 @@ impl Future for FindNode {
         loop {
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    TaskDescribe::PageEnable(task_id, target_id) => {
+                    PageResponse::PageEnable(target_id) => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id_mut(target_id.unwrap());
+                        let tab = self.debug_session.get_tab_by_id_mut(target_id);
                         tab.unwrap().navigate_to(self.url);
                     },
-                    TaskDescribe::SecondsElapsed(seconds) => {
+                    PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 39 {
                             error!("time out {}", seconds);
                             panic!("time out 40 seconds.");
                         }
                     }
-                    // TaskDescribe::PageEvent(PageEventName::loadEventFired) => {
-                    TaskDescribe::PageEvent(_) => {
+                    // PageResponse::PageEvent(PageEventName::loadEventFired) => {
+                    PageResponse::PageEvent(_) => {
                         // if let Some(_) = self.debug_session.chrome_debug_session.is_frame_navigated("ddlogin-iframe") {
                         //     self.debug_session.chrome_debug_session.dom_describe_node_by_selector(self.selector, Some(5));
                         // }
                     }
-                    // TaskDescribe::NodeComing(node, task) => {
+                    // PageResponse::NodeComing(node, task) => {
                     //     info!("got node:: {:?}", node);
                     //     info!("task done: {:?}", task);
                     //     break Ok(Some(node).into());

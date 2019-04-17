@@ -11,6 +11,7 @@ pub mod json_assistor;
 pub mod task_describe;
 pub mod tab;
 pub mod unique_number;
+pub mod inner_event;
 
 // pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 // use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};

@@ -74,47 +74,49 @@ impl ChangingFrameTree {
 
 #[derive(Debug)]
 pub enum PageEventName {
-    domContentEventFired,
-    frameAttached,
-    frameDetached,
-    frameNavigated,
-    interstitialHidden,
-    interstitialShown,
-    javascriptDialogClosed,
-    javascriptDialogOpening,
-    lifecycleEvent,
-    loadEventFired,
-    windowOpen,
+    DomContentEventFired,
+    FrameAttached,
+    FrameDetached,
+    FrameNavigated,
+    InterstitialHidden,
+    InterstitialShown,
+    JavascriptDialogClosed,
+    JavascriptDialogOpening,
+    LifecycleEvent,
+    LoadEventFired,
+    WindowOpen,
 }
 
 // just wait for things happen. don't care who caused happen.
-// #[derive(Debug)]
-// pub enum PageMessage {
-//     EnablePageDone(String),
-//     PageEvent(PageEventName),
-//     PageCreated(target::TargetInfo, Option<&'static str>),
-//     PageAttached(target::TargetInfo, SessionId),
-//     TargetInfoChanged(target::TargetInfo),
-//     NodeIdComing(dom::NodeId, tasks::TaskDescribe),
-//     NodeComing(dom::Node, tasks::TaskDescribe),
-//     // FindNode(Option<&'static str>, Option<dom::Node>),
-//     // DomQuerySelector(Option<&'static str>, Option<dom::NodeId>),
-//     DomDescribeNode(Option<&'static str>, Option<dom::Node>),
-//     FindElement(Option<&'static str>, Option<Element>),
-//     GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
-//     Screenshot(
-//         Option<&'static str>,
-//         page::ScreenshotFormat,
-//         bool,
-//         Option<Vec<u8>>,
-//     ),
-//     MessageAvailable(protocol::Message),
-//     // FrameNavigatedEvent(String, String, protocol::page::events::FrameNavigatedEvent),
-//     GetFrameTree(protocol::page::methods::FrameTree),
-//     // TargetInfoChanged(protocol::target::events::TargetInfoChangedEvent),
-//     Interval,
-//     SecondsElapsed(usize),
-// }
+#[derive(Debug)]
+pub enum PageResponse {
+    EnablePageDone(String),
+    SecondsElapsed(usize),
+    PageEvent(PageEventName),
+    PageCreated(Option<&'static str>),
+    QuerySelector(&'static str, Option<dom::NodeId>),
+    PageAttached(target::TargetInfo, SessionId),
+    PageEnable(target::TargetId),
+    TargetInfoChanged(target::TargetInfo),
+    FrameNavigated(target::TargetId, ChangingFrame),
+    NodeIdComing(dom::NodeId, tasks::TaskDescribe),
+    NodeComing(dom::Node, tasks::TaskDescribe),
+    DomDescribeNode(Option<&'static str>, Option<dom::Node>),
+    FindElement(Option<&'static str>, Option<Element>),
+    GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
+    SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
+    GetDocument(ids::Task, Option<target::TargetId>, Option<dom::Node>),
+    Screenshot(
+        Option<&'static str>,
+        page::ScreenshotFormat,
+        bool,
+        Option<Vec<u8>>,
+    ),
+    MessageAvailable(protocol::Message),
+    GetFrameTree(protocol::page::methods::FrameTree),
+    Fail,
+    Interval,
+}
 
 // impl fmt::Debug for PageMessage {
 //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

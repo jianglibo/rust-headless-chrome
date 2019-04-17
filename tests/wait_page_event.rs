@@ -6,7 +6,7 @@ extern crate tokio_timer;
 
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
-use headless_chrome::browser_async::task_describe::{TaskDescribe};
+use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
 use std::default::Default;
@@ -27,12 +27,12 @@ impl Future for LoadEventFired {
         loop {
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    TaskDescribe::PageEnable(_task_id, target_id) => {
+                    PageResponse::PageEnable(target_id) => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id_mut(target_id.unwrap());
+                        let tab = self.debug_session.get_tab_by_id_mut(target_id);
                         tab.unwrap().navigate_to(self.url);
                     },
-                    TaskDescribe::FrameNavigated(_target_id, changing_frame) => {
+                    PageResponse::FrameNavigated(_target_id, changing_frame) => {
                         info!("got frame: {:?}", changing_frame);
                         if let Some(tab) = self.debug_session.main_tab_mut() {
                             if tab.is_main_frame_navigated() {
@@ -46,14 +46,14 @@ impl Future for LoadEventFired {
                             }
                         }
                     }
-                    TaskDescribe::GetDocument(_task_id, _target_id, node) => {
+                    PageResponse::GetDocument(_task_id, _target_id, node) => {
                         let tab = self.debug_session.main_tab_mut().unwrap();
                         assert!(tab.root_node.is_some());
                         assert!(node.is_some());
                         self.root_node = Some(node.as_ref().unwrap().node_id);
                         assert_eq!(tab.root_node.as_ref().unwrap().node_id, node.unwrap().node_id);
                     }
-                    TaskDescribe::SecondsElapsed(seconds) => {
+                    PageResponse::SecondsElapsed(seconds) => {
                         if seconds > 29 {
                             let tab = self.debug_session.main_tab().unwrap();
                             assert_eq!(tab.frame_tree().count(), 7);

@@ -8,7 +8,7 @@ use headless_chrome::protocol::{dom};
 
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
-use headless_chrome::browser_async::task_describe::{TaskDescribe};
+use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
 use tokio;
@@ -30,15 +30,14 @@ impl Future for FindNode {
         loop {
             if let Some(value) = try_ready!(self.debug_session.poll()) {
                 match value {
-                    TaskDescribe::PageEnable(_task_id, target_id) => {
+                    PageResponse::PageEnable(target_id) => {
                         info!("page enabled.");
-                        assert!(target_id.is_some());
-                        let tab = self.debug_session.get_tab_by_id_mut(target_id.unwrap());
+                        let tab = self.debug_session.get_tab_by_id_mut(target_id);
                         assert!(tab.is_some());
                         let tab = tab.unwrap();
                         tab.navigate_to(self.url);
                     },
-                    TaskDescribe::FrameNavigated(_target_id, changing_frame) => {
+                    PageResponse::FrameNavigated(_target_id, changing_frame) => {
                         info!("got frame: {:?}", changing_frame);
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
@@ -48,10 +47,10 @@ impl Future for FindNode {
                             }
                         }
                     }
-                    TaskDescribe::QuerySelector(query_selector) => {
-                        self.found_node_id = query_selector.found_node_id;
+                    PageResponse::QuerySelector(_selector, node_id) => {
+                        self.found_node_id = node_id;
                     }
-                    TaskDescribe::SecondsElapsed(seconds) => {
+                    PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
                             assert!(self.found_node_id.is_some());

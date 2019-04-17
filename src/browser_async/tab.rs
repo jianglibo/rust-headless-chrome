@@ -18,7 +18,7 @@ pub struct Tab {
     pub session_id: Option<SessionId>,
     pub root_node: Option<dom::Node>,
     pub changing_frame_tree: ChangingFrameTree,
-    get_document_task_id: Option<ids::Task>,
+    pub temporary_node_holder: Vec<dom::Node>,
 }
 
 impl Tab {
@@ -32,7 +32,7 @@ impl Tab {
             session_id: None,
             root_node: None,
             changing_frame_tree: Default::default(),
-            get_document_task_id: None,
+            temporary_node_holder: vec![],
         }
     }
     pub fn navigate_to(&mut self, url: &str) {
@@ -64,6 +64,23 @@ impl Tab {
                 self.changing_frame_tree
                     .child_changing_frames
                     .insert(frame_id, changing_frame);
+            }
+        }
+    }
+
+    pub fn node_arrived(&mut self, parent_node_id: dom::NodeId, nodes: Vec<dom::Node>) {
+
+    }
+
+    pub fn find_node_by_id(&self, node_id: dom::NodeId) -> Option<&dom::Node> {
+        if let Some(node) = self.temporary_node_holder.iter().find(|n| n.node_id == node_id) {
+            Some(node)
+        } else {
+            if let Some(root_node) = &self.root_node {
+                root_node.find(|n| n.node_id == node_id)
+            } else {
+                error!("tab's root node is None.");
+                None
             }
         }
     }
@@ -132,6 +149,7 @@ impl Tab {
             selector,
             is_manual,
             session_id: self.session_id.clone(),
+            target_id: self.target_info.target_id.clone(),
             node_id: None,
             found_node_id: None,
             task_id: this_task_id,
@@ -184,7 +202,7 @@ impl Tab {
         self.chrome_session.lock().unwrap().add_task_and_method_map(
             mid.unwrap(),
             this_task_id,
-            tasks::TaskDescribe::PageEnable(this_task_id, None),
+            tasks::TaskDescribe::PageEnable(this_task_id, self.target_info.target_id.clone(), self.session_id.clone().unwrap()),
         );
         self.chrome_session.lock().unwrap().send_message(method_str);
     }

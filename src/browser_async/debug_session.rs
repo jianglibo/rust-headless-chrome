@@ -4,6 +4,7 @@ use super::dev_tools_method_util::SessionId;
 use super::interval_page_message::IntervalPageMessage;
 use super::tab::Tab;
 use super::task_describe::TaskDescribe;
+use super::page_message::PageResponse;
 use crate::protocol;
 use failure;
 use futures::{Async, Poll};
@@ -12,8 +13,9 @@ use std::collections::HashMap;
 use std::default::Default;
 use websocket::futures::Stream;
 use std::sync::{Arc, Mutex};
+use std::marker::PhantomData;
 
-const DEFAULT_TAB_NAME: &'static str = "_default_tab_";
+const DEFAULT_TAB_NAME: &str = "_default_tab_";
 
 
 struct Wrapper {
@@ -91,11 +93,11 @@ impl DebugSession {
     pub fn send_page_message(
         &mut self,
         item: TaskDescribe,
-    ) -> Poll<Option<TaskDescribe>, failure::Error> {
-        match &item {
+    ) -> Poll<Option<PageResponse>, failure::Error> {
+        match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
-                return Ok(Some(TaskDescribe::SecondsElapsed(self.seconds_from_start)).into());
+                return Ok(Some(PageResponse::SecondsElapsed(self.seconds_from_start)).into());
             }
             TaskDescribe::PageCreated(target_info, page_name) => {
                 trace!(
@@ -103,9 +105,11 @@ impl DebugSession {
                     target_info,
                     page_name
                 );
-                let mut tab = Tab::new(target_info.clone(), Arc::clone(&self.chrome_debug_session));
+                let mut tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                 tab.attach_to_page();
                 self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), tab);
+                let nt = PageResponse::PageCreated(page_name);
+                Ok(Some(nt).into())
             }
             TaskDescribe::PageAttached(target_info, session_id) => {
                 trace!(
@@ -116,34 +120,60 @@ impl DebugSession {
                 if let Some(tab) = self.get_tab_by_id_mut(target_info.target_id.clone()) {
                     tab.session_id.replace(session_id.clone());
                     tab.page_enable();
+                    let nt = PageResponse::PageAttached(target_info, session_id);
+                    Ok(Some(nt).into())
                 } else {
                     error!("got attach event, but cannot find target.");
+                    Ok(Some(PageResponse::Fail).into())
                 }
+            }
+            TaskDescribe::PageEnable(_task_id, target_id, _session_id) => {
+                return Ok(Some(PageResponse::PageEnable(target_id)).into());
             }
             TaskDescribe::FrameNavigated(target_id, changing_frame) => {
                 if let Some(tab) = self.get_tab_by_id_mut(target_id.clone()) {
                     tab._frame_navigated(changing_frame.clone());
+                    let nt = PageResponse::FrameNavigated(target_id, changing_frame);
+                    Ok(Some(nt).into())
                 } else {
                     error!("got frame navigated event, but cannot find target.");
+                    Ok(Some(PageResponse::Fail).into())
                 }
             }
-            TaskDescribe::GetDocument(_task_id, target_id, node) => {
+            TaskDescribe::GetDocument(task_id, target_id, node) => {
                 let t_id = target_id.as_ref().cloned().expect("get document task got none target_id.");
                 if let Some(tab) = self.get_tab_by_id_mut(t_id) {
                     tab.root_node = node.as_ref().cloned();
+                    let nt = PageResponse::GetDocument(task_id, target_id, node);
+                    Ok(Some(nt).into())
                 } else {
                     error!("got get document event, but cannot find target.");
+                    Ok(Some(PageResponse::Fail).into())
                 }
             }
-            _ => (),
+            TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
+                let t_id = target_id.clone();
+                if let Some(tab) = self.get_tab_by_id_mut(t_id) {
+                    tab.node_arrived(parent_node_id, nodes);
+                    let nt = PageResponse::SetChildNodes(target_id.to_owned(), parent_node_id, vec![]);
+                    Ok(Some(nt).into())
+                } else {
+                    error!("got get document event, but cannot find target.");
+                    Ok(Some(PageResponse::Fail).into())
+                }
+            }
+            TaskDescribe::QuerySelector(query_selector) => {
+                Ok(Some(PageResponse::QuerySelector(query_selector.selector, query_selector.found_node_id)).into())
+            }
+            _ => Ok(Some(PageResponse::Interval).into())
         }
-        return Ok(Some(item).into());
+        
     }
 }
 
 
 impl Stream for DebugSession {
-    type Item = TaskDescribe;
+    type Item = PageResponse;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {

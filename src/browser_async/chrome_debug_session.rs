@@ -2,6 +2,7 @@ use super::task_describe::{self as tasks, TaskDescribe};
 use super::element_async::{BoxModel, Element, ElementQuad};
 use super::id_type as ids;
 use super::page_message::ChangingFrame;
+use super::inner_event::{self, InnerEvent};
 use crate::browser::tab::keys;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
@@ -155,6 +156,21 @@ impl ChromeDebugSession {
         }
     }
 
+    #[allow(clippy::single_match_else)]
+    pub fn handle_inner_target_events(&mut self, 
+    inner_event: inner_event::InnerEvent, raw_session_id: String, target_id: target::TargetId) -> Option<TaskDescribe> {
+        match inner_event {
+            inner_event::InnerEvent::SetChildNodes(set_child_nodes_event) => {
+                let params = set_child_nodes_event.params;
+                return TaskDescribe::SetChildNodes(target_id, params.parentId, params.nodes).into();
+            },
+            _ => {
+                info!("discard inner event: {:?}", inner_event);
+            }
+        }
+        None
+    }
+
     pub fn handle_response(
         &mut self,
         resp: protocol::Response,
@@ -178,8 +194,8 @@ impl ChromeDebugSession {
         //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
         // }
 
-        if let Some(mut task) = maybe_matched_task {
-            match &mut task {
+        if let Some(task) = maybe_matched_task {
+            match task {
                 TaskDescribe::GetDocument(task_id, _, _) => {
                     // it must be a GetDocumentReturnObject or else something must go wrong.
                     if let Ok(get_document_return_object) =
@@ -188,9 +204,9 @@ impl ChromeDebugSession {
                         )
                     {
                         let node_id = get_document_return_object.root.node_id;
-                        self.feed_on_node_id(*task_id, node_id);
+                        self.feed_on_node_id(task_id, node_id);
                         return Some(TaskDescribe::GetDocument(
-                            *task_id,
+                            task_id,
                             target_id,
                             Some(get_document_return_object.root),
                         ));
@@ -198,8 +214,8 @@ impl ChromeDebugSession {
                         panic!("GetDocument failed.");
                     }
                 }
-                TaskDescribe::PageEnable(task_id, _) => {
-                    return Some(TaskDescribe::PageEnable(*task_id, target_id));
+                TaskDescribe::PageEnable(task_id, target_id, session_id) => {
+                    return Some(TaskDescribe::PageEnable(task_id, target_id, session_id));
                 }
                 TaskDescribe::QuerySelector(query_selector) => {
                     if let Ok(query_select_return_object) =
@@ -209,8 +225,11 @@ impl ChromeDebugSession {
                     {
                         self.feed_on_node_id(query_selector.task_id, query_select_return_object.node_id);
                         if query_selector.is_manual {
-                            query_selector.found_node_id.replace(query_select_return_object.node_id);
-                            return Some(task);
+                            // query_selector.found_node_id.replace(query_select_return_object.node_id);
+                            return Some(TaskDescribe::QuerySelector(tasks::QuerySelector {
+                                found_node_id: Some(query_select_return_object.node_id),
+                                ..query_selector
+                            }));
                         }
                     } else {
                         panic!("QuerySelector failed.");
@@ -222,7 +241,7 @@ impl ChromeDebugSession {
                     ) {
                         // self.feed_on_node(describe_node.task_id, node.node);
                         if describe_node.is_manual {
-                            return Some(task);
+                            return Some(TaskDescribe::DescribeNode(describe_node));
                             // return Some(TaskDescribe::DescribeNode(*describe_node));
                         }
                     } else {
@@ -302,6 +321,10 @@ impl ChromeDebugSession {
     }
 }
 
+pub fn parse_raw_message(raw_message: &str) -> Result<inner_event::InnerEventWrapper, Error> {
+    Ok(serde_json::from_str::<inner_event::InnerEventWrapper>(raw_message)?)
+}
+
 // The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
 impl Stream for ChromeDebugSession {
     type Item = TaskDescribe;
@@ -341,7 +364,14 @@ impl Stream for ChromeDebugSession {
                                 }
                             }
                             _ => {
-                                error!("unprocessed ** {:?}", message_field);
+                                if let Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) = parse_raw_message(&message_field) {
+                                    info!("got inner event: {:?}", inner_event);
+                                    if let Some(page_message) = self.handle_inner_target_events(inner_event, session_id, target_id) {
+                                        break Ok(Some(page_message).into());
+                                    }
+                                } else {
+                                    error!("unprocessed ** {:?}", message_field);
+                                }
                             }
                         }
                     }

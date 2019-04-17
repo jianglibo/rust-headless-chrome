@@ -196,7 +196,7 @@ impl ChromeDebugSession {
 
         if let Some(task) = maybe_matched_task {
             match task {
-                TaskDescribe::GetDocument(task_id, _, _) => {
+                TaskDescribe::GetDocument(task_id, t_id, _) => {
                     // it must be a GetDocumentReturnObject or else something must go wrong.
                     if let Ok(get_document_return_object) =
                         serde_json::from_value::<dom::methods::GetDocumentReturnObject>(
@@ -207,7 +207,7 @@ impl ChromeDebugSession {
                         self.feed_on_node_id(task_id, node_id);
                         return Some(TaskDescribe::GetDocument(
                             task_id,
-                            target_id,
+                            t_id,
                             Some(get_document_return_object.root),
                         ));
                     } else {

@@ -25,14 +25,18 @@ impl Future for LoadEventFired {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some(value) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, value)) = try_ready!(self.debug_session.poll()) {
+                let tab = if let Some(tid) = &tab_id {
+                    self.debug_session.get_tab_by_id_mut(tid)
+                } else {
+                    None
+                };
                 match value {
-                    PageResponse::PageEnable(target_id) => {
+                    PageResponse::PageEnable => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id_mut(target_id);
                         tab.unwrap().navigate_to(self.url);
                     },
-                    PageResponse::FrameNavigated(_target_id, changing_frame) => {
+                    PageResponse::FrameNavigated(changing_frame) => {
                         info!("got frame: {:?}", changing_frame);
                         if let Some(tab) = self.debug_session.main_tab_mut() {
                             if tab.is_main_frame_navigated() {
@@ -46,12 +50,11 @@ impl Future for LoadEventFired {
                             }
                         }
                     }
-                    PageResponse::GetDocument(_task_id, _target_id, node) => {
-                        let tab = self.debug_session.main_tab_mut().unwrap();
-                        assert!(tab.root_node.is_some());
-                        assert!(node.is_some());
-                        self.root_node = Some(node.as_ref().unwrap().node_id);
-                        assert_eq!(tab.root_node.as_ref().unwrap().node_id, node.unwrap().node_id);
+                    PageResponse::GetDocument => {
+                        if let Some(nd) = &tab.unwrap().root_node {
+                            self.root_node = Some(nd.node_id);
+                        }
+                        
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         if seconds > 29 {
@@ -62,7 +65,6 @@ impl Future for LoadEventFired {
                             } else {
                                 assert!(false);
                             }
-
                             assert!(self.root_node.is_some());
                             break Ok(().into())
                         }

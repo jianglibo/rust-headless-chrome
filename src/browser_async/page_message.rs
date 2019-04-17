@@ -6,6 +6,7 @@ use super::task_describe as tasks;
 use super::dev_tools_method_util::{SessionId};
 use log::*;
 use std::fmt;
+use super::tab::Tab;
 use std::default::Default;
 use std::convert::TryInto;
 
@@ -87,6 +88,8 @@ pub enum PageEventName {
     WindowOpen,
 }
 
+pub type PageResponsePlusTabId = (Option<target::TargetId>, PageResponse);
+
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
 pub enum PageResponse {
@@ -96,16 +99,16 @@ pub enum PageResponse {
     PageCreated(Option<&'static str>),
     QuerySelector(&'static str, Option<dom::NodeId>),
     PageAttached(target::TargetInfo, SessionId),
-    PageEnable(target::TargetId),
+    PageEnable,
     TargetInfoChanged(target::TargetInfo),
-    FrameNavigated(target::TargetId, ChangingFrame),
+    FrameNavigated(ChangingFrame),
     NodeIdComing(dom::NodeId, tasks::TaskDescribe),
     NodeComing(dom::Node, tasks::TaskDescribe),
-    DomDescribeNode(Option<&'static str>, Option<dom::Node>),
+    DescribeNode(target::TargetId, Option<&'static str>, Option<dom::Node>),
     FindElement(Option<&'static str>, Option<Element>),
     GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
-    SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
-    GetDocument(ids::Task, Option<target::TargetId>, Option<dom::Node>),
+    SetChildNodes(dom::NodeId, Vec<dom::Node>),
+    GetDocument,
     Screenshot(
         Option<&'static str>,
         page::ScreenshotFormat,
@@ -117,24 +120,3 @@ pub enum PageResponse {
     Fail,
     Interval,
 }
-
-// impl fmt::Debug for PageMessage {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         info!("----------------enter fmt---------------------------");
-//         match self {
-//             PageMessage::FindElement(selector, ele) => {
-//                 let a = selector.map_or("None", |v| v);
-//                 if let Some(el) = ele {
-//                     write!(
-//                         f,
-//                         "selector: {}, remote_object_id: {}, backend_node_id: {}",
-//                         a, el.remote_object_id, el.backend_node_id
-//                     )
-//                 } else {
-//                     write!(f, "selector: {}, None", a)
-//                 }
-//             }
-//             _ => write!(f, "{}", self),
-//         }
-//     }
-// }

@@ -4,7 +4,7 @@ use super::dev_tools_method_util::SessionId;
 use super::interval_page_message::IntervalPageMessage;
 use super::tab::Tab;
 use super::task_describe::TaskDescribe;
-use super::page_message::PageResponse;
+use super::page_message::{PageResponse, PageResponsePlusTabId};
 use crate::protocol;
 use failure;
 use futures::{Async, Poll};
@@ -71,10 +71,10 @@ impl DebugSession {
             },
         }
     }
-    pub fn get_tab_by_id_mut(&mut self, tab_id: String) -> Option<&mut Tab> {
+    pub fn get_tab_by_id_mut(&mut self, tab_id: &String) -> Option<&mut Tab> {
         self.tabs
             .values_mut()
-            .find(|t| t.target_info.target_id == tab_id)
+            .find(|t| &t.target_info.target_id == tab_id)
     }
 
     pub fn get_tab_by_id(&self, tab_id: String) -> Option<&Tab> {
@@ -90,14 +90,20 @@ impl DebugSession {
         self.tabs.get(DEFAULT_TAB_NAME)
     }
 
+    fn send_fail(&mut self) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
+        let pr = (None, PageResponse::Fail);
+        Ok(Some(pr).into())
+    }
+
     pub fn send_page_message(
         &mut self,
         item: TaskDescribe,
-    ) -> Poll<Option<PageResponse>, failure::Error> {
+    ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
         match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
-                return Ok(Some(PageResponse::SecondsElapsed(self.seconds_from_start)).into());
+                let pr = (None, PageResponse::SecondsElapsed(self.seconds_from_start));
+                Ok(Some(pr).into())
             }
             TaskDescribe::PageCreated(target_info, page_name) => {
                 trace!(
@@ -105,11 +111,12 @@ impl DebugSession {
                     target_info,
                     page_name
                 );
+                let target_id = target_info.target_id.clone();
                 let mut tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                 tab.attach_to_page();
                 self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), tab);
-                let nt = PageResponse::PageCreated(page_name);
-                Ok(Some(nt).into())
+                let pr = (Some(target_id), PageResponse::PageCreated(page_name));
+                Ok(Some(pr).into())
             }
             TaskDescribe::PageAttached(target_info, session_id) => {
                 trace!(
@@ -117,55 +124,61 @@ impl DebugSession {
                     target_info,
                     session_id.clone()
                 );
-                if let Some(tab) = self.get_tab_by_id_mut(target_info.target_id.clone()) {
+                let target_id = target_info.target_id.clone();
+                if let Some(tab) = self.get_tab_by_id_mut(&target_info.target_id) {
                     tab.session_id.replace(session_id.clone());
                     tab.page_enable();
-                    let nt = PageResponse::PageAttached(target_info, session_id);
-                    Ok(Some(nt).into())
+                    let pr = (Some(target_id), PageResponse::PageAttached(target_info, session_id));
+                    Ok(Some(pr).into())
                 } else {
                     error!("got attach event, but cannot find target.");
-                    Ok(Some(PageResponse::Fail).into())
+                    self.send_fail()
                 }
             }
             TaskDescribe::PageEnable(_task_id, target_id, _session_id) => {
-                return Ok(Some(PageResponse::PageEnable(target_id)).into());
+                let pr = (Some(target_id), PageResponse::PageEnable);
+                Ok(Some(pr).into())
             }
             TaskDescribe::FrameNavigated(target_id, changing_frame) => {
-                if let Some(tab) = self.get_tab_by_id_mut(target_id.clone()) {
+                if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
                     tab._frame_navigated(changing_frame.clone());
-                    let nt = PageResponse::FrameNavigated(target_id, changing_frame);
-                    Ok(Some(nt).into())
+                    let pr = (Some(target_id), PageResponse::FrameNavigated(changing_frame));
+                    Ok(Some(pr).into())
                 } else {
                     error!("got frame navigated event, but cannot find target.");
-                    Ok(Some(PageResponse::Fail).into())
+                    self.send_fail()
                 }
             }
             TaskDescribe::GetDocument(task_id, target_id, node) => {
-                let t_id = target_id.as_ref().cloned().expect("get document task got none target_id.");
-                if let Some(tab) = self.get_tab_by_id_mut(t_id) {
-                    tab.root_node = node.as_ref().cloned();
-                    let nt = PageResponse::GetDocument(task_id, target_id, node);
-                    Ok(Some(nt).into())
+                // let t_id = target_id.as_ref().cloned().expect("get document task got none target_id.");
+                if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
+                    tab.root_node = node;
+                    let pr = (Some(target_id), PageResponse::GetDocument);
+                    Ok(Some(pr).into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    Ok(Some(PageResponse::Fail).into())
+                    self.send_fail()
                 }
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
-                let t_id = target_id.clone();
-                if let Some(tab) = self.get_tab_by_id_mut(t_id) {
+                // let t_id = target_id.clone();
+                if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
                     tab.node_arrived(parent_node_id, nodes);
-                    let nt = PageResponse::SetChildNodes(target_id.to_owned(), parent_node_id, vec![]);
-                    Ok(Some(nt).into())
+                    let pr = (Some(target_id), PageResponse::SetChildNodes(parent_node_id, vec![]));
+                    Ok(Some(pr).into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    Ok(Some(PageResponse::Fail).into())
+                    self.send_fail()
                 }
             }
             TaskDescribe::QuerySelector(query_selector) => {
-                Ok(Some(PageResponse::QuerySelector(query_selector.selector, query_selector.found_node_id)).into())
+                let pr = (Some(query_selector.target_id), PageResponse::QuerySelector(query_selector.selector, query_selector.found_node_id));
+                Ok(Some(pr).into())
             }
-            _ => Ok(Some(PageResponse::Interval).into())
+            _ => {
+                error!("task unknown {:?}", item);
+                self.send_fail()
+            }
         }
         
     }
@@ -173,7 +186,7 @@ impl DebugSession {
 
 
 impl Stream for DebugSession {
-    type Item = PageResponse;
+    type Item = PageResponsePlusTabId;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {

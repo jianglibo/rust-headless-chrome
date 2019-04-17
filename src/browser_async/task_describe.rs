@@ -8,7 +8,7 @@ pub enum TaskDescribe {
     QuerySelector(QuerySelector),
     DescribeNode(DescribeNode),
     SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
-    GetDocument(ids::Task, Option<target::TargetId>, Option<dom::Node>),
+    GetDocument(ids::Task, target::TargetId, Option<dom::Node>),
     PageEnable(ids::Task, target::TargetId, SessionId),
     Interval,
     PageEvent(PageEventName),

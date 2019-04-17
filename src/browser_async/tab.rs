@@ -132,7 +132,7 @@ impl Tab {
             self.chrome_session.lock().unwrap().add_task_and_method_map(
                 mid.unwrap(),
                 this_id,
-                tasks::TaskDescribe::GetDocument(this_id, None, None),
+                tasks::TaskDescribe::GetDocument(this_id, self.target_info.target_id.clone(), None),
             );
             self.chrome_session.lock().unwrap().send_message(method_str);
             (Some(this_id), None)

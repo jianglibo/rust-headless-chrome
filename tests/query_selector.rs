@@ -28,16 +28,20 @@ impl Future for FindNode {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some(value) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, value)) = try_ready!(self.debug_session.poll()) {
+                let tab = if let Some(tid) = &tab_id {
+                    self.debug_session.get_tab_by_id_mut(tid)
+                } else {
+                    None
+                };
                 match value {
-                    PageResponse::PageEnable(target_id) => {
+                    PageResponse::PageEnable => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id_mut(target_id);
                         assert!(tab.is_some());
                         let tab = tab.unwrap();
                         tab.navigate_to(self.url);
                     },
-                    PageResponse::FrameNavigated(_target_id, changing_frame) => {
+                    PageResponse::FrameNavigated(changing_frame) => {
                         info!("got frame: {:?}", changing_frame);
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {

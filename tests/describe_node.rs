@@ -21,16 +21,20 @@ struct FindNode {
 }
 
 impl Future for FindNode {
-    type Item = Option<dom::Node>;
+    type Item = ();
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some(value) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, value)) = try_ready!(self.debug_session.poll()) {
+                let tab = if let Some(tid) = &tab_id {
+                    self.debug_session.get_tab_by_id_mut(tid)
+                } else {
+                    None
+                };
                 match value {
-                    PageResponse::PageEnable(target_id) => {
+                    PageResponse::PageEnable => {
                         info!("page enabled.");
-                        let tab = self.debug_session.get_tab_by_id_mut(target_id);
                         tab.unwrap().navigate_to(self.url);
                     },
                     PageResponse::SecondsElapsed(seconds) => {
@@ -46,11 +50,11 @@ impl Future for FindNode {
                         //     self.debug_session.chrome_debug_session.dom_describe_node_by_selector(self.selector, Some(5));
                         // }
                     }
-                    // PageResponse::NodeComing(node, task) => {
-                    //     info!("got node:: {:?}", node);
-                    //     info!("task done: {:?}", task);
-                    //     break Ok(Some(node).into());
-                    // }
+                    PageResponse::DescribeNode(_task_id, node, task) => {
+                        info!("got node:: {:?}", node);
+                        info!("task done: {:?}", task);
+                        break Ok(().into());
+                    }
                     _ => {
                         info!("got unused page message {:?}", value);
                     }
@@ -93,6 +97,5 @@ fn t_dom_describe_node() {
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    let result = runtime.block_on(my_page.into_future()).unwrap();
-    assert!(result.is_some());
+    runtime.block_on(my_page.into_future()).unwrap();
 }

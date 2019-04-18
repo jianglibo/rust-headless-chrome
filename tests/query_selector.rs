@@ -28,7 +28,7 @@ impl Future for FindNode {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
                     self.debug_session.get_tab_by_id_mut(tid)
                 } else {
@@ -52,7 +52,10 @@ impl Future for FindNode {
                         }
                     }
                     PageResponse::QuerySelector(_selector, node_id) => {
+                        let tab = tab.unwrap();
                         self.found_node_id = node_id;
+                        let node = tab.find_node_by_id(node_id.unwrap());
+                        assert!(node.is_none());
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);

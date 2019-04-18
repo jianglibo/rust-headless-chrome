@@ -34,8 +34,10 @@ pub struct QuerySelector {
 pub struct DescribeNode {
         pub task_id: usize,
         pub session_id: Option<SessionId>,
+        pub target_id: target::TargetId,
         pub is_manual: bool,
         pub node_id: Option<dom::NodeId>,
         pub backend_node_id: Option<dom::NodeId>,
-        pub selector: &'static str,
+        pub found_node: Option<dom::Node>,
+        pub selector: Option<&'static str>,
 }

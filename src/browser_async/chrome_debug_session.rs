@@ -120,10 +120,9 @@ impl ChromeDebugSession {
         if let tasks::TaskDescribe::DescribeNode(tasks::DescribeNode {
             task_id,
             node_id,
-            is_manual,
             backend_node_id,
-            selector,
             session_id,
+            ..
         }) = &task
         {
             let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(dom::methods::DescribeNode {

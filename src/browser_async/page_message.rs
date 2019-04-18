@@ -43,36 +43,6 @@ impl ChangingFrameTree {
     }
 }
 
-// pub trait SelectorString {
-//      fn get_selector(&self) -> Option<&'static str>;
-// }
-
-// pub trait TaskId {
-//      fn get_task_id(&self) -> usize;
-// }
-
-
-
-// impl SelectorString for TaskDescribe {
-//     fn get_selector(&self) -> Option<&'static str> {
-//         match self {
-//             TaskDescribe::QuerySelector(qs) => Some(qs.selector),
-//             _ => None,
-//         }
-//     }
-// }
-
-// impl TaskId for TaskDescribe {
-//     fn get_task_id(&self) -> usize {
-//         match self {
-//             TaskDescribe::QuerySelector(qs) => qs.task_id,
-//             TaskDescribe::GetDocument(tid) => *tid,
-//         }
-//     }
-// }
-
-
-
 #[derive(Debug)]
 pub enum PageEventName {
     DomContentEventFired,
@@ -88,7 +58,7 @@ pub enum PageEventName {
     WindowOpen,
 }
 
-pub type PageResponsePlusTabId = (Option<target::TargetId>, PageResponse);
+pub type PageResponsePlusTabId = (Option<target::TargetId>, Option<ids::Task>, PageResponse);
 
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
@@ -104,7 +74,7 @@ pub enum PageResponse {
     FrameNavigated(ChangingFrame),
     NodeIdComing(dom::NodeId, tasks::TaskDescribe),
     NodeComing(dom::Node, tasks::TaskDescribe),
-    DescribeNode(target::TargetId, Option<&'static str>, Option<dom::Node>),
+    DescribeNode(Option<&'static str>, Option<dom::NodeId>),
     FindElement(Option<&'static str>, Option<Element>),
     GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
     SetChildNodes(dom::NodeId, Vec<dom::Node>),

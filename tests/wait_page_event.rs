@@ -25,7 +25,7 @@ impl Future for LoadEventFired {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
                     self.debug_session.get_tab_by_id_mut(tid)
                 } else {

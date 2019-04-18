@@ -26,7 +26,7 @@ impl Future for FindNode {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
                     self.debug_session.get_tab_by_id_mut(tid)
                 } else {
@@ -50,9 +50,7 @@ impl Future for FindNode {
                         //     self.debug_session.chrome_debug_session.dom_describe_node_by_selector(self.selector, Some(5));
                         // }
                     }
-                    PageResponse::DescribeNode(_task_id, node, task) => {
-                        info!("got node:: {:?}", node);
-                        info!("task done: {:?}", task);
+                    PageResponse::DescribeNode(selecotr, node_id) => {
                         break Ok(().into());
                     }
                     _ => {

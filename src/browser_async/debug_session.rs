@@ -5,7 +5,8 @@ use super::interval_page_message::IntervalPageMessage;
 use super::tab::Tab;
 use super::task_describe::TaskDescribe;
 use super::page_message::{PageResponse, PageResponsePlusTabId};
-use crate::protocol;
+use super::id_type as ids;
+use crate::protocol::{self, target};
 use failure;
 use futures::{Async, Poll};
 use log::*;
@@ -90,8 +91,8 @@ impl DebugSession {
         self.tabs.get(DEFAULT_TAB_NAME)
     }
 
-    fn send_fail(&mut self) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
-        let pr = (None, PageResponse::Fail);
+    fn send_fail(&mut self,target_id: Option<target::TargetId>, task_id: Option<ids::Task>) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
+        let pr = (target_id, task_id, PageResponse::Fail);
         Ok(Some(pr).into())
     }
 
@@ -102,7 +103,7 @@ impl DebugSession {
         match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
-                let pr = (None, PageResponse::SecondsElapsed(self.seconds_from_start));
+                let pr = (None, None, PageResponse::SecondsElapsed(self.seconds_from_start));
                 Ok(Some(pr).into())
             }
             TaskDescribe::PageCreated(target_info, page_name) => {
@@ -115,7 +116,7 @@ impl DebugSession {
                 let mut tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                 tab.attach_to_page();
                 self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), tab);
-                let pr = (Some(target_id), PageResponse::PageCreated(page_name));
+                let pr = (Some(target_id), None, PageResponse::PageCreated(page_name));
                 Ok(Some(pr).into())
             }
             TaskDescribe::PageAttached(target_info, session_id) => {
@@ -124,63 +125,66 @@ impl DebugSession {
                     target_info,
                     session_id.clone()
                 );
-                let target_id = target_info.target_id.clone();
                 if let Some(tab) = self.get_tab_by_id_mut(&target_info.target_id) {
                     tab.session_id.replace(session_id.clone());
                     tab.page_enable();
-                    let pr = (Some(target_id), PageResponse::PageAttached(target_info, session_id));
+                    let pr = (Some(target_info.target_id.clone()), None, PageResponse::PageAttached(target_info, session_id));
                     Ok(Some(pr).into())
                 } else {
                     error!("got attach event, but cannot find target.");
-                    self.send_fail()
+                    self.send_fail(Some(target_info.target_id), None)
                 }
             }
-            TaskDescribe::PageEnable(_task_id, target_id, _session_id) => {
-                let pr = (Some(target_id), PageResponse::PageEnable);
+            TaskDescribe::PageEnable(task_id, target_id, _session_id) => {
+                let pr = (Some(target_id), Some(task_id), PageResponse::PageEnable);
                 Ok(Some(pr).into())
             }
             TaskDescribe::FrameNavigated(target_id, changing_frame) => {
                 if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
                     tab._frame_navigated(changing_frame.clone());
-                    let pr = (Some(target_id), PageResponse::FrameNavigated(changing_frame));
+                    let pr = (Some(target_id), None, PageResponse::FrameNavigated(changing_frame));
                     Ok(Some(pr).into())
                 } else {
                     error!("got frame navigated event, but cannot find target.");
-                    self.send_fail()
+                    self.send_fail(Some(target_id), None)
                 }
             }
             TaskDescribe::GetDocument(task_id, target_id, node) => {
                 // let t_id = target_id.as_ref().cloned().expect("get document task got none target_id.");
                 if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
                     tab.root_node = node;
-                    let pr = (Some(target_id), PageResponse::GetDocument);
+                    let pr = (Some(target_id), Some(task_id), PageResponse::GetDocument);
                     Ok(Some(pr).into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    self.send_fail()
+                    self.send_fail(Some(target_id), Some(task_id))
                 }
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
                 // let t_id = target_id.clone();
                 if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
                     tab.node_arrived(parent_node_id, nodes);
-                    let pr = (Some(target_id), PageResponse::SetChildNodes(parent_node_id, vec![]));
+                    let pr = (Some(target_id), None, PageResponse::SetChildNodes(parent_node_id, vec![]));
                     Ok(Some(pr).into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    self.send_fail()
+                    self.send_fail(Some(target_id), None)
                 }
             }
             TaskDescribe::QuerySelector(query_selector) => {
-                let pr = (Some(query_selector.target_id), PageResponse::QuerySelector(query_selector.selector, query_selector.found_node_id));
+                let pr = (Some(query_selector.target_id), Some(query_selector.task_id), PageResponse::QuerySelector(query_selector.selector, query_selector.found_node_id));
+                Ok(Some(pr).into())
+            }
+            TaskDescribe::DescribeNode(describe_node) => {
+                let node_id = describe_node.found_node.and_then(|n|Some(n.node_id));
+                let pr = (Some(describe_node.target_id), Some(describe_node.task_id), PageResponse::DescribeNode(describe_node.selector, node_id));
                 Ok(Some(pr).into())
             }
             _ => {
                 error!("task unknown {:?}", item);
-                self.send_fail()
+                self.send_fail(None, None)
             }
         }
-        
     }
 }
 

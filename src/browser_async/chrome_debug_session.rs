@@ -138,6 +138,10 @@ impl ChromeDebugSession {
         }
     }
 
+    pub fn resolve_node(&mut self) -> (Option<ids::Task>, Option<ids::RemoteObject>) {
+        (None, None)
+    }
+
     pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
         let mut waiting_tasks = self.get_waiting_tasks(task_id);
         while let Some(mut task) = waiting_tasks.pop() {
@@ -155,13 +159,30 @@ impl ChromeDebugSession {
         }
     }
 
+    // pub fn feed_on_node(&mut self, task_id: ids::Task, node: dom::Node) {
+    //     let mut waiting_tasks = self.get_waiting_tasks(task_id);
+    //     while let Some(mut task) = waiting_tasks.pop() {
+    //         match &mut task {
+    //             tasks::TaskDescribe::QuerySelector(query_selector) => {
+    //                 query_selector.node_id = Some(node_id);
+    //                 self.dom_query_selector(task);
+    //             }
+    //             tasks::TaskDescribe::DescribeNode(describe_node) => {
+    //                 describe_node.node_id = Some(node_id);
+    //                 self.dom_describe_node(task);
+    //             }
+    //             _ => (),
+    //         }
+    //     }
+    // }
+
     #[allow(clippy::single_match_else)]
     pub fn handle_inner_target_events(&mut self, 
     inner_event: inner_event::InnerEvent, raw_session_id: String, target_id: target::TargetId) -> Option<TaskDescribe> {
         match inner_event {
             inner_event::InnerEvent::SetChildNodes(set_child_nodes_event) => {
                 let params = set_child_nodes_event.params;
-                return TaskDescribe::SetChildNodes(target_id, params.parentId, params.nodes).into();
+                return TaskDescribe::SetChildNodes(target_id, params.parent_id, params.nodes).into();
             },
             _ => {
                 info!("discard inner event: {:?}", inner_event);
@@ -637,18 +658,7 @@ impl Stream for ChromeDebugSession {
 //     }
 // }
 
-// pub fn get_box_model(&mut self, selector: Option<&'static str>, element: &Element) {
-//     let (_, method_str, mid) = self
-//         .create_msg_to_send_with_session_id(dom::methods::GetBoxModel {
-//             node_id: None,
-//             backend_node_id: Some(element.backend_node_id),
-//             object_id: None,
-//         })
-//         .unwrap();
 
-//     // self.state = ChromeSessionState::WaitingModelBox(selector, element.backend_node_id, mid.unwrap());
-//     self.chrome_browser.send_message(method_str);
-// }
 
 // pass in an usize under 10000 or None.
 // pub fn dom_query_selector_by_selector(

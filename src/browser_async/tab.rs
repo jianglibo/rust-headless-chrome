@@ -75,13 +75,11 @@ impl Tab {
     pub fn find_node_by_id(&self, node_id: dom::NodeId) -> Option<&dom::Node> {
         if let Some(node) = self.temporary_node_holder.iter().find(|n| n.node_id == node_id) {
             Some(node)
+        } else if let Some(root_node) = &self.root_node {
+            root_node.find(|n| n.node_id == node_id)
         } else {
-            if let Some(root_node) = &self.root_node {
-                root_node.find(|n| n.node_id == node_id)
-            } else {
-                error!("tab's root node is None.");
-                None
-            }
+            error!("tab's root node is None.");
+            None
         }
     }
 
@@ -120,7 +118,7 @@ impl Tab {
         if let Some(root_node) = &self.root_node {
             (None, Some(root_node.node_id))
         } else {
-            let (this_id, _) = create_if_no_manual_input(manual_task_id);
+            let (this_task_id, _) = create_if_no_manual_input(manual_task_id);
             let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
                 dom::methods::GetDocument {
                     depth: Some(0),
@@ -131,12 +129,78 @@ impl Tab {
             .unwrap();
             self.chrome_session.lock().unwrap().add_task_and_method_map(
                 mid.unwrap(),
-                this_id,
-                tasks::TaskDescribe::GetDocument(this_id, self.target_info.target_id.clone(), None),
+                this_task_id,
+                tasks::TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
             );
             self.chrome_session.lock().unwrap().send_message(method_str);
-            (Some(this_id), None)
+            (Some(this_task_id), None)
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn describe_node(&mut self, manual_task_id: Option<ids::Task>, node_id: Option<dom::NodeId>, backend_node_id: Option<dom::NodeId>,
+        object_id: Option<ids::RemoteObject>, depth: Option<i8>, pierce: bool, selector: Option<&'static str>) {
+        let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+        let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(dom::methods::DescribeNode {
+                node_id,
+                backend_node_id,
+                depth,
+            }, &self.session_id)
+            .unwrap();
+            let task = tasks::DescribeNode {
+                task_id: this_task_id,
+                target_id: self.target_info.target_id.clone(),
+                session_id: self.session_id.clone(),
+                is_manual,
+                node_id,
+                backend_node_id,
+                object_id,
+                depth,
+                pierce,
+                selector,
+                found_node: None,
+            };
+            self.chrome_session.lock().unwrap().add_task_and_method_map(
+                mid.unwrap(),
+                this_task_id,
+                tasks::TaskDescribe::DescribeNode(task),
+            );
+        self.chrome_session.lock().unwrap().send_message(method_str);
+
+    }
+
+    pub fn get_box_model_by_node_id(&mut self, node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) {
+        self.get_box_model(manual_task_id, None, node_id, None, None);
+    }
+
+    pub fn get_box_model_by_backend_node_id(&mut self, backend_node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) {
+        self.get_box_model(manual_task_id, backend_node_id, None, None, None);
+    }
+
+    pub fn get_box_model(&mut self, manual_task_id: Option<ids::Task>, backend_node_id: Option<dom::NodeId>, node_id: Option<dom::NodeId>, object_id: Option<ids::RemoteObject>, selector: Option<&'static str>) {
+        let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+        let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(dom::methods::GetBoxModel {
+                node_id,
+                backend_node_id,
+                object_id: None,
+            }, &self.session_id)
+            .unwrap();
+            let task = tasks::GetBoxModel {
+                task_id: this_task_id,
+                target_id: self.target_info.target_id.clone(),
+                session_id: self.session_id.clone(),
+                is_manual,
+                node_id,
+                backend_node_id,
+                object_id,
+                selector,
+            };
+            self.chrome_session.lock().unwrap().add_task_and_method_map(
+                mid.unwrap(),
+                this_task_id,
+                tasks::TaskDescribe::GetBoxModel(task),
+            );
+        self.chrome_session.lock().unwrap().send_message(method_str);
     }
 
     pub fn dom_query_selector_by_selector(

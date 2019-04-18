@@ -13,7 +13,7 @@ pub mod inner_events {
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct SetChildNodesParams {
-        pub parentId: protocol_dom::NodeId,
+        pub parent_id: protocol_dom::NodeId,
         pub nodes: Vec<protocol_dom::Node>,
     }
 }

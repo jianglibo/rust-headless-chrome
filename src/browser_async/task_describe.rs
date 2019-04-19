@@ -2,6 +2,7 @@ use crate::protocol::{dom, target};
 use super::id_type as ids;
 use super::page_message::{PageEventName, ChangingFrame};
 use super::dev_tools_method_util::{SessionId};
+// use super::element_async::{BoxModel};
 
 #[derive(Debug)]
 pub enum TaskDescribe {
@@ -31,6 +32,7 @@ pub struct GetBoxModel {
         pub selector: Option<&'static str>,
         pub backend_node_id: Option<dom::NodeId>,
         pub object_id: Option<ids::RemoteObject>,
+        pub found_box: Option<dom::methods::BoxModel>
 }
 
 #[derive(Debug)]

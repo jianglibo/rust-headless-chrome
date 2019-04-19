@@ -1,5 +1,5 @@
 use super::task_describe::{self as tasks, TaskDescribe};
-use super::element_async::{BoxModel, Element, ElementQuad};
+// use super::element_async::{BoxModel, Element, ElementQuad};
 use super::id_type as ids;
 use super::page_message::ChangingFrame;
 use super::inner_event::{self, InnerEvent};
@@ -138,8 +138,47 @@ impl ChromeDebugSession {
         }
     }
 
+    pub fn get_box_model(&mut self, task: tasks::TaskDescribe) {
+        if let tasks::TaskDescribe::GetBoxModel(tasks::GetBoxModel {
+            task_id,
+            node_id,
+            backend_node_id,
+            session_id,
+            ..
+        }) = &task
+        {
+            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(dom::methods::GetBoxModel {
+                    node_id: *node_id,
+                    backend_node_id: *backend_node_id,
+                    object_id: None,
+                }, &session_id)
+                .unwrap();
+            self.add_task_and_method_map(mid.unwrap(), *task_id, task);
+            self.chrome_browser.send_message(method_str);
+        } else {
+            error!("not a get_box_model.")
+        }
+    }
+
     pub fn resolve_node(&mut self) -> (Option<ids::Task>, Option<ids::RemoteObject>) {
         (None, None)
+    }
+
+    pub fn feed_on_root_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+        let mut waiting_tasks = self.get_waiting_tasks(task_id);
+        while let Some(mut task) = waiting_tasks.pop() {
+            match &mut task {
+                tasks::TaskDescribe::QuerySelector(query_selector) => {
+                    query_selector.node_id = Some(node_id);
+                    self.dom_query_selector(task);
+                }
+                tasks::TaskDescribe::DescribeNode(describe_node) => {
+                    describe_node.node_id = Some(node_id);
+                    self.dom_describe_node(task);
+                }
+                _ => (),
+            }
+        }
     }
 
     pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
@@ -153,6 +192,10 @@ impl ChromeDebugSession {
                 tasks::TaskDescribe::DescribeNode(describe_node) => {
                     describe_node.node_id = Some(node_id);
                     self.dom_describe_node(task);
+                }
+                tasks::TaskDescribe::GetBoxModel(get_box_model) => {
+                    get_box_model.node_id = Some(node_id);
+                    self.get_box_model(task);
                 }
                 _ => (),
             }
@@ -224,7 +267,7 @@ impl ChromeDebugSession {
                         )
                     {
                         let node_id = get_document_return_object.root.node_id;
-                        self.feed_on_node_id(task_id, node_id);
+                        self.feed_on_root_node_id(task_id, node_id);
                         return Some(TaskDescribe::GetDocument(
                             task_id,
                             t_id,
@@ -255,17 +298,28 @@ impl ChromeDebugSession {
                         panic!("QuerySelector failed.");
                     }
                 }
-                TaskDescribe::DescribeNode(describe_node) => {
-                    if let Ok(node) = serde_json::from_value::<dom::methods::DescribeNodeReturnObject>(
+                TaskDescribe::DescribeNode(mut describe_node) => {
+                    if let Ok(describe_node_return_object) = serde_json::from_value::<dom::methods::DescribeNodeReturnObject>(
                         resp.result.unwrap(),
                     ) {
-                        // self.feed_on_node(describe_node.task_id, node.node);
                         if describe_node.is_manual {
+                            describe_node.found_node = Some(describe_node_return_object.node);
                             return Some(TaskDescribe::DescribeNode(describe_node));
-                            // return Some(TaskDescribe::DescribeNode(*describe_node));
                         }
                     } else {
-                        panic!("QuerySelector failed.");
+                        panic!("DescribeNode failed.");
+                    }
+                }
+                TaskDescribe::GetBoxModel(mut get_box_model) => {
+                    if let Ok(get_box_model_return_object) = serde_json::from_value::<dom::methods::GetBoxModelReturnObject>(
+                        resp.result.unwrap(),
+                    ) {
+                        if get_box_model.is_manual {
+                            get_box_model.found_box = Some(get_box_model_return_object.model);
+                            return Some(TaskDescribe::GetBoxModel(get_box_model));
+                        }
+                    } else {
+                        panic!("GetBoxModel failed.");
                     }
                 }
                 task_describe => {

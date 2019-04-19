@@ -18,7 +18,7 @@ pub struct Tab {
     pub session_id: Option<SessionId>,
     pub root_node: Option<dom::Node>,
     pub changing_frame_tree: ChangingFrameTree,
-    pub temporary_node_holder: Vec<dom::Node>,
+    pub temporary_node_holder: HashMap<dom::NodeId, dom::Node>,
 }
 
 impl Tab {
@@ -32,7 +32,7 @@ impl Tab {
             session_id: None,
             root_node: None,
             changing_frame_tree: Default::default(),
-            temporary_node_holder: vec![],
+            temporary_node_holder: HashMap::new(),
         }
     }
     pub fn navigate_to(&mut self, url: &str) {
@@ -72,15 +72,18 @@ impl Tab {
 
     }
 
-    pub fn find_node_by_id(&self, node_id: dom::NodeId) -> Option<&dom::Node> {
-        if let Some(node) = self.temporary_node_holder.iter().find(|n| n.node_id == node_id) {
-            Some(node)
-        } else if let Some(root_node) = &self.root_node {
-            root_node.find(|n| n.node_id == node_id)
-        } else {
-            error!("tab's root node is None.");
-            None
+    pub fn node_returned(&mut self, node: Option<dom::Node>) {
+        if let Some(nd) = node {
+            self.temporary_node_holder.entry(nd.node_id).or_insert(nd);
         }
+    }
+
+    pub fn find_node_by_id(&self, node_id: dom::NodeId) -> Option<&dom::Node> {
+        self.temporary_node_holder.get(&node_id)
+    }
+
+    pub fn find_node_by_id_mut(&mut self, node_id: dom::NodeId) -> Option<&mut dom::Node> {
+        self.temporary_node_holder.get_mut(&node_id)
     }
 
     pub fn is_main_frame_navigated(&self) -> bool {
@@ -137,6 +140,35 @@ impl Tab {
         }
     }
 
+    pub fn describe_node_by_selector(&mut self, selector: &'static str, depth: Option<i8>, manual_task_id: Option<ids::Task>) {
+        match self.dom_query_selector_by_selector(selector, manual_task_id) {
+            (_, Some(node_id)) => {
+                self.describe_node(manual_task_id, Some(node_id), None, None, depth, false, Some(selector));
+            }
+            (Some(task_id), _) => {
+                let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+                let ds = tasks::DescribeNode {
+                    task_id: this_task_id,
+                    target_id: self.target_info.target_id.clone(),
+                    session_id: self.session_id.clone(),
+                    is_manual,
+                    node_id: None,
+                    backend_node_id: None,
+                    object_id: None,
+                    depth,
+                    pierce: false,
+                    selector: Some(selector),
+                    found_node: None,
+                };
+                self.chrome_session.lock().unwrap().add_task(ds.task_id, tasks::TaskDescribe::DescribeNode(ds));
+                self.chrome_session.lock().unwrap().add_waiting_task(task_id, this_task_id);
+            }
+            _ => {
+                panic!("impossile result in describe_node_by_selector");
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn describe_node(&mut self, manual_task_id: Option<ids::Task>, node_id: Option<dom::NodeId>, backend_node_id: Option<dom::NodeId>,
         object_id: Option<ids::RemoteObject>, depth: Option<i8>, pierce: bool, selector: Option<&'static str>) {
@@ -169,6 +201,33 @@ impl Tab {
 
     }
 
+    pub fn get_box_model_by_selector(&mut self, selector: &'static str, manual_task_id: Option<ids::Task>) {
+        match self.dom_query_selector_by_selector(selector, None) { // task_id cannot share between tasks.
+            (_, Some(node_id)) => {
+                self.get_box_model_by_node_id(Some(node_id), manual_task_id);
+            }
+            (Some(task_id), _) => {
+                let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+                let gb = tasks::GetBoxModel {
+                    task_id: this_task_id,
+                    target_id: self.target_info.target_id.clone(),
+                    session_id: self.session_id.clone(),
+                    is_manual,
+                    node_id: None,
+                    backend_node_id: None,
+                    object_id: None,
+                    selector: Some(selector),
+                    found_box: None,
+                };
+                self.chrome_session.lock().unwrap().add_task(gb.task_id, tasks::TaskDescribe::GetBoxModel(gb));
+                self.chrome_session.lock().unwrap().add_waiting_task(task_id, this_task_id);
+            }
+            _ => {
+                panic!("impossible result in get_box_model_by_selector");
+            }
+        }
+    }
+
     pub fn get_box_model_by_node_id(&mut self, node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) {
         self.get_box_model(manual_task_id, None, node_id, None, None);
     }
@@ -194,6 +253,7 @@ impl Tab {
                 backend_node_id,
                 object_id,
                 selector,
+                found_box: None,
             };
             self.chrome_session.lock().unwrap().add_task_and_method_map(
                 mid.unwrap(),

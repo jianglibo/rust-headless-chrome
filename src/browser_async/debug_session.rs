@@ -176,8 +176,18 @@ impl DebugSession {
                 Ok(Some(pr).into())
             }
             TaskDescribe::DescribeNode(describe_node) => {
-                let node_id = describe_node.found_node.and_then(|n|Some(n.node_id));
-                let pr = (Some(describe_node.target_id), Some(describe_node.task_id), PageResponse::DescribeNode(describe_node.selector, node_id));
+                let node_id = describe_node.found_node.as_ref().and_then(|n|Some(n.node_id));
+                if let Some(tab) = self.get_tab_by_id_mut(&describe_node.target_id) {
+                    tab.node_returned(describe_node.found_node);
+                    let pr = (Some(describe_node.target_id), Some(describe_node.task_id), PageResponse::DescribeNode(describe_node.selector, node_id));
+                    Ok(Some(pr).into())
+                } else {
+                    error!("got describe_node event, but cannot find target.");
+                    self.send_fail(Some(describe_node.target_id), Some(describe_node.task_id))
+                }
+            }
+            TaskDescribe::GetBoxModel(get_box_model) => {
+                let pr = (Some(get_box_model.target_id), Some(get_box_model.task_id), PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box));
                 Ok(Some(pr).into())
             }
             _ => {

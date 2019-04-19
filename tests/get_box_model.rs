@@ -11,19 +11,19 @@ use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
+// use headless_chrome::browser_async::element_async::{BoxModel};
 use std::default::Default;
 use tokio;
 
 
-struct FindNode {
+struct GetBoxModelTest {
     debug_session: DebugSession,
     url: &'static str,
     selector: &'static str,
-    node_id: Option<dom::NodeId>,
-    node: Option<dom::Node>,
+    box_model: Option<dom::methods::BoxModel>,
 }
 
-impl Future for FindNode {
+impl Future for GetBoxModelTest {
     type Item = ();
     type Error = failure::Error;
 
@@ -43,8 +43,7 @@ impl Future for FindNode {
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
-                            assert!(self.node_id.is_some());
-                            assert!(self.node.is_some());
+                            assert!(self.box_model.is_some());
                         }
                     }
                     PageResponse::FrameNavigated(changing_frame) => {
@@ -52,16 +51,16 @@ impl Future for FindNode {
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.describe_node_by_selector(self.selector, Some(2), Some(100));
+                                    tab.get_box_model_by_selector(self.selector, Some(100));
                                 }
                             }
                         }
                     }
-                    PageResponse::DescribeNode(selector, node_id) => {
-                        assert!(node_id.is_some());
+                    PageResponse::GetBoxModel(selector, box_model) => {
+                        info!("got box model: {:?}", box_model);
+                        assert!(box_model.is_some());
                         assert_eq!(selector, Some(self.selector));
-                        self.node_id  = node_id;
-                        self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
+                        self.box_model  = box_model;
                         break Ok(().into());
                     }
                     _ => {
@@ -75,38 +74,25 @@ impl Future for FindNode {
     }
 }
 
-// fn run_one<F>(f: F) -> Result<F::Item, F::Error>
-// where
-//     F: IntoFuture,
-//     F::Future: Send + 'static,
-//     F::Item: Send + 'static,
-//     F::Error: Send + 'static,
-// {
-//         let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-//         runtime.block_on(f.into_future())
-// }
-
 #[test]
-fn t_dom_describe_node() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,describe_node=info");
+fn t_get_model_box() {
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,get_box_model=info");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let mut selector = "#ddlogin-iframe #qrcode";
-    let _my_page = FindNode {
+    let _my_page = GetBoxModelTest {
         debug_session: Default::default(),
         url,
         selector,
-        node_id: None,
-        node: None,
+        box_model: None,
     };
 
     selector = "#ddlogin-iframe";
-    let my_page = FindNode {
+    let my_page = GetBoxModelTest {
         debug_session: Default::default(),
         url,
         selector,
-        node_id: None,
-        node: None,
+        box_model: None,
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");

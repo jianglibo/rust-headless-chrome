@@ -52,61 +52,61 @@ impl ElementQuad {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct BoxModel {
-    pub content: ElementQuad,
-    pub padding: ElementQuad,
-    pub border: ElementQuad,
-    pub margin: ElementQuad,
-    pub width: u64,
-    pub height: u64,
-}
+// #[derive(Debug, Clone)]
+// pub struct BoxModel {
+//     pub content: ElementQuad,
+//     pub padding: ElementQuad,
+//     pub border: ElementQuad,
+//     pub margin: ElementQuad,
+//     pub width: u64,
+//     pub height: u64,
+// }
 
-impl BoxModel {
-    /// Create a `page::Viewport` equal to the content-box, using a scale of 1.0
-    pub fn content_viewport(&self) -> page::Viewport {
-        page::Viewport {
-            x: self.content.top_left.x,
-            y: self.content.top_left.y,
-            width: self.content.width(),
-            height: self.content.height(),
-            scale: 1.0,
-        }
-    }
+// impl BoxModel {
+//     /// Create a `page::Viewport` equal to the content-box, using a scale of 1.0
+//     pub fn content_viewport(&self) -> page::Viewport {
+//         page::Viewport {
+//             x: self.content.top_left.x,
+//             y: self.content.top_left.y,
+//             width: self.content.width(),
+//             height: self.content.height(),
+//             scale: 1.0,
+//         }
+//     }
 
-    /// Create a `page::Viewport` equal to the padding-box, using a scale of 1.0
-    pub fn padding_viewport(&self) -> page::Viewport {
-        page::Viewport {
-            x: self.padding.top_left.x,
-            y: self.padding.top_left.y,
-            width: self.padding.width(),
-            height: self.padding.height(),
-            scale: 1.0,
-        }
-    }
+//     /// Create a `page::Viewport` equal to the padding-box, using a scale of 1.0
+//     pub fn padding_viewport(&self) -> page::Viewport {
+//         page::Viewport {
+//             x: self.padding.top_left.x,
+//             y: self.padding.top_left.y,
+//             width: self.padding.width(),
+//             height: self.padding.height(),
+//             scale: 1.0,
+//         }
+//     }
 
-    /// Create a `page::Viewport` equal to the border-box, using a scale of 1.0
-    pub fn border_viewport(&self) -> page::Viewport {
-        page::Viewport {
-            x: self.border.top_left.x,
-            y: self.border.top_left.y,
-            width: self.border.width(),
-            height: self.border.height(),
-            scale: 1.0,
-        }
-    }
+//     /// Create a `page::Viewport` equal to the border-box, using a scale of 1.0
+//     pub fn border_viewport(&self) -> page::Viewport {
+//         page::Viewport {
+//             x: self.border.top_left.x,
+//             y: self.border.top_left.y,
+//             width: self.border.width(),
+//             height: self.border.height(),
+//             scale: 1.0,
+//         }
+//     }
 
-    /// Create a `page::Viewport` equal to the margin-box, using a scale of 1.0
-    pub fn margin_viewport(&self) -> page::Viewport {
-        page::Viewport {
-            x: self.margin.top_left.x,
-            y: self.margin.top_left.y,
-            width: self.margin.width(),
-            height: self.margin.height(),
-            scale: 1.0,
-        }
-    }
-}
+//     /// Create a `page::Viewport` equal to the margin-box, using a scale of 1.0
+//     pub fn margin_viewport(&self) -> page::Viewport {
+//         page::Viewport {
+//             x: self.margin.top_left.x,
+//             y: self.margin.top_left.y,
+//             width: self.margin.width(),
+//             height: self.margin.height(),
+//             scale: 1.0,
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct Element {

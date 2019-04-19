@@ -1,4 +1,4 @@
-use super::element_async::{BoxModel, Element, ElementQuad};
+// use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use super::chrome_debug_session::{ChromeDebugSession};
 use super::id_type as ids;
@@ -72,11 +72,9 @@ pub enum PageResponse {
     PageEnable,
     TargetInfoChanged(target::TargetInfo),
     FrameNavigated(ChangingFrame),
-    NodeIdComing(dom::NodeId, tasks::TaskDescribe),
-    NodeComing(dom::Node, tasks::TaskDescribe),
     DescribeNode(Option<&'static str>, Option<dom::NodeId>),
-    FindElement(Option<&'static str>, Option<Element>),
-    GetBoxModel(Option<&'static str>, dom::NodeId, BoxModel),
+    // FindElement(Option<&'static str>, Option<Element>),
+    GetBoxModel(Option<&'static str>, Option<dom::methods::BoxModel>),
     SetChildNodes(dom::NodeId, Vec<dom::Node>),
     GetDocument,
     Screenshot(

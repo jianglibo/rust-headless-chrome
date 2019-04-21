@@ -4,7 +4,7 @@ use super::dev_tools_method_util::SessionId;
 use super::interval_page_message::IntervalPageMessage;
 use super::tab::Tab;
 use super::task_describe::TaskDescribe;
-use super::page_message::{PageResponse, PageResponsePlusTabId};
+use super::page_message::{PageResponse, PageResponsePlusTabId, response_object};
 use super::id_type as ids;
 use crate::protocol::{self, target};
 use failure;
@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::default::Default;
 use websocket::futures::Stream;
 use std::sync::{Arc, Mutex};
-use std::marker::PhantomData;
 
 const DEFAULT_TAB_NAME: &str = "_default_tab_";
 
@@ -188,6 +187,18 @@ impl DebugSession {
             }
             TaskDescribe::GetBoxModel(get_box_model) => {
                 let pr = (Some(get_box_model.target_id), Some(get_box_model.task_id), PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box));
+                Ok(Some(pr).into())
+            }
+            TaskDescribe::LoadEventFired(target_id, timestamp) => {
+                let pr = (Some(target_id), None, PageResponse::LoadEventFired(timestamp));
+                Ok(Some(pr).into())
+            }
+            TaskDescribe::ScreenShot(screen_shot) => {
+                let ro = response_object::CaptureScreenshot{
+                    selector: screen_shot.selector,
+                    base64: screen_shot.base64,
+                };
+                let pr = (Some(screen_shot.target_id), Some(screen_shot.task_id), PageResponse::Screenshot(ro));
                 Ok(Some(pr).into())
             }
             _ => {

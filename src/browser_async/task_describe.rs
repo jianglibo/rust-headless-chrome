@@ -1,8 +1,11 @@
-use crate::protocol::{dom, target};
+use crate::protocol::{dom, target, page};
 use super::id_type as ids;
 use super::page_message::{PageEventName, ChangingFrame};
 use super::dev_tools_method_util::{SessionId};
-// use super::element_async::{BoxModel};
+use super::inner_event::{InnerEvent, inner_events};
+use crate::browser::tab::element::BoxModel;
+use std::fs::File;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum TaskDescribe {
@@ -16,10 +19,25 @@ pub enum TaskDescribe {
     Interval,
     PageEvent(PageEventName),
     FrameNavigated(target::TargetId, ChangingFrame),
+    LoadEventFired(target::TargetId, f32),
     TargetInfoChanged(target::TargetInfo),
     PageCreated(target::TargetInfo, Option<&'static str>),
     PageAttached(target::TargetInfo, SessionId),
+    ScreenShot(ScreenShot),
     Fail,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScreenShot {
+        pub task_id: ids::Task,
+        pub target_id: target::TargetId,
+        pub session_id: Option<SessionId>,
+        pub is_manual: bool,
+        pub selector: Option<&'static str>,
+        pub format: page::ScreenshotFormat,
+        pub clip: Option<page::Viewport>,
+        pub from_surface: bool,
+        pub base64: Option<String>,
 }
 
 #[derive(Debug)]
@@ -32,7 +50,7 @@ pub struct GetBoxModel {
         pub selector: Option<&'static str>,
         pub backend_node_id: Option<dom::NodeId>,
         pub object_id: Option<ids::RemoteObject>,
-        pub found_box: Option<dom::methods::BoxModel>
+        pub found_box: Option<BoxModel>
 }
 
 #[derive(Debug)]

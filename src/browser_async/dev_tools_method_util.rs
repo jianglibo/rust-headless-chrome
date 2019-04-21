@@ -218,7 +218,7 @@ impl MethodUtil {
         C: protocol::Method + serde::Serialize,
     {
         if let Some(s_id) = session_id {
-            Self::create_msg_to_send(method, MethodDestination::Target(s_id.clone().into()), None)
+            Self::create_msg_to_send(method, MethodDestination::Target(s_id.clone()), None)
         } else {
             error!("no session_id exists.");
             panic!("no session_id exists.");

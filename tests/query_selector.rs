@@ -11,24 +11,34 @@ use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
+use headless_chrome::browser_async::tab::{Tab};
 use tokio;
 use std::default::Default;
+// use serde_json;
 
 
-struct FindNode {
+fn assert_result(tab: &Tab, found_node_id: Option<dom::NodeId>) {
+    assert_eq!(tab.temporary_node_holder.len() , 7);
+    info!("all nodes: {:?}", tab.temporary_node_holder);
+    // tab.temporary_node_holder.values().for_each(|v| v.iter().for_each(|nd| assert_eq!(nd.node_name, "IFRAME")));
+    assert!(found_node_id.is_some());
+}
+
+
+struct QuerySelector {
     debug_session: DebugSession,
     url: &'static str,
     selector: &'static str,
     found_node_id: Option<dom::NodeId>,
 }
 
-impl Future for FindNode {
+impl Future for QuerySelector {
     type Item = ();
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
                     self.debug_session.get_tab_by_id_mut(tid)
                 } else {
@@ -55,12 +65,18 @@ impl Future for FindNode {
                         let tab = tab.unwrap();
                         self.found_node_id = node_id;
                         let node = tab.find_node_by_id(node_id.unwrap());
-                        assert!(node.is_none());
+                        assert!(node.is_some());
+                    }
+                    PageResponse::LoadEventFired(_timestamp) => {
+                        let tab = tab.unwrap();
+                        assert_result(&tab, self.found_node_id);
+                        break Ok(().into())                        
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
-                            assert!(self.found_node_id.is_some());
+                            let tab = self.debug_session.main_tab_mut().unwrap();
+                            assert_result(&tab, self.found_node_id);
                             break Ok(().into())
                         }
                     }
@@ -83,7 +99,7 @@ fn t_dom_query_selector() {
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let mut selector = "#ddlogin-iframe #qrcode";
-    let _my_page = FindNode {
+    let _my_page = QuerySelector {
         debug_session: Default::default(),
         url,
         selector,
@@ -91,7 +107,7 @@ fn t_dom_query_selector() {
     };
 
     selector = "#ddlogin-iframe";
-    let my_page = FindNode {
+    let my_page = QuerySelector {
         debug_session: Default::default(),
         url,
         selector,

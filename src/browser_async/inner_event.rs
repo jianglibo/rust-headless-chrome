@@ -16,6 +16,18 @@ pub mod inner_events {
         pub parent_id: protocol_dom::NodeId,
         pub nodes: Vec<protocol_dom::Node>,
     }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct LoadEventFired {
+        pub params: LoadEventFiredParams,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct LoadEventFiredParams {
+        pub timestamp: f32,
+    }
 }
 
 // https://serde.rs/enum-representations.html
@@ -26,6 +38,8 @@ pub mod inner_events {
 pub enum InnerEvent {
     #[serde(rename = "DOM.setChildNodes")]
     SetChildNodes(inner_events::SetChildNodesEvent),
+    #[serde(rename = "Page.loadEventFired")]
+    LoadEventFired(inner_events::LoadEventFired),
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -25,7 +25,7 @@ impl Future for LoadEventFired {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
                     self.debug_session.get_tab_by_id_mut(tid)
                 } else {
@@ -38,15 +38,10 @@ impl Future for LoadEventFired {
                     },
                     PageResponse::FrameNavigated(changing_frame) => {
                         info!("got frame: {:?}", changing_frame);
-                        if let Some(tab) = self.debug_session.main_tab_mut() {
-                            if tab.is_main_frame_navigated() {
-                                tab.get_document(Some(100));
-                            }
-                        }
-
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
-                                
+                                info!("send get document command.");
+                                tab.unwrap().get_document(None, Some(100));
                             }
                         }
                     }
@@ -57,15 +52,17 @@ impl Future for LoadEventFired {
                         
                     }
                     PageResponse::SecondsElapsed(seconds) => {
+                        info!("seconds elapsed: {} ", seconds);
                         if seconds > 29 {
-                            let tab = self.debug_session.main_tab().unwrap();
-                            assert_eq!(tab.frame_tree().count(), 7);
-                            if let Some(ChangingFrame::Navigated(frame)) = tab.main_frame() {
+                            let tab = self.debug_session.main_tab_mut().unwrap();
+                            assert_eq!(tab.changing_frames.len(), 7);
+                            if let Some(frame) = tab.main_frame() {
                                 assert_eq!(tab.target_info.target_id, frame.id);
                             } else {
-                                assert!(false);
+                                panic!("test failed.");
                             }
                             assert!(self.root_node.is_some());
+                            // assert!(tab.temporary_node_holder.len() > 2);
                             break Ok(().into())
                         }
                     }
@@ -82,7 +79,7 @@ impl Future for LoadEventFired {
 
 #[test]
 fn t_load_event_fired() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,wait_page_event=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,wait_page_event=trace");
     env_logger::init();
 
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";

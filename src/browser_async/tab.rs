@@ -3,7 +3,7 @@ use super::chrome_debug_session::ChromeDebugSession;
 use super::dev_tools_method_util::{MethodDestination, MethodUtil, SessionId};
 use super::id_type as ids;
 use crate::browser_async::unique_number::{self, create_if_no_manual_input};
-use super::page_message::{ChangingFrame, ChangingFrameTree};
+use super::page_message::{ChangingFrame};
 use super::task_describe as tasks;
 use crate::protocol::{self, dom, page, target};
 use log::*;
@@ -17,8 +17,8 @@ pub struct Tab {
     pub target_info: protocol::target::TargetInfo,
     pub session_id: Option<SessionId>,
     pub root_node: Option<dom::Node>,
-    pub changing_frame_tree: ChangingFrameTree,
-    pub temporary_node_holder: HashMap<dom::NodeId, dom::Node>,
+    pub changing_frames: HashMap<String, ChangingFrame>,
+    pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
 }
 
 impl Tab {
@@ -31,7 +31,7 @@ impl Tab {
             chrome_session,
             session_id: None,
             root_node: None,
-            changing_frame_tree: Default::default(),
+            changing_frames: HashMap::new(),
             temporary_node_holder: HashMap::new(),
         }
     }
@@ -44,78 +44,52 @@ impl Tab {
         self.chrome_session.lock().unwrap().send_message(method_str);
     }
 
-    pub fn frame_tree(&self) -> &ChangingFrameTree {
-        &self.changing_frame_tree
-    }
-
-    pub fn main_frame(&self) -> Option<&ChangingFrame> {
-        self.changing_frame_tree.changing_frame.as_ref()
+    pub fn main_frame(&self) -> Option<&page::Frame> {
+        self.changing_frames.values().find_map(|cf| match cf {
+            ChangingFrame::Navigated(fm) | ChangingFrame::StoppedLoading(fm)  if fm.parent_id.is_none() => Some(fm),
+            _ => None,
+        })
     }
 
     pub fn _frame_navigated(&mut self, changing_frame: ChangingFrame) {
         if let ChangingFrame::Navigated(frame) = &changing_frame {
             let frame_id = frame.id.clone();
-            let parent_id = frame.parent_id.clone();
-            if parent_id.is_none() {
-                self.changing_frame_tree
-                    .changing_frame
-                    .replace(changing_frame);
-            } else {
-                self.changing_frame_tree
-                    .child_changing_frames
-                    .insert(frame_id, changing_frame);
-            }
+            self.changing_frames.insert(frame_id, changing_frame);
         }
     }
 
-    pub fn node_arrived(&mut self, parent_node_id: dom::NodeId, nodes: Vec<dom::Node>) {
-
+    pub fn node_arrived(&mut self, parent_node_id: dom::NodeId, mut nodes: Vec<dom::Node>) {
+        self.temporary_node_holder.entry(parent_node_id).or_insert_with(||vec![]).append(&mut nodes);
     }
 
     pub fn node_returned(&mut self, node: Option<dom::Node>) {
         if let Some(nd) = node {
-            self.temporary_node_holder.entry(nd.node_id).or_insert(nd);
+            if let Some(parent_id) = nd.parent_id {
+                self.temporary_node_holder.entry(parent_id).or_insert_with(||vec![]).push(nd);
+            } else {
+                error!("node_returned has no parent_id. treat as 0.");
+                self.temporary_node_holder.entry(0_u16).or_insert_with(||vec![]).push(nd);
+            }
+        } else {
+            error!("return None Node.");
         }
     }
 
     pub fn find_node_by_id(&self, node_id: dom::NodeId) -> Option<&dom::Node> {
-        self.temporary_node_holder.get(&node_id)
+        self.temporary_node_holder.values().flatten().find(|nd|nd.node_id == node_id)
     }
 
-    pub fn find_node_by_id_mut(&mut self, node_id: dom::NodeId) -> Option<&mut dom::Node> {
-        self.temporary_node_holder.get_mut(&node_id)
+    pub fn find_navigated_frame<F>(&self, mut filter: F) -> Option<&page::Frame> 
+        where F: FnMut(&page::Frame) -> bool {
+        self.changing_frames.values().filter_map(|cf| match cf {
+            ChangingFrame::Navigated(fm) | ChangingFrame::StoppedLoading(fm) => Some(fm),
+            _ => None,
+        }).find(|frame| filter(frame))
     }
-
-    pub fn is_main_frame_navigated(&self) -> bool {
-        if let Some(ChangingFrame::Navigated(_)) = &self.changing_frame_tree.changing_frame {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_frame_navigated(&self, frame_name: &'static str) -> Option<&page::Frame> {
-        let op = self
-            .changing_frame_tree
-            .child_changing_frames
-            .values()
-            .find(|cv| {
-                if let ChangingFrame::Navigated(frame) = cv {
-                    frame.name == Some(frame_name.into())
-                } else {
-                    false
-                }
-            });
-        if let Some(ChangingFrame::Navigated(frame)) = op {
-            Some(frame)
-        } else {
-            None
-        }
-    }
-
 
     pub fn get_document(
         &mut self,
+        depth: Option<u8>,
         manual_task_id: Option<ids::Task>,
     ) -> (Option<ids::Task>, Option<dom::NodeId>) {
         if let Some(root_node) = &self.root_node {
@@ -124,7 +98,7 @@ impl Tab {
             let (this_task_id, _) = create_if_no_manual_input(manual_task_id);
             let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
                 dom::methods::GetDocument {
-                    depth: Some(0),
+                    depth: depth.or(Some(1)),
                     pierce: Some(false),
                 },
                 &self.session_id,
@@ -140,12 +114,77 @@ impl Tab {
         }
     }
 
+    pub fn capture_screenshot_by_selector (
+        &mut self,
+        selector: &'static str,
+        format: page::ScreenshotFormat,
+        from_surface: bool,
+        manual_task_id: Option<ids::Task>
+    ) {
+        let get_box_model_task_id = self.get_box_model_by_selector(selector, None);
+            
+        let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+        let sh = tasks::ScreenShot {
+            task_id: this_task_id,
+            target_id: self.target_info.target_id.clone(),
+            session_id: self.session_id.clone(),
+            selector: Some(selector),
+            is_manual,
+            format,
+            clip: None,
+            from_surface,
+            base64: None,
+        };
+        self.chrome_session.lock().unwrap().add_task(sh.task_id, tasks::TaskDescribe::ScreenShot(sh));
+        self.chrome_session.lock().unwrap().add_waiting_task(get_box_model_task_id, this_task_id);
+    }
+
+    // pub fn capture_screenshot(
+    //     &mut self,
+    //     format: page::ScreenshotFormat,
+    //     clip: Option<page::Viewport>,
+    //     from_surface: bool,
+    //     manual_task_id: Option<ids::Task>
+    // ) {
+    //     let (format, quality) = match format {
+    //         page::ScreenshotFormat::JPEG(quality) => {
+    //             (page::InternalScreenshotFormat::JPEG, quality)
+    //         }
+    //         page::ScreenshotFormat::PNG => (page::InternalScreenshotFormat::PNG, None),
+    //     };
+    //     let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+    //     let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(page::methods::CaptureScreenshot {
+    //             format,
+    //             clip,
+    //             quality,
+    //             from_surface,
+    //         }, &self.session_id)
+    //         .unwrap();
+    //         let dn = tasks::ScreenShot {
+    //             task_id: this_task_id,
+    //             target_id: self.target_info.target_id.clone(),
+    //             session_id: self.session_id.clone(),
+    //             is_manual,
+    //             format,
+    //             clip,
+    //             quality,
+    //             from_surface,
+    //             base64: None,
+    //         };
+    //         self.chrome_session.lock().unwrap().add_task_and_method_map(
+    //             mid.unwrap(),
+    //             this_task_id,
+    //             tasks::TaskDescribe::ScreenShot(dn),
+    //         );
+    //     self.chrome_session.lock().unwrap().send_message(method_str);
+    // }
+
     pub fn describe_node_by_selector(&mut self, selector: &'static str, depth: Option<i8>, manual_task_id: Option<ids::Task>) {
-        match self.dom_query_selector_by_selector(selector, manual_task_id) {
+        match self.dom_query_selector_by_selector(selector, None) {
             (_, Some(node_id)) => {
                 self.describe_node(manual_task_id, Some(node_id), None, None, depth, false, Some(selector));
             }
-            (Some(task_id), _) => {
+            (Some(dom_query_selector_task_id), _) => {
                 let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
                 let ds = tasks::DescribeNode {
                     task_id: this_task_id,
@@ -161,7 +200,7 @@ impl Tab {
                     found_node: None,
                 };
                 self.chrome_session.lock().unwrap().add_task(ds.task_id, tasks::TaskDescribe::DescribeNode(ds));
-                self.chrome_session.lock().unwrap().add_waiting_task(task_id, this_task_id);
+                self.chrome_session.lock().unwrap().add_waiting_task(dom_query_selector_task_id, this_task_id);
             }
             _ => {
                 panic!("impossile result in describe_node_by_selector");
@@ -179,7 +218,7 @@ impl Tab {
                 depth,
             }, &self.session_id)
             .unwrap();
-            let task = tasks::DescribeNode {
+            let dn = tasks::DescribeNode {
                 task_id: this_task_id,
                 target_id: self.target_info.target_id.clone(),
                 session_id: self.session_id.clone(),
@@ -195,18 +234,18 @@ impl Tab {
             self.chrome_session.lock().unwrap().add_task_and_method_map(
                 mid.unwrap(),
                 this_task_id,
-                tasks::TaskDescribe::DescribeNode(task),
+                tasks::TaskDescribe::DescribeNode(dn),
             );
         self.chrome_session.lock().unwrap().send_message(method_str);
 
     }
 
-    pub fn get_box_model_by_selector(&mut self, selector: &'static str, manual_task_id: Option<ids::Task>) {
+    pub fn get_box_model_by_selector(&mut self, selector: &'static str, manual_task_id: Option<ids::Task>) -> ids::Task {
         match self.dom_query_selector_by_selector(selector, None) { // task_id cannot share between tasks.
             (_, Some(node_id)) => {
-                self.get_box_model_by_node_id(Some(node_id), manual_task_id);
+                self.get_box_model_by_node_id(Some(node_id), manual_task_id)
             }
-            (Some(task_id), _) => {
+            (Some(query_selector_task_id), _) => {
                 let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
                 let gb = tasks::GetBoxModel {
                     task_id: this_task_id,
@@ -220,7 +259,8 @@ impl Tab {
                     found_box: None,
                 };
                 self.chrome_session.lock().unwrap().add_task(gb.task_id, tasks::TaskDescribe::GetBoxModel(gb));
-                self.chrome_session.lock().unwrap().add_waiting_task(task_id, this_task_id);
+                self.chrome_session.lock().unwrap().add_waiting_task(query_selector_task_id, this_task_id);
+                this_task_id
             }
             _ => {
                 panic!("impossible result in get_box_model_by_selector");
@@ -228,15 +268,15 @@ impl Tab {
         }
     }
 
-    pub fn get_box_model_by_node_id(&mut self, node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) {
-        self.get_box_model(manual_task_id, None, node_id, None, None);
+    pub fn get_box_model_by_node_id(&mut self, node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) -> ids::Task {
+        self.get_box_model(manual_task_id, None, node_id, None, None)
     }
 
-    pub fn get_box_model_by_backend_node_id(&mut self, backend_node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) {
-        self.get_box_model(manual_task_id, backend_node_id, None, None, None);
+    pub fn get_box_model_by_backend_node_id(&mut self, backend_node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) -> ids::Task {
+        self.get_box_model(manual_task_id, backend_node_id, None, None, None)
     }
 
-    pub fn get_box_model(&mut self, manual_task_id: Option<ids::Task>, backend_node_id: Option<dom::NodeId>, node_id: Option<dom::NodeId>, object_id: Option<ids::RemoteObject>, selector: Option<&'static str>) {
+    pub fn get_box_model(&mut self, manual_task_id: Option<ids::Task>, backend_node_id: Option<dom::NodeId>, node_id: Option<dom::NodeId>, object_id: Option<ids::RemoteObject>, selector: Option<&'static str>) -> ids::Task {
         let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
         let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(dom::methods::GetBoxModel {
                 node_id,
@@ -261,6 +301,7 @@ impl Tab {
                 tasks::TaskDescribe::GetBoxModel(task),
             );
         self.chrome_session.lock().unwrap().send_message(method_str);
+        this_task_id
     }
 
     pub fn dom_query_selector_by_selector(
@@ -278,7 +319,7 @@ impl Tab {
             found_node_id: None,
             task_id: this_task_id,
         };
-        match self.get_document(None) {
+        match self.get_document(None, None) {
             (Some(get_document_task_id), _) => {
                 self.chrome_session
                     .lock()

@@ -87,6 +87,7 @@ impl ChromeDebugSession {
         task: TaskDescribe,
     ) {
         self.add_method_task_map(mid, task_id);
+        trace!("add_method_task_map: {:?} -> {:?}", mid, task_id);
         self.add_task(task_id, task);
     }
 
@@ -99,6 +100,7 @@ impl ChromeDebugSession {
             .entry(task_id_to_waiting_for)
             .or_insert_with(||vec![])
             .push(waiting_task_id);
+        info!("waiting_for_me: {:?}", self.waiting_for_me);
     }
 
 
@@ -205,8 +207,8 @@ impl ChromeDebugSession {
     }
 
     pub fn feed_on_root_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
-        let mut waiting_tasks = self.get_waiting_tasks(task_id);
-        while let Some(mut task) = waiting_tasks.pop() {
+        let waiting_tasks = self.get_waiting_tasks(task_id);
+        waiting_tasks.into_iter().for_each(|mut task|{
             match &mut task {
                 tasks::TaskDescribe::QuerySelector(query_selector) => {
                     query_selector.node_id = Some(node_id);
@@ -218,7 +220,20 @@ impl ChromeDebugSession {
                 }
                 _ => (),
             }
-        }
+        });
+        // while let Some(mut task) = waiting_tasks.pop() {
+        //     match &mut task {
+        //         tasks::TaskDescribe::QuerySelector(query_selector) => {
+        //             query_selector.node_id = Some(node_id);
+        //             self.dom_query_selector(task);
+        //         }
+        //         tasks::TaskDescribe::DescribeNode(describe_node) => {
+        //             describe_node.node_id = Some(node_id);
+        //             self.dom_describe_node(task);
+        //         }
+        //         _ => (),
+        //     }
+        // }
     }
 
     pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: Option<dom::NodeId>) -> Option<TaskDescribe> {

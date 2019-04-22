@@ -96,8 +96,7 @@ impl Tab {
     ) -> (Option<ids::Task>, Option<dom::NodeId>) {
         if let Some(root_node) = &self.root_node {
             (None, Some(root_node.node_id))
-        } else {
-            if self.get_document_task_id.is_none() {
+        } else if self.get_document_task_id.is_none() {
                 let (this_task_id, _) = create_if_no_manual_input(manual_task_id);
                 let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
                     dom::methods::GetDocument {
@@ -113,11 +112,12 @@ impl Tab {
                     tasks::TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
                 );
                 self.chrome_session.lock().unwrap().send_message(method_str);
+                self.get_document_task_id = Some(this_task_id);
                 (Some(this_task_id), None)
             } else {
                 (self.get_document_task_id, None)
             }
-        }
+        
     }
 
     pub fn capture_screenshot_by_selector (

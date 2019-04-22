@@ -4,7 +4,7 @@ use super::dev_tools_method_util::{MethodDestination, MethodUtil, SessionId};
 use super::id_type as ids;
 use crate::browser_async::unique_number::{self, create_if_no_manual_input};
 use super::page_message::{ChangingFrame};
-use super::task_describe as tasks;
+use super::task_describe::{self as tasks, TaskDescribe};
 use crate::protocol::{self, dom, page, target};
 use log::*;
 use std::collections::HashMap;
@@ -43,7 +43,7 @@ impl Tab {
             &self.session_id,
         )
         .unwrap();
-        self.chrome_session.lock().unwrap().send_message(method_str);
+        self.chrome_session.lock().unwrap().send_message_direct(method_str);
     }
 
     pub fn main_frame(&self) -> Option<&page::Frame> {
@@ -106,13 +106,15 @@ impl Tab {
                     &self.session_id,
                 )
                 .unwrap();
-                self.chrome_session.lock().unwrap().add_task_and_method_map(
-                    mid.unwrap(),
-                    this_task_id,
-                    tasks::TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
-                );
-                self.chrome_session.lock().unwrap().send_message(method_str);
+                // self.chrome_session.lock().unwrap().add_task_and_method_map(
+                //     mid.unwrap(),
+                //     this_task_id,
+                //     TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
+                // );
+                let method_str_id = Some((method_str, mid.unwrap()));
+                self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None));
                 self.get_document_task_id = Some(this_task_id);
+                // self.chrome_session.lock().unwrap().pedding_tasks.push_back()
                 (Some(this_task_id), None)
             } else {
                 (self.get_document_task_id, None)
@@ -237,12 +239,13 @@ impl Tab {
                 selector,
                 found_node: None,
             };
-            self.chrome_session.lock().unwrap().add_task_and_method_map(
-                mid.unwrap(),
-                this_task_id,
-                tasks::TaskDescribe::DescribeNode(dn),
-            );
-        self.chrome_session.lock().unwrap().send_message(method_str);
+            // self.chrome_session.lock().unwrap().add_task_and_method_map(
+            //     mid.unwrap(),
+            //     this_task_id,
+            //     tasks::TaskDescribe::DescribeNode(dn),
+            // );
+            let method_str_id = Some((method_str, mid.unwrap()));
+        self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::DescribeNode(dn));
 
     }
 
@@ -301,12 +304,13 @@ impl Tab {
                 selector,
                 found_box: None,
             };
-            self.chrome_session.lock().unwrap().add_task_and_method_map(
-                mid.unwrap(),
-                this_task_id,
-                tasks::TaskDescribe::GetBoxModel(task),
-            );
-        self.chrome_session.lock().unwrap().send_message(method_str);
+            // self.chrome_session.lock().unwrap().add_task_and_method_map(
+            //     mid.unwrap(),
+            //     this_task_id,
+            //     tasks::TaskDescribe::GetBoxModel(task),
+            // );
+        let method_str_id = Some((method_str, mid.unwrap()));
+        self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::GetBoxModel(task));
         this_task_id
     }
 
@@ -360,7 +364,7 @@ impl Tab {
             None,
         )
         .unwrap();
-        self.chrome_session.lock().unwrap().send_message(method_str);
+        self.chrome_session.lock().unwrap().send_message_direct(method_str);
     }
 
     pub fn page_enable(&mut self) {
@@ -370,11 +374,12 @@ impl Tab {
             &self.session_id,
         )
         .unwrap();
-        self.chrome_session.lock().unwrap().add_task_and_method_map(
-            mid.unwrap(),
-            this_task_id,
-            tasks::TaskDescribe::PageEnable(this_task_id, self.target_info.target_id.clone(), self.session_id.clone().unwrap()),
-        );
-        self.chrome_session.lock().unwrap().send_message(method_str);
+        // self.chrome_session.lock().unwrap().add_task_and_method_map(
+        //     mid.unwrap(),
+        //     this_task_id,
+        //     tasks::TaskDescribe::PageEnable(this_task_id, self.target_info.target_id.clone(), self.session_id.clone().unwrap()),
+        // );
+        let method_str_id = Some((method_str, mid.unwrap()));
+        self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::PageEnable(this_task_id, self.target_info.target_id.clone(), self.session_id.clone().unwrap()));
     }
 }

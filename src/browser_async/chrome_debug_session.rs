@@ -10,7 +10,7 @@ use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use failure::Error;
 use log::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize};
 use websocket::futures::{Poll, Stream};
 
@@ -23,6 +23,7 @@ pub struct ChromeDebugSession {
     task_id_2_task: HashMap<ids::Task, TaskDescribe>,
     waiting_for_me: HashMap<ids::Task, Vec<ids::Task>>,
     unique_number: AtomicUsize,
+    pending_tasks: VecDeque<ids::Task>,
 }
 
 impl ChromeDebugSession {
@@ -35,6 +36,7 @@ impl ChromeDebugSession {
             task_id_2_task: HashMap::new(),
             waiting_for_me: HashMap::new(),
             unique_number: AtomicUsize::new(10000),
+            pending_tasks: VecDeque::new(),
         }
     }
 
@@ -55,15 +57,32 @@ impl ChromeDebugSession {
                 &session_id,
             )
             .unwrap();
-            self.add_task_and_method_map(mid.unwrap(), task_id.clone(), task);
-            self.send_message(method_str);
+            // self.add_task_and_method_map(mid.unwrap(), task_id.clone(), task);
+            let method_str_id = Some((method_str,mid.unwrap()));
+            self.send_message_and_save_task(method_str_id, *task_id, task);
         } else {
             error!("maybe node_id to select with is None.");
         }
     }
 
+    pub fn send_message_and_save_task(&mut self, method_str_id: Option<(String, usize)>, task_id: ids::Task, task: TaskDescribe) {
+        if let Some((method_str, mid)) = method_str_id {
+            self.add_task_and_method_map(
+                mid,
+                task_id,
+                task,
+            );
+            if self.pending_tasks.is_empty() {
+                self.chrome_browser.send_message(method_str);
+            }
+        } else {
+            self.add_task(task_id, task);
+        }
+        self.pending_tasks.push_back(task_id);
+    }
 
-    pub fn send_message(&mut self, method_str: String) {
+
+    pub fn send_message_direct(&mut self, method_str: String) {
         self.chrome_browser.send_message(method_str);
     }
 
@@ -322,6 +341,10 @@ impl ChromeDebugSession {
         }
     }
 
+    fn process_pending_tasks(&mut self,task_id: ids::Task, current_task: &TaskDescribe) {
+
+    }
+
 
     pub fn handle_response(
         &mut self,
@@ -360,11 +383,13 @@ impl ChromeDebugSession {
                         Ok(get_document_return_object) => {
                             let node_id = get_document_return_object.root.node_id;
                             self.feed_on_root_node_id(task_id, node_id);
-                            return Some(TaskDescribe::GetDocument(
+                            let t = TaskDescribe::GetDocument(
                                 task_id,
                                 t_id,
                                 Some(get_document_return_object.root),
-                            ));
+                            );
+                            self.process_pending_tasks(task_id, &t);
+                            return Some(t);
                         }
                         Err(remote_error) => panic!("{:?}", remote_error)
                     }
@@ -375,15 +400,17 @@ impl ChromeDebugSession {
                 TaskDescribe::QuerySelector(query_selector) => {
                     match protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
                         Ok(query_select_return_object) => {
-                            self.feed_on_node_id(
-                                query_selector.task_id,
-                                Some(query_select_return_object.node_id),
-                            );
-                            if query_selector.is_manual {
-                                return Some(TaskDescribe::QuerySelector(tasks::QuerySelector {
+                            let t = TaskDescribe::QuerySelector(tasks::QuerySelector {
                                     found_node_id: Some(query_select_return_object.node_id),
                                     ..query_selector
-                                }));
+                                });
+                            // self.feed_on_node_id(
+                            //     query_selector.task_id,
+                            //     Some(query_select_return_object.node_id),
+                            // );
+                            self.process_pending_tasks(query_selector.task_id, &t);
+                            if query_selector.is_manual {
+                                return Some(t);
                             }
                         }
                         Err(remote_error) => {
@@ -404,7 +431,10 @@ impl ChromeDebugSession {
                         Ok(describe_node_return_object) => {
                             if describe_node.is_manual {
                                 describe_node.found_node = Some(describe_node_return_object.node);
-                                return Some(TaskDescribe::DescribeNode(describe_node));
+                                let task_id = describe_node.task_id;
+                                let t = TaskDescribe::DescribeNode(describe_node);
+                                self.process_pending_tasks(task_id, &t);
+                                return Some(t);
                             }
                         }
                         Err(remote_error) => {
@@ -426,24 +456,30 @@ impl ChromeDebugSession {
                                 width: raw_model.width,
                                 height: raw_model.height,
                             };
-                            self.feed_on_box_model(get_box_model.task_id, model_box.clone());
-                            if get_box_model.is_manual {
-                                get_box_model.found_box = Some(model_box);
-                                return Some(TaskDescribe::GetBoxModel(get_box_model));
+                            let is_manual = get_box_model.is_manual;
+                            get_box_model.found_box = Some(model_box);
+                            let task_id = get_box_model.task_id;
+                            let t = TaskDescribe::GetBoxModel(get_box_model);
+                            self.process_pending_tasks(task_id, &t);
+                            // self.feed_on_box_model(get_box_model.task_id, model_box.clone());
+                            if is_manual {
+                                return Some(t);
                             }
                         }
                         Err(remote_error) => {
                             error!("{:?}", remote_error);
                             return Some(TaskDescribe::GetBoxModel(get_box_model));
                         }
-
                     }
                 }
                 TaskDescribe::ScreenShot(mut screen_shot) => {
                     match protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp) {
                         Ok(capture_screenshot_return_object) => {
                             screen_shot.base64 = Some(capture_screenshot_return_object.data);
-                            return Some(TaskDescribe::ScreenShot(screen_shot));
+                            let task_id = screen_shot.task_id;
+                            let t = TaskDescribe::ScreenShot(screen_shot);
+                            self.process_pending_tasks(task_id, &t);
+                            return Some(t);
                         }
                         Err(remote_error) => {
                             error!("{:?}", remote_error);

@@ -17,6 +17,7 @@ struct LoadEventFired {
     debug_session: DebugSession,
     url: &'static str,
     root_node: Option<u16>,
+    call_count: u8,
 }
 
 impl Future for LoadEventFired {
@@ -41,11 +42,15 @@ impl Future for LoadEventFired {
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 info!("send get document command.");
-                                tab.unwrap().get_document(None, Some(100));
+                                let tab = tab.unwrap();
+                                tab.get_document(Some(1), Some(100));
+                                tab.get_document(Some(1), Some(101));
+                                tab.get_document(Some(1), Some(102));
                             }
                         }
                     }
                     PageResponse::GetDocument => {
+                        self.call_count += 1;
                         if let Some(nd) = &tab.unwrap().root_node {
                             self.root_node = Some(nd.node_id);
                         }
@@ -53,9 +58,10 @@ impl Future for LoadEventFired {
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
-                        if seconds > 29 {
+                        if seconds > 19 {
+                            assert_eq!(self.call_count, 1); // if send same get_document method to server successively, only response to last request.
                             let tab = self.debug_session.main_tab_mut().unwrap();
-                            assert_eq!(tab.changing_frames.len(), 7);
+                            assert_eq!(tab.changing_frames.len(), 8);
                             if let Some(frame) = tab.main_frame() {
                                 assert_eq!(tab.target_info.target_id, frame.id);
                             } else {
@@ -79,7 +85,7 @@ impl Future for LoadEventFired {
 
 #[test]
 fn t_load_event_fired() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,wait_page_event=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,wait_page_event=trace");
     env_logger::init();
 
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
@@ -87,6 +93,7 @@ fn t_load_event_fired() {
         debug_session: Default::default(),
         url,
         root_node: None,
+        call_count: 0,
     };
     // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
     // let result = run_one(my_page).unwrap();

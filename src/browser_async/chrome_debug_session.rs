@@ -58,8 +58,7 @@ impl ChromeDebugSession {
             self.add_task_and_method_map(mid.unwrap(), task_id.clone(), task);
             self.send_message(method_str);
         } else {
-            error!("it's not a query selector task.");
-            panic!("it's not a query selector task.");
+            error!("maybe node_id to select with is None.");
         }
     }
 
@@ -222,25 +221,29 @@ impl ChromeDebugSession {
         }
     }
 
-    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: Option<dom::NodeId>) -> Option<TaskDescribe> {
         let mut waiting_tasks = self.get_waiting_tasks(task_id);
         while let Some(mut task) = waiting_tasks.pop() {
+            if node_id.is_none() {
+                return Some(task);
+            }
             match &mut task {
-                tasks::TaskDescribe::QuerySelector(query_selector) => {
-                    query_selector.node_id = Some(node_id);
+                TaskDescribe::QuerySelector(query_selector) => {
+                    query_selector.node_id = node_id;
                     self.dom_query_selector(task);
                 }
-                tasks::TaskDescribe::DescribeNode(describe_node) => {
-                    describe_node.node_id = Some(node_id);
+                TaskDescribe::DescribeNode(describe_node) => {
+                    describe_node.node_id = node_id;
                     self.dom_describe_node(task);
                 }
-                tasks::TaskDescribe::GetBoxModel(get_box_model) => {
-                    get_box_model.node_id = Some(node_id);
+                TaskDescribe::GetBoxModel(get_box_model) => {
+                    get_box_model.node_id = node_id;
                     self.get_box_model(task);
                 }
                 _ => (),
             }
         }
+        None
     }
 
     pub fn feed_on_box_model(&mut self, task_id: ids::Task, box_model: BoxModel) {
@@ -296,13 +299,22 @@ impl ChromeDebugSession {
         None
     }
 
+    pub fn parse_response_error(response: protocol::Response) -> Result<protocol::Response, Error> {
+        if let Some(error) = response.error {
+            Err(error.into())
+        } else {
+            Ok(response)
+        }
+    }
+
+
     pub fn handle_response(
         &mut self,
         resp: protocol::Response,
         session_id: Option<String>,
         target_id: Option<String>,
     ) -> Option<TaskDescribe> {
-        trace!("got message from target response. {:?}", resp);
+        trace!("got **response**. {:?}", resp);
         let call_id = resp.call_id;
         // remove method id and task from page scope hashmap.
         let maybe_matched_task = self
@@ -316,6 +328,9 @@ impl ChromeDebugSession {
                 );
                 None
             });
+        // if let Some(error) = resp.error {
+        //     return Err(error.into());
+        // }
 
         // message: "{\"id\":6,\"result\":{\"root\":{\"nodeId\":1,\"backendNodeId\":3,\"nodeType\":9,\"nodeName\":\"#document\",\"localName\":\"\",\"nodeValue\":\"\",\"childNodeCount\":2,\"documentURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"baseURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"xmlVersion\":\"\"}}}"
         // if json_assistor::response_result_field_has_properties(&resp, "root", vec!["nodeId", "backendNodeId"]) {
@@ -326,10 +341,8 @@ impl ChromeDebugSession {
             match task {
                 TaskDescribe::GetDocument(task_id, t_id, _) => {
                     // it must be a GetDocumentReturnObject or else something must go wrong.
-                    if let Some(result) = resp.result {
-                        if let Ok(get_document_return_object) =
-                            serde_json::from_value::<dom::methods::GetDocumentReturnObject>(result)
-                        {
+                    match protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp) {
+                        Ok(get_document_return_object) => {
                             let node_id = get_document_return_object.root.node_id;
                             self.feed_on_root_node_id(task_id, node_id);
                             return Some(TaskDescribe::GetDocument(
@@ -337,65 +350,58 @@ impl ChromeDebugSession {
                                 t_id,
                                 Some(get_document_return_object.root),
                             ));
-                        } else {
-                            panic!("GetDocument failed.");
                         }
-                    } else {
-                        panic!("GetDocument respose has None result.");
+                        Err(remote_error) => panic!("{:?}", remote_error)
                     }
                 }
                 TaskDescribe::PageEnable(task_id, target_id, session_id) => {
                     return Some(TaskDescribe::PageEnable(task_id, target_id, session_id));
                 }
                 TaskDescribe::QuerySelector(query_selector) => {
-                    if let Some(result) = resp.result {
-                        if let Ok(query_select_return_object) = serde_json::from_value::<
-                            dom::methods::QuerySelectorReturnObject,
-                        >(result)
-                        {
+                    match protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
+                        Ok(query_select_return_object) => {
                             self.feed_on_node_id(
                                 query_selector.task_id,
-                                query_select_return_object.node_id,
+                                Some(query_select_return_object.node_id),
                             );
                             if query_selector.is_manual {
-                                // query_selector.found_node_id.replace(query_select_return_object.node_id);
                                 return Some(TaskDescribe::QuerySelector(tasks::QuerySelector {
                                     found_node_id: Some(query_select_return_object.node_id),
                                     ..query_selector
                                 }));
                             }
-                        } else {
-                            panic!("QuerySelector failed.");
                         }
-                    } else {
-                        panic!("QuerySelector response has None result");
+                        Err(remote_error) => {
+                            error!("{:?}, {:?}", query_selector, remote_error);
+                            if let Some(tk) = self.feed_on_node_id(
+                                query_selector.task_id,
+                                None,
+                            ) {
+                                return Some(tk);
+                            }
+                            return Some(TaskDescribe::QuerySelector(query_selector));
+                        }
                     }
-
                 }
 
                 TaskDescribe::DescribeNode(mut describe_node) => {
-                    if let Some(result) = resp.result {
-                        if let Ok(describe_node_return_object) =
-                            serde_json::from_value::<dom::methods::DescribeNodeReturnObject>(result)
-                        {
+                    match protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
+                        Ok(describe_node_return_object) => {
                             if describe_node.is_manual {
                                 describe_node.found_node = Some(describe_node_return_object.node);
                                 return Some(TaskDescribe::DescribeNode(describe_node));
                             }
-                        } else {
-                            panic!("DescribeNode failed.");
                         }
-                    } else {
-                        panic!("DescribeNode response has None result {:?}", resp);
+                        Err(remote_error) => {
+                            error!("{:?}, {:?}",describe_node, remote_error);
+                            return Some(TaskDescribe::DescribeNode(describe_node));
+                        }
                     }
-
                 }
 
                 TaskDescribe::GetBoxModel(mut get_box_model) => {
-                    if let Some(result) = resp.result {
-                        if let Ok(get_box_model_return_object) =
-                            serde_json::from_value::<dom::methods::GetBoxModelReturnObject>(result)
-                        {
+                    match protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp) {
+                        Ok(get_box_model_return_object) => {
                             let raw_model = get_box_model_return_object.model;
                             let model_box = BoxModel {
                                 content: ElementQuad::from_raw_points(&raw_model.content),
@@ -410,32 +416,26 @@ impl ChromeDebugSession {
                                 get_box_model.found_box = Some(model_box);
                                 return Some(TaskDescribe::GetBoxModel(get_box_model));
                             }
-                        } else {
-                            panic!("GetBoxModel failed.");
                         }
-                    } else {
-                        panic!("GetBoxModel response has None result");
+                        Err(remote_error) => {
+                            error!("{:?}", remote_error);
+                            return Some(TaskDescribe::GetBoxModel(get_box_model));
+                        }
+
                     }
-
                 }
-
                 TaskDescribe::ScreenShot(mut screen_shot) => {
-                    if let Some(result) = resp.result {
-                        if let Ok(get_box_model_return_object) = serde_json::from_value::<
-                            page::methods::CaptureScreenshotReturnObject,
-                        >(result)
-                        {
-                            screen_shot.base64 = Some(get_box_model_return_object.data);
+                    match protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp) {
+                        Ok(capture_screenshot_return_object) => {
+                            screen_shot.base64 = Some(capture_screenshot_return_object.data);
                             return Some(TaskDescribe::ScreenShot(screen_shot));
-                        } else {
-                            panic!("ScreenShop failed.");
                         }
-                    } else {
-                        panic!("Screenshot response has None result");
+                        Err(remote_error) => {
+                            error!("{:?}", remote_error);
+                            return Some(TaskDescribe::ScreenShot(screen_shot));
+                        }
                     }
-
                 }
-
                 task_describe => {
                     info!("got task_describe: {:?}", task_describe);
                 }

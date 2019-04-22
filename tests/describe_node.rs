@@ -65,20 +65,24 @@ impl Future for DescribeNode {
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    // tab.describe_node_by_selector(self.selector, Some(2), Some(100));
-                                    tab.describe_node_by_selector("#notexistid", Some(2), Some(101));
+                                    tab.describe_node_by_selector(self.selector, Some(2), Some(100));
+                                    tab.describe_node_by_selector("#not-existed", Some(2), Some(101));
                                 }
                             }
                         }
                     }
                     PageResponse::DescribeNode(selector, node_id) => {
-                        assert!(task_id == Some(100) || task_id == Some(101));
-                        assert!(node_id.is_some());
-                        assert_eq!(selector, Some(self.selector));
-                        self.node_id  = node_id;
-                        self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
-                        info!("content document: {:?}", self.node.as_ref().unwrap().content_document);
-                        // tab.unwrap().
+                        if task_id == Some(101) {
+                            assert!(node_id.is_none());
+                            info!("{:?}", selector);
+                        } else {
+                            assert!(task_id == Some(100));
+                            assert!(node_id.is_some());
+                            assert_eq!(selector, Some(self.selector));
+                            self.node_id  = node_id;
+                            self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
+                            info!("content document: {:?}", self.node.as_ref().unwrap().content_document);
+                        }
                     }
                     _ => {
                         info!("got unused page message {:?}", value);
@@ -104,7 +108,7 @@ impl Future for DescribeNode {
 
 #[test]
 fn t_dom_describe_node() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,describe_node=info");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,describe_node=info");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let mut selector = "#ddlogin-iframe #qrcode";
@@ -126,5 +130,8 @@ fn t_dom_describe_node() {
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    match runtime.block_on(my_page.into_future()) {
+        Err(error) => error!("{:?}", error),
+        _ => ()
+    }
 }

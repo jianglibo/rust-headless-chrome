@@ -19,6 +19,7 @@ pub struct Tab {
     pub root_node: Option<dom::Node>,
     pub changing_frames: HashMap<String, ChangingFrame>,
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
+    get_document_task_id: Option<ids::Task>,
 }
 
 impl Tab {
@@ -33,6 +34,7 @@ impl Tab {
             root_node: None,
             changing_frames: HashMap::new(),
             temporary_node_holder: HashMap::new(),
+            get_document_task_id: None,
         }
     }
     pub fn navigate_to(&mut self, url: &str) {
@@ -95,22 +97,26 @@ impl Tab {
         if let Some(root_node) = &self.root_node {
             (None, Some(root_node.node_id))
         } else {
-            let (this_task_id, _) = create_if_no_manual_input(manual_task_id);
-            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::GetDocument {
-                    depth: depth.or(Some(1)),
-                    pierce: Some(false),
-                },
-                &self.session_id,
-            )
-            .unwrap();
-            self.chrome_session.lock().unwrap().add_task_and_method_map(
-                mid.unwrap(),
-                this_task_id,
-                tasks::TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
-            );
-            self.chrome_session.lock().unwrap().send_message(method_str);
-            (Some(this_task_id), None)
+            if self.get_document_task_id.is_none() {
+                let (this_task_id, _) = create_if_no_manual_input(manual_task_id);
+                let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
+                    dom::methods::GetDocument {
+                        depth: depth.or(Some(1)),
+                        pierce: Some(false),
+                    },
+                    &self.session_id,
+                )
+                .unwrap();
+                self.chrome_session.lock().unwrap().add_task_and_method_map(
+                    mid.unwrap(),
+                    this_task_id,
+                    tasks::TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
+                );
+                self.chrome_session.lock().unwrap().send_message(method_str);
+                (Some(this_task_id), None)
+            } else {
+                (self.get_document_task_id, None)
+            }
         }
     }
 

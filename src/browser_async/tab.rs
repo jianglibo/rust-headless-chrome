@@ -112,9 +112,9 @@ impl Tab {
                 //     TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
                 // );
                 let method_str_id = Some((method_str, mid.unwrap()));
-                self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None));
+                let task = TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None); 
+                self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, task);
                 self.get_document_task_id = Some(this_task_id);
-                // self.chrome_session.lock().unwrap().pedding_tasks.push_back()
                 (Some(this_task_id), None)
             } else {
                 (self.get_document_task_id, None)
@@ -304,11 +304,6 @@ impl Tab {
                 selector,
                 found_box: None,
             };
-            // self.chrome_session.lock().unwrap().add_task_and_method_map(
-            //     mid.unwrap(),
-            //     this_task_id,
-            //     tasks::TaskDescribe::GetBoxModel(task),
-            // );
         let method_str_id = Some((method_str, mid.unwrap()));
         self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::GetBoxModel(task));
         this_task_id
@@ -330,22 +325,29 @@ impl Tab {
             task_id: this_task_id,
         };
         match self.get_document(None, None) {
-            (Some(get_document_task_id), _) => {
-                self.chrome_session
-                    .lock()
-                    .unwrap()
-                    .add_task(qs.task_id, tasks::TaskDescribe::QuerySelector(qs));
-                self.chrome_session
-                    .lock()
-                    .unwrap()
-                    .add_waiting_task(get_document_task_id, this_task_id);
+            (Some(_get_document_task_id), _) => {
+                self.chrome_session.lock().unwrap().send_message_and_save_task(None, this_task_id, TaskDescribe::QuerySelector(qs));
+                // self.chrome_session
+                //     .lock()
+                //     .unwrap()
+                //     .add_task(qs.task_id, tasks::TaskDescribe::QuerySelector(qs));
+                // self.chrome_session
+                //     .lock()
+                //     .unwrap()
+                //     .add_waiting_task(get_document_task_id, this_task_id);
             }
             (_, Some(node_id)) => {
                 qs.node_id = Some(node_id);
-                self.chrome_session
-                    .lock()
-                    .unwrap()
-                    .dom_query_selector(tasks::TaskDescribe::QuerySelector(qs));
+                let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
+                    dom::methods::QuerySelector {
+                        node_id,
+                        selector,
+                    },
+                    &self.session_id,
+                )
+                .unwrap();
+                let method_str_id = Some((method_str, mid.unwrap()));
+                self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::QuerySelector(qs));
             }
             _ => {
                 error!("get_document return impossible value combination.");

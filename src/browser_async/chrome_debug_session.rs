@@ -40,7 +40,27 @@ impl ChromeDebugSession {
         }
     }
 
-    pub fn dom_query_selector(&mut self, task: TaskDescribe) {
+    pub fn method_id_2_task_id_remain(&self) -> usize {
+        info!("{:?}", self.method_id_2_task_id);
+        self.method_id_2_task_id.len()
+    }
+
+    pub fn task_id_2_task_remain(&self) -> usize {
+        info!("{:?}", self.task_id_2_task);
+        self.task_id_2_task.len()
+    }
+
+    pub fn pending_tasks_remain(&self) -> usize {
+        info!("{:?}", self.pending_tasks);
+        self.pending_tasks.len()
+    }
+
+    pub fn waiting_for_me_remain(&self) -> usize {
+        info!("{:?}", self.waiting_for_me);
+        self.waiting_for_me.len()
+    }
+
+    pub fn dom_query_selector_to_str(&mut self, task: &TaskDescribe) {
         if let TaskDescribe::QuerySelector(tasks::QuerySelector {
             task_id,
             node_id: Some(node_id_value),
@@ -57,9 +77,7 @@ impl ChromeDebugSession {
                 &session_id,
             )
             .unwrap();
-            // self.add_task_and_method_map(mid.unwrap(), task_id.clone(), task);
-            let method_str_id = Some((method_str,mid.unwrap()));
-            self.send_message_and_save_task(method_str_id, *task_id, task);
+            self.send_message_direct(method_str);
         } else {
             error!("maybe node_id to select with is None.");
         }
@@ -73,6 +91,7 @@ impl ChromeDebugSession {
                 task,
             );
             if self.pending_tasks.is_empty() {
+                trace!("**sending** call_id: {:?}, call content: {:?}", mid, method_str);
                 self.chrome_browser.send_message(method_str);
             }
         } else {
@@ -131,7 +150,6 @@ impl ChromeDebugSession {
             .unwrap_or(&mut vec![])
             .drain(..)
             .collect();
-
         // Remove task_id task pair.
         waiting_task_ids
             .iter()
@@ -139,7 +157,7 @@ impl ChromeDebugSession {
             .collect()
     }
 
-    pub fn dom_describe_node(&mut self, task: TaskDescribe) {
+    pub fn dom_describe_node(&mut self, task: &TaskDescribe) {
         if let TaskDescribe::DescribeNode(tasks::DescribeNode {
             task_id,
             node_id,
@@ -158,8 +176,7 @@ impl ChromeDebugSession {
                 &session_id,
             )
             .unwrap();
-            self.add_task_and_method_map(mid.unwrap(), task_id.clone(), task);
-            self.chrome_browser.send_message(method_str);
+            self.send_message_direct(method_str);
         } else {
             error!("not a node_describe.")
         }
@@ -225,73 +242,44 @@ impl ChromeDebugSession {
         (None, None)
     }
 
-    pub fn feed_on_root_node_id(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
-        let waiting_tasks = self.get_waiting_tasks(task_id);
-        waiting_tasks.into_iter().for_each(|mut task|{
-            match &mut task {
-                tasks::TaskDescribe::QuerySelector(query_selector) => {
-                    query_selector.node_id = Some(node_id);
-                    self.dom_query_selector(task);
-                }
-                tasks::TaskDescribe::DescribeNode(describe_node) => {
-                    describe_node.node_id = Some(node_id);
-                    self.dom_describe_node(task);
-                }
-                _ => (),
-            }
-        });
-        // while let Some(mut task) = waiting_tasks.pop() {
-        //     match &mut task {
-        //         tasks::TaskDescribe::QuerySelector(query_selector) => {
-        //             query_selector.node_id = Some(node_id);
-        //             self.dom_query_selector(task);
-        //         }
-        //         tasks::TaskDescribe::DescribeNode(describe_node) => {
-        //             describe_node.node_id = Some(node_id);
-        //             self.dom_describe_node(task);
-        //         }
-        //         _ => (),
-        //     }
-        // }
-    }
 
-    pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: Option<dom::NodeId>) -> Option<TaskDescribe> {
-        let mut waiting_tasks = self.get_waiting_tasks(task_id);
-        while let Some(mut task) = waiting_tasks.pop() {
-            if node_id.is_none() {
-                return Some(task);
-            }
-            match &mut task {
-                TaskDescribe::QuerySelector(query_selector) => {
-                    query_selector.node_id = node_id;
-                    self.dom_query_selector(task);
-                }
-                TaskDescribe::DescribeNode(describe_node) => {
-                    describe_node.node_id = node_id;
-                    self.dom_describe_node(task);
-                }
-                TaskDescribe::GetBoxModel(get_box_model) => {
-                    get_box_model.node_id = node_id;
-                    self.get_box_model(task);
-                }
-                _ => (),
-            }
-        }
-        None
-    }
+    // pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: Option<dom::NodeId>) -> Option<TaskDescribe> {
+    //     let mut waiting_tasks = self.get_waiting_tasks(task_id);
+    //     while let Some(mut task) = waiting_tasks.pop() {
+    //         if node_id.is_none() {
+    //             return Some(task);
+    //         }
+    //         match &mut task {
+    //             TaskDescribe::QuerySelector(query_selector) => {
+    //                 query_selector.node_id = node_id;
+    //                 self.dom_query_selector(task);
+    //             }
+    //             TaskDescribe::DescribeNode(describe_node) => {
+    //                 describe_node.node_id = node_id;
+    //                 self.dom_describe_node(task);
+    //             }
+    //             TaskDescribe::GetBoxModel(get_box_model) => {
+    //                 get_box_model.node_id = node_id;
+    //                 self.get_box_model(task);
+    //             }
+    //             _ => (),
+    //         }
+    //     }
+    //     None
+    // }
 
-    pub fn feed_on_box_model(&mut self, task_id: ids::Task, box_model: BoxModel) {
-        let mut waiting_tasks = self.get_waiting_tasks(task_id);
-        while let Some(mut task) = waiting_tasks.pop() {
-            match &mut task {
-                tasks::TaskDescribe::ScreenShot(screen_shot) => {
-                    screen_shot.clip = Some(box_model.content_viewport());
-                    self.capture_screen_shot(task);
-                }
-                _ => (),
-            }
-        }
-    }
+    // pub fn feed_on_box_model(&mut self, task_id: ids::Task, box_model: BoxModel) {
+    //     let mut waiting_tasks = self.get_waiting_tasks(task_id);
+    //     while let Some(mut task) = waiting_tasks.pop() {
+    //         match &mut task {
+    //             tasks::TaskDescribe::ScreenShot(screen_shot) => {
+    //                 screen_shot.clip = Some(box_model.content_viewport());
+    //                 self.capture_screen_shot(task);
+    //             }
+    //             _ => (),
+    //         }
+    //     }
+    // }
     // pub fn feed_on_node(&mut self, task_id: ids::Task, node: dom::Node) {
     //     let mut waiting_tasks = self.get_waiting_tasks(task_id);
     //     while let Some(mut task) = waiting_tasks.pop() {
@@ -341,8 +329,67 @@ impl ChromeDebugSession {
         }
     }
 
-    fn process_pending_tasks(&mut self,task_id: ids::Task, current_task: &TaskDescribe) {
+    // pub fn after_get_document(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
+    //     let waiting_tasks = self.get_waiting_tasks(task_id);
+    //     waiting_tasks.into_iter().for_each(|mut task|{
+    //         match &mut task {
+    //             tasks::TaskDescribe::QuerySelector(query_selector) => {
+    //                 query_selector.node_id = Some(node_id);
+    //                 self.dom_query_selector(task);
+    //             }
+    //             tasks::TaskDescribe::DescribeNode(describe_node) => {
+    //                 describe_node.node_id = Some(node_id);
+    //                 self.dom_describe_node(task);
+    //             }
+    //             _ => (),
+    //         }
+    //     });
+    // }
 
+
+    pub fn after_get_document(&mut self,next_task_id: ids::Task, node_id: dom::NodeId) {
+        if let Some(next_task) = self.task_id_2_task.get_mut(&next_task_id){
+            match &mut next_task {
+                tasks::TaskDescribe::QuerySelector(query_selector) => {
+                    query_selector.node_id = Some(node_id);
+                    self.dom_query_selector(&next_task);
+                }
+                tasks::TaskDescribe::DescribeNode(describe_node) => {
+                    describe_node.node_id = Some(node_id);
+                    self.dom_describe_node(&next_task);
+                }
+                _ => (),
+            }
+        } else {
+            error!("cannot find task in task_id_2_task: {:?}", next_task_id);
+        }       
+    }
+
+    #[allow(clippy::single_match_else)]
+    fn process_pending_tasks(&mut self,task_id: ids::Task, current_task: &TaskDescribe) {
+        if let Some(pending_task_id) = self.pending_tasks.pop_front() {
+            if pending_task_id == task_id {
+                if let Some(next_id) = self.pending_tasks.front() {
+                    // it doesn't matter taking task out of task_id_2_task, I can put it back again.
+                        match current_task {
+                            TaskDescribe::GetDocument(__task_id, _target_id, node_id) => {
+                                let nd = node_id.as_ref().unwrap().node_id;
+                                self.after_get_document(*next_id, nd);
+                            }
+                            _ => {
+                                warn!("unprocessed after task: {:?}", current_task);
+                            }
+                        }
+
+                } else {
+                    trace!("no pending tasks.");
+                }
+            } else {
+                error!("unmatched task ids, pending_task_id: {:?}, this task id: {:?}", pending_task_id, task_id);
+            }
+        } else {
+            error!("missing pending task_id: {:?}", task_id);
+        }
     }
 
 
@@ -366,6 +413,8 @@ impl ChromeDebugSession {
                 );
                 None
             });
+        // already remove from method_id_2_task_id and task_id_2_task!!!
+        
         // if let Some(error) = resp.error {
         //     return Err(error.into());
         // }
@@ -381,8 +430,8 @@ impl ChromeDebugSession {
                     // it must be a GetDocumentReturnObject or else something must go wrong.
                     match protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp) {
                         Ok(get_document_return_object) => {
-                            let node_id = get_document_return_object.root.node_id;
-                            self.feed_on_root_node_id(task_id, node_id);
+                            // let node_id = get_document_return_object.root.node_id;
+                            // self.feed_on_root_node_id(task_id, node_id);
                             let t = TaskDescribe::GetDocument(
                                 task_id,
                                 t_id,
@@ -395,7 +444,9 @@ impl ChromeDebugSession {
                     }
                 }
                 TaskDescribe::PageEnable(task_id, target_id, session_id) => {
-                    return Some(TaskDescribe::PageEnable(task_id, target_id, session_id));
+                    let t = TaskDescribe::PageEnable(task_id, target_id, session_id);
+                    self.process_pending_tasks(task_id, &t);
+                    return Some(t);
                 }
                 TaskDescribe::QuerySelector(query_selector) => {
                     match protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
@@ -415,12 +466,12 @@ impl ChromeDebugSession {
                         }
                         Err(remote_error) => {
                             error!("{:?}, {:?}", query_selector, remote_error);
-                            if let Some(tk) = self.feed_on_node_id(
-                                query_selector.task_id,
-                                None,
-                            ) {
-                                return Some(tk);
-                            }
+                            // if let Some(tk) = self.feed_on_node_id(
+                            //     query_selector.task_id,
+                            //     None,
+                            // ) {
+                            //     return Some(tk);
+                            // }
                             return Some(TaskDescribe::QuerySelector(query_selector));
                         }
                     }

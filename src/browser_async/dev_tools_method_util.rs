@@ -250,7 +250,6 @@ impl MethodUtil {
                 Self::create_msg_to_send(target_method, MethodDestination::Browser, Some(call_id))
             }
             MethodDestination::Browser => {
-                trace!("**sending** method id: {:?}, inner id: {:?}, call content: {:?}", call_id, mid, message_text);
                 Ok((call_id, message_text, mid))
             }
         }

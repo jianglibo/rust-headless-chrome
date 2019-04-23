@@ -331,44 +331,49 @@ impl ChromeDebugSession {
         }
     }
 
-    pub fn after_get_document(&mut self,next_task_id: ids::Task, node_id: dom::NodeId) {
-        if let Some(mut next_task) = self.task_id_2_task.get_mut(&next_task_id){
-            match &mut next_task {
-                tasks::TaskDescribe::QuerySelector(query_selector) => {
-                    query_selector.node_id = Some(node_id);
-                    let (_, method_str, _) = MethodTuple::try_from(&*next_task).unwrap();
-                    self.send_message_direct(method_str);
+    pub fn after_get_document(&mut self, node_id: dom::NodeId) {
+        // feed node_id to waiting invokes. then get first invoke and invoke it.
+        for task_id in &self.pending_tasks {
+            if let Some(mut next_task) = self.task_id_2_task.get_mut(&task_id){
+                match &mut next_task {
+                    tasks::TaskDescribe::QuerySelector(query_selector) => {
+                        query_selector.node_id = Some(node_id);
+                    }
+                    tasks::TaskDescribe::DescribeNode(describe_node) => {
+                        describe_node.node_id = Some(node_id);
+                    }
+                    _ => (),
                 }
-                tasks::TaskDescribe::DescribeNode(describe_node) => {
-                    describe_node.node_id = Some(node_id);
-                    let (_, method_str, _) = MethodTuple::try_from(&*next_task).unwrap();
-                    self.send_message_direct(method_str);
-                }
-                _ => (),
+            } else {
+                error!("cannot find task in task_id_2_task: {:?}", task_id);
             }
+        }
+        let next_task_id = self.pending_tasks.front().unwrap();
+        if let Some(next_task) = self.task_id_2_task.get(next_task_id){
+            let method_str = MethodTuple::try_from(next_task).unwrap().1;
+            self.send_message_direct(method_str);
         } else {
-            error!("cannot find task in task_id_2_task: {:?}", next_task_id);
-        }       
+            warn!("no following method to invoke, maybe there is logic problem.");
+        }
     }
 
     #[allow(clippy::single_match_else)]
     fn process_pending_tasks(&mut self,task_id: ids::Task, current_task: &TaskDescribe) {
         if let Some(pending_task_id) = self.pending_tasks.pop_front() {
             if pending_task_id == task_id {
-                if let Some(next_id) = self.pending_tasks.front() {
-                    // it doesn't matter taking task out of task_id_2_task, I can put it back again.
+                if self.pending_tasks.is_empty() {
+                    trace!("no pending tasks.");
+                } else {
+                        // it doesn't matter taking task out of task_id_2_task, I can put it back again.
                         match current_task {
                             TaskDescribe::GetDocument(get_document) => {
                                 let nd = get_document.root_node.as_ref().unwrap().node_id;
-                                self.after_get_document(*next_id, nd);
+                                self.after_get_document(nd);
                             }
                             _ => {
                                 warn!("unprocessed after task: {:?}", current_task);
                             }
                         }
-
-                } else {
-                    trace!("no pending tasks.");
                 }
             } else {
                 error!("unmatched task ids, pending_task_id: {:?}, this task id: {:?}", pending_task_id, task_id);

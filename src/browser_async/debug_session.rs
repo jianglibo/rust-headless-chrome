@@ -162,15 +162,14 @@ impl DebugSession {
                     self.send_fail(Some(target_id), None)
                 }
             }
-            TaskDescribe::GetDocument(task_id, target_id, node) => {
-                // let t_id = target_id.as_ref().cloned().expect("get document task got none target_id.");
-                if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
-                    tab.root_node = node;
-                    let pr = (Some(target_id), Some(task_id), PageResponse::GetDocument);
+            TaskDescribe::GetDocument(get_document) => {
+                if let Some(tab) = self.get_tab_by_id_mut(&get_document.target_id) {
+                    tab.root_node = get_document.root_node;
+                    let pr = (Some(get_document.target_id), Some(get_document.task_id), PageResponse::GetDocument);
                     Ok(Some(pr).into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    self.send_fail(Some(target_id), Some(task_id))
+                    self.send_fail(Some(get_document.target_id), Some(get_document.task_id))
                 }
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {

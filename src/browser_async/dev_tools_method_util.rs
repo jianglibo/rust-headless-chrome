@@ -5,7 +5,8 @@ use log::*;
 
 use serde_json;
 use std::sync::atomic::{AtomicUsize, Ordering};
-pub type MethodBeforSendResult = Result<(usize, String, Option<usize>), failure::Error>;
+pub type MethodTuple = (usize, String, Option<usize>);
+pub type MethodBeforSendResult = Result<MethodTuple, failure::Error>;
 
 pub static GLOBAL_METHOD_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -69,6 +70,8 @@ pub enum ChromePageError {
     QuerySelectorNoResult { selector: &'static str },
     #[fail(display = "I had wait {} seconds.", seconds)]
     WaitTimeout { seconds: usize },
+    #[fail(display = "task describe convert to string fail.")]
+    TaskDescribeConvert,
 }
 
 #[derive(Debug)]

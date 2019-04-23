@@ -1,6 +1,6 @@
 
 use super::chrome_debug_session::ChromeDebugSession;
-use super::dev_tools_method_util::{MethodDestination, MethodUtil, SessionId};
+use super::dev_tools_method_util::{MethodDestination, MethodUtil, SessionId, MethodTuple};
 use super::id_type as ids;
 use crate::browser_async::unique_number::{self, create_if_no_manual_input};
 use super::page_message::{ChangingFrame};
@@ -9,6 +9,7 @@ use crate::protocol::{self, dom, page, target};
 use log::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::convert::TryFrom;
 
 
 #[derive(Debug)]
@@ -97,29 +98,25 @@ impl Tab {
         if let Some(root_node) = &self.root_node {
             (None, Some(root_node.node_id))
         } else if self.get_document_task_id.is_none() {
-                let (this_task_id, _) = create_if_no_manual_input(manual_task_id);
-                let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                    dom::methods::GetDocument {
-                        depth: depth.or(Some(1)),
-                        pierce: Some(false),
-                    },
-                    &self.session_id,
-                )
-                .unwrap();
-                // self.chrome_session.lock().unwrap().add_task_and_method_map(
-                //     mid.unwrap(),
-                //     this_task_id,
-                //     TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None),
-                // );
+                let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+                let dc = tasks::GetDocument {
+                    task_id: this_task_id,
+                    target_id: self.target_info.target_id.clone(),
+                    session_id: self.session_id.clone(),
+                    is_manual,
+                    depth,
+                    pierce: false,
+                    root_node: None,
+                };
+                let task = TaskDescribe::GetDocument(dc); 
+                let (_, method_str, mid) = MethodTuple::try_from(&task).unwrap();
                 let method_str_id = Some((method_str, mid.unwrap()));
-                let task = TaskDescribe::GetDocument(this_task_id, self.target_info.target_id.clone(), None); 
                 self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, task);
                 self.get_document_task_id = Some(this_task_id);
                 (Some(this_task_id), None)
             } else {
                 (self.get_document_task_id, None)
             }
-        
     }
 
     pub fn capture_screenshot_by_selector (
@@ -144,7 +141,7 @@ impl Tab {
             base64: None,
         };
         self.chrome_session.lock().unwrap().add_task(sh.task_id, tasks::TaskDescribe::ScreenShot(sh));
-        self.chrome_session.lock().unwrap().add_waiting_task(get_box_model_task_id, this_task_id);
+        // self.chrome_session.lock().unwrap().add_waiting_task(get_box_model_task_id, this_task_id);
     }
 
     // pub fn capture_screenshot(
@@ -208,7 +205,7 @@ impl Tab {
                     found_node: None,
                 };
                 self.chrome_session.lock().unwrap().add_task(ds.task_id, tasks::TaskDescribe::DescribeNode(ds));
-                self.chrome_session.lock().unwrap().add_waiting_task(dom_query_selector_task_id, this_task_id);
+                // self.chrome_session.lock().unwrap().add_waiting_task(dom_query_selector_task_id, this_task_id);
             }
             _ => {
                 panic!("impossile result in describe_node_by_selector");
@@ -268,7 +265,7 @@ impl Tab {
                     found_box: None,
                 };
                 self.chrome_session.lock().unwrap().add_task(gb.task_id, tasks::TaskDescribe::GetBoxModel(gb));
-                self.chrome_session.lock().unwrap().add_waiting_task(query_selector_task_id, this_task_id);
+                // self.chrome_session.lock().unwrap().add_waiting_task(query_selector_task_id, this_task_id);
                 this_task_id
             }
             _ => {
@@ -327,27 +324,13 @@ impl Tab {
         match self.get_document(None, None) {
             (Some(_get_document_task_id), _) => {
                 self.chrome_session.lock().unwrap().send_message_and_save_task(None, this_task_id, TaskDescribe::QuerySelector(qs));
-                // self.chrome_session
-                //     .lock()
-                //     .unwrap()
-                //     .add_task(qs.task_id, tasks::TaskDescribe::QuerySelector(qs));
-                // self.chrome_session
-                //     .lock()
-                //     .unwrap()
-                //     .add_waiting_task(get_document_task_id, this_task_id);
             }
             (_, Some(node_id)) => {
                 qs.node_id = Some(node_id);
-                let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                    dom::methods::QuerySelector {
-                        node_id,
-                        selector,
-                    },
-                    &self.session_id,
-                )
-                .unwrap();
+                let task = TaskDescribe::QuerySelector(qs);
+                let (_, method_str, mid) = MethodTuple::try_from(&task).unwrap();
                 let method_str_id = Some((method_str, mid.unwrap()));
-                self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, TaskDescribe::QuerySelector(qs));
+                self.chrome_session.lock().unwrap().send_message_and_save_task(method_str_id, this_task_id, task);
             }
             _ => {
                 error!("get_document return impossible value combination.");

@@ -5,7 +5,7 @@ use super::inner_event::{self, InnerEvent};
 use super::page_message::ChangingFrame;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
-use crate::browser_async::dev_tools_method_util::MethodUtil;
+use crate::browser_async::dev_tools_method_util::{MethodUtil, MethodTuple};
 use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use failure::Error;
@@ -13,6 +13,8 @@ use log::*;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize};
 use websocket::futures::{Poll, Stream};
+use std::convert::TryFrom;
+
 
 #[derive(Debug)]
 pub struct ChromeDebugSession {
@@ -21,7 +23,7 @@ pub struct ChromeDebugSession {
     session_id: Option<String>,
     method_id_2_task_id: HashMap<ids::Method, ids::Task>,
     task_id_2_task: HashMap<ids::Task, TaskDescribe>,
-    waiting_for_me: HashMap<ids::Task, Vec<ids::Task>>,
+    // waiting_for_me: HashMap<ids::Task, Vec<ids::Task>>,
     unique_number: AtomicUsize,
     pending_tasks: VecDeque<ids::Task>,
 }
@@ -34,7 +36,7 @@ impl ChromeDebugSession {
             session_id: None,
             method_id_2_task_id: HashMap::new(),
             task_id_2_task: HashMap::new(),
-            waiting_for_me: HashMap::new(),
+            // waiting_for_me: HashMap::new(),
             unique_number: AtomicUsize::new(10000),
             pending_tasks: VecDeque::new(),
         }
@@ -55,10 +57,10 @@ impl ChromeDebugSession {
         self.pending_tasks.len()
     }
 
-    pub fn waiting_for_me_remain(&self) -> usize {
-        info!("{:?}", self.waiting_for_me);
-        self.waiting_for_me.len()
-    }
+    // pub fn waiting_for_me_remain(&self) -> usize {
+    //     info!("{:?}", self.waiting_for_me);
+    //     self.waiting_for_me.len()
+    // }
 
     pub fn dom_query_selector_to_str(&mut self, task: &TaskDescribe) {
         if let TaskDescribe::QuerySelector(tasks::QuerySelector {
@@ -129,33 +131,33 @@ impl ChromeDebugSession {
         self.add_task(task_id, task);
     }
 
-    pub fn add_waiting_task(
-        &mut self,
-        task_id_to_waiting_for: ids::Task,
-        waiting_task_id: ids::Task,
-    ) {
-        self.waiting_for_me
-            .entry(task_id_to_waiting_for)
-            .or_insert_with(||vec![])
-            .push(waiting_task_id);
-        info!("waiting_for_me: {:?}", self.waiting_for_me);
-    }
+    // pub fn add_waiting_task(
+    //     &mut self,
+    //     task_id_to_waiting_for: ids::Task,
+    //     waiting_task_id: ids::Task,
+    // ) {
+    //     self.waiting_for_me
+    //         .entry(task_id_to_waiting_for)
+    //         .or_insert_with(||vec![])
+    //         .push(waiting_task_id);
+    //     info!("waiting_for_me: {:?}", self.waiting_for_me);
+    // }
 
 
-    fn get_waiting_tasks(&mut self, task_id: ids::Task) -> Vec<TaskDescribe> {
-        // Take out all tasks waiting for me.
-        let waiting_task_ids: Vec<_> = self
-            .waiting_for_me
-            .get_mut(&task_id)
-            .unwrap_or(&mut vec![])
-            .drain(..)
-            .collect();
-        // Remove task_id task pair.
-        waiting_task_ids
-            .iter()
-            .flat_map(|t_id| self.task_id_2_task.remove(&t_id))
-            .collect()
-    }
+    // fn get_waiting_tasks(&mut self, task_id: ids::Task) -> Vec<TaskDescribe> {
+    //     // Take out all tasks waiting for me.
+    //     let waiting_task_ids: Vec<_> = self
+    //         .waiting_for_me
+    //         .get_mut(&task_id)
+    //         .unwrap_or(&mut vec![])
+    //         .drain(..)
+    //         .collect();
+    //     // Remove task_id task pair.
+    //     waiting_task_ids
+    //         .iter()
+    //         .flat_map(|t_id| self.task_id_2_task.remove(&t_id))
+    //         .collect()
+    // }
 
     pub fn dom_describe_node(&mut self, task: &TaskDescribe) {
         if let TaskDescribe::DescribeNode(tasks::DescribeNode {
@@ -329,34 +331,18 @@ impl ChromeDebugSession {
         }
     }
 
-    // pub fn after_get_document(&mut self, task_id: ids::Task, node_id: dom::NodeId) {
-    //     let waiting_tasks = self.get_waiting_tasks(task_id);
-    //     waiting_tasks.into_iter().for_each(|mut task|{
-    //         match &mut task {
-    //             tasks::TaskDescribe::QuerySelector(query_selector) => {
-    //                 query_selector.node_id = Some(node_id);
-    //                 self.dom_query_selector(task);
-    //             }
-    //             tasks::TaskDescribe::DescribeNode(describe_node) => {
-    //                 describe_node.node_id = Some(node_id);
-    //                 self.dom_describe_node(task);
-    //             }
-    //             _ => (),
-    //         }
-    //     });
-    // }
-
-
     pub fn after_get_document(&mut self,next_task_id: ids::Task, node_id: dom::NodeId) {
-        if let Some(next_task) = self.task_id_2_task.get_mut(&next_task_id){
+        if let Some(mut next_task) = self.task_id_2_task.get_mut(&next_task_id){
             match &mut next_task {
                 tasks::TaskDescribe::QuerySelector(query_selector) => {
                     query_selector.node_id = Some(node_id);
-                    self.dom_query_selector(&next_task);
+                    let (_, method_str, _) = MethodTuple::try_from(&*next_task).unwrap();
+                    self.send_message_direct(method_str);
                 }
                 tasks::TaskDescribe::DescribeNode(describe_node) => {
                     describe_node.node_id = Some(node_id);
-                    self.dom_describe_node(&next_task);
+                    let (_, method_str, _) = MethodTuple::try_from(&*next_task).unwrap();
+                    self.send_message_direct(method_str);
                 }
                 _ => (),
             }
@@ -372,8 +358,8 @@ impl ChromeDebugSession {
                 if let Some(next_id) = self.pending_tasks.front() {
                     // it doesn't matter taking task out of task_id_2_task, I can put it back again.
                         match current_task {
-                            TaskDescribe::GetDocument(__task_id, _target_id, node_id) => {
-                                let nd = node_id.as_ref().unwrap().node_id;
+                            TaskDescribe::GetDocument(get_document) => {
+                                let nd = get_document.root_node.as_ref().unwrap().node_id;
                                 self.after_get_document(*next_id, nd);
                             }
                             _ => {
@@ -426,18 +412,17 @@ impl ChromeDebugSession {
 
         if let Some(task) = maybe_matched_task {
             match task {
-                TaskDescribe::GetDocument(task_id, t_id, _) => {
+                TaskDescribe::GetDocument(get_document) => {
                     // it must be a GetDocumentReturnObject or else something must go wrong.
                     match protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp) {
                         Ok(get_document_return_object) => {
                             // let node_id = get_document_return_object.root.node_id;
                             // self.feed_on_root_node_id(task_id, node_id);
-                            let t = TaskDescribe::GetDocument(
-                                task_id,
-                                t_id,
-                                Some(get_document_return_object.root),
-                            );
-                            self.process_pending_tasks(task_id, &t);
+                            let t = TaskDescribe::GetDocument(tasks::GetDocument {
+                                root_node: Some(get_document_return_object.root),
+                                ..get_document
+                            });
+                            self.process_pending_tasks(get_document.task_id, &t);
                             return Some(t);
                         }
                         Err(remote_error) => panic!("{:?}", remote_error)

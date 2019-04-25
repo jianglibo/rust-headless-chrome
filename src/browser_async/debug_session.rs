@@ -1,12 +1,11 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
-use super::dev_tools_method_util::SessionId;
 use super::id_type as ids;
 use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{response_object, PageResponse, PageResponsePlusTabId};
 use super::tab::Tab;
 use super::task_describe::{TaskDescribe, CommonDescribeFields};
-use crate::protocol::{self, target};
+use crate::protocol::{target};
 use failure;
 use futures::{Async, Poll};
 use log::*;

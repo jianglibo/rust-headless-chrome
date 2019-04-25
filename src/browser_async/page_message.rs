@@ -1,12 +1,8 @@
 // use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use crate::browser::tab::element::{BoxModel};
-use super::chrome_debug_session::{ChromeDebugSession};
 use super::id_type as ids;
-use super::task_describe as tasks;
 use super::dev_tools_method_util::{SessionId};
-use log::*;
-use std::fmt;
 use super::tab::Tab;
 use std::default::Default;
 use std::convert::TryInto;

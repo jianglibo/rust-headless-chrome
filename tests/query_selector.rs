@@ -11,7 +11,6 @@ use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
-use headless_chrome::browser_async::tab::{Tab};
 use tokio;
 use std::default::Default;
 

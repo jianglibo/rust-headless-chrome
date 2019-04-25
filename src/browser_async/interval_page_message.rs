@@ -1,7 +1,6 @@
-use futures::{Poll, Async};
+use futures::{Poll};
 use websocket::futures::{Stream};
 use tokio::timer::{Interval};
-// use super::page_message::{PageMessage};
 use super::task_describe::TaskDescribe;
 use std::time::{Duration};
 

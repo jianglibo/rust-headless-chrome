@@ -5,7 +5,6 @@ use super::inner_event::{self, InnerEvent};
 use super::page_message::ChangingFrame;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
-use crate::browser_async::dev_tools_method_util::{MethodUtil, MethodTuple};
 use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use failure::Error;
@@ -23,7 +22,6 @@ pub struct ChromeDebugSession {
     session_id: Option<String>,
     method_id_2_task_id: HashMap<ids::Method, ids::Task>,
     task_id_2_task: HashMap<ids::Task, TaskDescribe>,
-    // waiting_for_me: HashMap<ids::Task, Vec<ids::Task>>,
     unique_number: AtomicUsize,
     pending_tasks: VecDeque<ids::Task>,
 }
@@ -273,6 +271,7 @@ impl ChromeDebugSession {
     // }
 
     #[allow(clippy::single_match_else)]
+    #[allow(unreachable_patterns)]
     pub fn handle_inner_target_events(
         &mut self,
         inner_event: InnerEvent,
@@ -325,21 +324,22 @@ impl ChromeDebugSession {
 
     pub fn after_get_document(&mut self, node_id: dom::NodeId) {
         // feed node_id to waiting invokes. then get first invoke and invoke it.
-        for task_id in &self.pending_tasks {
+        let it = self.pending_tasks.clone();
+        it.iter().for_each(|task_id|{
             if let Some(mut next_task) = self.task_id_2_task.get_mut(&task_id){
                 match &mut next_task {
                     tasks::TaskDescribe::QuerySelector(query_selector) => {
                         query_selector.node_id = Some(node_id);
                     }
-                    tasks::TaskDescribe::DescribeNode(describe_node) => {
-                        describe_node.node_id = Some(node_id);
+                    tasks::TaskDescribe::DescribeNode(_describe_node) => {
+                        // describe_node.node_id = Some(node_id);
                     }
                     _ => (),
                 }
             } else {
                 error!("cannot find task in task_id_2_task: {:?}", task_id);
             }
-        }
+        });
         self.invoke_next_task();
     }
 
@@ -361,7 +361,7 @@ impl ChromeDebugSession {
                                         let nd = get_document.root_node.as_ref().unwrap().node_id;
                                         self.after_get_document(nd);
                                     }
-                                    TaskDescribe::QuerySelector(query_selector) => {
+                                    TaskDescribe::QuerySelector(_query_selector) => {
 
                                     }
                                     _ => {
@@ -385,8 +385,8 @@ impl ChromeDebugSession {
     pub fn handle_response(
         &mut self,
         resp: protocol::Response,
-        session_id: Option<String>,
-        target_id: Option<String>,
+        _session_id: Option<String>,
+        _target_id: Option<String>,
     ) -> Option<TaskDescribe> {
         trace!("got **response**. {:?}", resp);
         let call_id = resp.call_id;
@@ -535,7 +535,7 @@ impl ChromeDebugSession {
     fn handle_protocol_event(
         &mut self,
         protocol_event: protocol::Event,
-        session_id: Option<String>,
+        _session_id: Option<String>,
         target_id: Option<String>,
     ) -> Option<TaskDescribe> {
         match protocol_event {

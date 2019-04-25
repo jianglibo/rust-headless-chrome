@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::borrow::Borrow;
-use crate::protocol::{self, dom, input, page, page::methods::Navigate, target};
+use crate::protocol::{self};
 use log::*;
 
 pub fn json_has_properties(json_value: &serde_json::Value, field_names: Vec<&str>) -> bool {

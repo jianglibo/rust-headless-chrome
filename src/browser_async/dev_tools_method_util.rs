@@ -36,10 +36,8 @@ pub fn next_call_id() -> usize {
 
 #[derive(Debug, failure::Fail)]
 pub enum ChannelBridgeError {
-    // #[fail(display = "invalid toolchain name: {}", name)]
     #[fail(display = "send to error")]
     Sending,
-    // #[fail(display = "unknown toolchain version: {}", version)]
     #[fail(display = "receiving error.")]
     Receiving,
     #[fail(display = "ws error.")]

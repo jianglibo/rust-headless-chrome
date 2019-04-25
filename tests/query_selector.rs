@@ -27,7 +27,7 @@ struct QuerySelector {
 impl QuerySelector {
     fn assert_result(&self) {
         let tab = self.debug_session.main_tab().unwrap();
-        assert_eq!(self.call_count, 1);
+        assert_eq!(self.call_count, 3);
         assert!(self.task_id_100_called);
         assert_eq!(tab.temporary_node_holder.len() , 7);
         info!("all nodes: {:?}", tab.temporary_node_holder);
@@ -71,6 +71,7 @@ impl Future for QuerySelector {
                         self.call_count += 1;
                         if task_id == Some(102) {
                             assert_eq!(selector, "#not-existed");
+                            assert_eq!(node_id, Some(0));
                         } else if task_id == Some(100) {
                             self.task_id_100_called = true;
                         } else {
@@ -118,5 +119,7 @@ fn t_dom_query_selector() {
         task_id_100_called: false,
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    if let Err(err) = runtime.block_on(my_page.into_future()) {
+        error!("err: {:?}", err);
+    }
 }

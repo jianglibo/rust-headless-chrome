@@ -22,7 +22,7 @@ use websocket::ClientBuilder;
 
 use crate::protocol::target;
 
-use crate::browser_async::dev_tools_method_util::{MethodDestination, MethodUtil};
+use crate::browser_async::dev_tools_method_util::{MethodDestination, MethodUtil, next_call_id};
 
 type WsClient = Client<TcpStream>;
 
@@ -80,8 +80,9 @@ impl ChromeBrowser {
             last_be_polled: Instant::now(),
         }
     }
-    pub fn send_message(&mut self, md: String) {
-        self.state = BrowserState::StartSend(md);
+    pub fn send_message(&mut self, method_str: String) {
+        trace!("**sending** : {:?}", method_str);
+        self.state = BrowserState::StartSend(method_str);
     }
 
     pub fn have_not_be_polled_for(&self, duration: Duration) -> bool {
@@ -122,13 +123,13 @@ impl Stream for ChromeBrowser {
                 }
                 BrowserState::EnableDiscover => {
                     trace!("enter enable discover state.");
-                    let (_, md, _) = MethodUtil::create_msg_to_send(
+                    let method_str = MethodUtil::create_msg_to_send(
                         target::methods::SetDiscoverTargets { discover: true },
                         MethodDestination::Browser,
+                        next_call_id(),
                         None,
-                    )
-                    .unwrap();
-                    self.state = BrowserState::StartSend(md);
+                    );
+                    self.state = BrowserState::StartSend(method_str);
                 }
                 BrowserState::Receiving => {
                     match self.ws_client.as_mut().unwrap().poll() {

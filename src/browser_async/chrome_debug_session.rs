@@ -57,58 +57,33 @@ impl ChromeDebugSession {
         self.pending_tasks.len()
     }
 
-    // pub fn waiting_for_me_remain(&self) -> usize {
-    //     info!("{:?}", self.waiting_for_me);
-    //     self.waiting_for_me.len()
-    // }
-
-    pub fn dom_query_selector_to_str(&mut self, task: &TaskDescribe) {
-        if let TaskDescribe::QuerySelector(tasks::QuerySelector {
-            task_id,
-            node_id: Some(node_id_value),
-            session_id,
-            selector,
-            ..
-        }) = &task
-        {
-            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::QuerySelector {
-                    node_id: *node_id_value,
-                    selector,
-                },
-                &session_id,
-            )
-            .unwrap();
-            self.send_message_direct(method_str);
-        } else {
-            error!("maybe node_id to select with is None.");
-        }
-    }
-
-    pub fn send_message_and_save_task(&mut self, method_str_id: Option<(String, usize)>, task_id: ids::Task, task: TaskDescribe) {
-        if let Some((method_str, mid)) = method_str_id {
-            self.add_task_and_method_map(
-                mid,
-                task_id,
-                task,
-            );
-            if self.pending_tasks.is_empty() {
-                trace!("**sending** call_id: {:?}, call content: {:?}", mid, method_str);
-                self.chrome_browser.send_message(method_str);
+    pub fn send_message_and_save_task(&mut self, task: TaskDescribe) {
+        let cf = task.get_common_fields().unwrap();
+        
+        if self.pending_tasks.is_empty() {
+            match String::try_from(&task) {
+                Ok(method_str) => self.chrome_browser.send_message(method_str),
+                Err(err) => error!("{:?}", err),
             }
-        } else {
-            self.add_task(task_id, task);
         }
-        self.pending_tasks.push_back(task_id);
+        
+        self.pending_tasks.push_back(cf.task_id);
+        self.add_task_and_method_map(
+                cf.call_id,
+                cf.task_id,
+                task,
+        );
+        trace!("current pending tasks: {:?}", self.pending_tasks);
     }
 
 
     pub fn send_message_direct(&mut self, method_str: String) {
+        trace!("**sending** directly: {:?}", method_str);
         self.chrome_browser.send_message(method_str);
     }
 
     pub fn add_task(&mut self, task_id: ids::Task, task: TaskDescribe) {
-        info!("add task is and task: {:?}, {:?}", task_id, task);
+        info!("add task id and task: {:?}, {:?}", task_id, task);
         self.task_id_2_task.insert(task_id, task);
     }
 
@@ -127,7 +102,6 @@ impl ChromeDebugSession {
         task: TaskDescribe,
     ) {
         self.add_method_task_map(mid, task_id);
-        trace!("add_method_task_map: {:?} -> {:?}", mid, task_id);
         self.add_task(task_id, task);
     }
 
@@ -159,86 +133,85 @@ impl ChromeDebugSession {
     //         .collect()
     // }
 
-    pub fn dom_describe_node(&mut self, task: &TaskDescribe) {
-        if let TaskDescribe::DescribeNode(tasks::DescribeNode {
-            task_id,
-            node_id,
-            backend_node_id,
-            depth,
-            session_id,
-            ..
-        }) = &task
-        {
-            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::DescribeNode {
-                    node_id: *node_id,
-                    backend_node_id: *backend_node_id,
-                    depth: *depth,
-                },
-                &session_id,
-            )
-            .unwrap();
-            self.send_message_direct(method_str);
-        } else {
-            error!("not a node_describe.")
-        }
-    }
+    // pub fn dom_describe_node(&mut self, task: &TaskDescribe) {
+    //     if let TaskDescribe::DescribeNode(tasks::DescribeNode {
+    //         common_fields,
+    //         node_id,
+    //         backend_node_id,
+    //         depth,
+    //         ..
+    //     }) = &task
+    //     {
+    //         let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
+    //             dom::methods::DescribeNode {
+    //                 node_id: *node_id,
+    //                 backend_node_id: *backend_node_id,
+    //                 depth: *depth,
+    //             },
+    //             &session_id,
+    //         )
+    //         .unwrap();
+    //         self.send_message_direct(method_str);
+    //     } else {
+    //         error!("not a node_describe.")
+    //     }
+    // }
 
-    pub fn get_box_model(&mut self, task: TaskDescribe) {
-        if let TaskDescribe::GetBoxModel(tasks::GetBoxModel {
-            task_id,
-            node_id,
-            backend_node_id,
-            session_id,
-            ..
-        }) = &task
-        {
-            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::GetBoxModel {
-                    node_id: *node_id,
-                    backend_node_id: *backend_node_id,
-                    object_id: None,
-                },
-                &session_id,
-            )
-            .unwrap();
-            self.add_task_and_method_map(mid.unwrap(), *task_id, task);
-            self.chrome_browser.send_message(method_str);
-        } else {
-            error!("not a get_box_model.")
-        }
-    }
+    // pub fn get_box_model(&mut self, task: TaskDescribe) {
+    //     if let TaskDescribe::GetBoxModel(tasks::GetBoxModel {
+    //         task_id,
+    //         node_id,
+    //         backend_node_id,
+    //         session_id,
+    //         ..
+    //     }) = &task
+    //     {
+    //         let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
+    //             dom::methods::GetBoxModel {
+    //                 node_id: *node_id,
+    //                 backend_node_id: *backend_node_id,
+    //                 object_id: None,
+    //             },
+    //             &session_id,
+    //         )
+    //         .unwrap();
+    //         self.add_task_and_method_map(mid.unwrap(), *task_id, task);
+    //         self.chrome_browser.send_message(method_str);
+    //     } else {
+    //         error!("not a get_box_model.")
+    //     }
+    // }
 
-    pub fn capture_screen_shot(&mut self, task: TaskDescribe) {
-        if let TaskDescribe::ScreenShot(sh) = task {
-            let cloned_sh = sh.clone();
+    // pub fn capture_screen_shot(&mut self, task: TaskDescribe) {
+    //     if let TaskDescribe::ScreenShot(sh) = task {
+    //         let cloned_sh = sh.clone();
 
-            let (format, quality) = match sh.format {
-                page::ScreenshotFormat::JPEG(quality) => {
-                    (page::InternalScreenshotFormat::JPEG, quality)
-                }
-                page::ScreenshotFormat::PNG => (page::InternalScreenshotFormat::PNG, None),
-            };
-            let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
-                page::methods::CaptureScreenshot {
-                    format,
-                    quality,
-                    clip: sh.clip,
-                    from_surface: sh.from_surface,
-                },
-                &sh.session_id,
-            )
-            .unwrap();
-            self.add_task_and_method_map(
-                mid.unwrap(),
-                sh.task_id,
-                TaskDescribe::ScreenShot(cloned_sh),
-            );
-            self.chrome_browser.send_message(method_str);
-        } else {
-            error!("not a capture_screen_shot.")
-        }
-    }
+    //         let (format, quality) = match sh.format {
+    //             page::ScreenshotFormat::JPEG(quality) => {
+    //                 (page::InternalScreenshotFormat::JPEG, quality)
+    //             }
+    //             page::ScreenshotFormat::PNG => (page::InternalScreenshotFormat::PNG, None),
+    //         };
+    //         let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(
+    //             page::methods::CaptureScreenshot {
+    //                 format,
+    //                 quality,
+    //                 clip: sh.clip,
+    //                 from_surface: sh.from_surface,
+    //             },
+    //             &sh.session_id,
+    //         )
+    //         .unwrap();
+    //         self.add_task_and_method_map(
+    //             mid.unwrap(),
+    //             sh.task_id,
+    //             TaskDescribe::ScreenShot(cloned_sh),
+    //         );
+    //         self.chrome_browser.send_message(method_str);
+    //     } else {
+    //         error!("not a capture_screen_shot.")
+    //     }
+    // }
 
     pub fn resolve_node(&mut self) -> (Option<ids::Task>, Option<ids::RemoteObject>) {
         (None, None)
@@ -331,6 +304,25 @@ impl ChromeDebugSession {
         }
     }
 
+    fn invoke_next_task(&mut self) -> bool {
+        let next_task_id = self.pending_tasks.front().unwrap();
+        if let Some(next_task) = self.task_id_2_task.get(next_task_id){
+            match String::try_from(next_task) {
+                Ok(method_str) => {
+                    self.send_message_direct(method_str);
+                    true
+                }
+                Err(err) => {
+                    trace!("unfulfilled task describe. {:?}", err);
+                    false
+                }
+            } 
+        } else {
+            warn!("no following method to invoke, maybe there is logic problem.");
+            true
+        }
+    }
+
     pub fn after_get_document(&mut self, node_id: dom::NodeId) {
         // feed node_id to waiting invokes. then get first invoke and invoke it.
         for task_id in &self.pending_tasks {
@@ -348,38 +340,44 @@ impl ChromeDebugSession {
                 error!("cannot find task in task_id_2_task: {:?}", task_id);
             }
         }
-        let next_task_id = self.pending_tasks.front().unwrap();
-        if let Some(next_task) = self.task_id_2_task.get(next_task_id){
-            let method_str = MethodTuple::try_from(next_task).unwrap().1;
-            self.send_message_direct(method_str);
-        } else {
-            warn!("no following method to invoke, maybe there is logic problem.");
-        }
+        self.invoke_next_task();
     }
 
     #[allow(clippy::single_match_else)]
-    fn process_pending_tasks(&mut self,task_id: ids::Task, current_task: &TaskDescribe) {
-        if let Some(pending_task_id) = self.pending_tasks.pop_front() {
-            if pending_task_id == task_id {
-                if self.pending_tasks.is_empty() {
-                    trace!("no pending tasks.");
+    fn process_pending_tasks(&mut self, current_task: &TaskDescribe) {
+        if let Some(cf) = current_task.get_common_fields() {
+            let task_id = cf.task_id;
+            if let Some(pending_task_id) = self.pending_tasks.pop_front() { // remove current completed task id.
+                if pending_task_id == task_id {
+                    if self.pending_tasks.is_empty() {
+                        trace!("no pending tasks.");
+                    } else {
+                            // try to invoke next task, if next task describe is fulfilled it runs or it will fail.
+                            if self.invoke_next_task() {
+                                trace!("got fulfilled task, run it.");
+                            } else {
+                                match current_task {
+                                    TaskDescribe::GetDocument(get_document) => {
+                                        let nd = get_document.root_node.as_ref().unwrap().node_id;
+                                        self.after_get_document(nd);
+                                    }
+                                    TaskDescribe::QuerySelector(query_selector) => {
+
+                                    }
+                                    _ => {
+                                        warn!("unprocessed after task: {:?}", current_task);
+                                    }
+                                }
+                            }
+                    }
                 } else {
-                        // it doesn't matter taking task out of task_id_2_task, I can put it back again.
-                        match current_task {
-                            TaskDescribe::GetDocument(get_document) => {
-                                let nd = get_document.root_node.as_ref().unwrap().node_id;
-                                self.after_get_document(nd);
-                            }
-                            _ => {
-                                warn!("unprocessed after task: {:?}", current_task);
-                            }
-                        }
+                    error!("unmatched task ids, pending_task_id: {:?}, this task id: {:?}", pending_task_id, task_id);
                 }
             } else {
-                error!("unmatched task ids, pending_task_id: {:?}, this task id: {:?}", pending_task_id, task_id);
+                error!("missing pending task_id: {:?}", task_id);
             }
         } else {
-            error!("missing pending task_id: {:?}", task_id);
+            error!("no common fields for task: {:?}", current_task);
         }
     }
 
@@ -427,30 +425,27 @@ impl ChromeDebugSession {
                                 root_node: Some(get_document_return_object.root),
                                 ..get_document
                             });
-                            self.process_pending_tasks(get_document.task_id, &t);
+                            self.process_pending_tasks(&t);
                             return Some(t);
                         }
                         Err(remote_error) => panic!("{:?}", remote_error)
                     }
                 }
-                TaskDescribe::PageEnable(task_id, target_id, session_id) => {
-                    let t = TaskDescribe::PageEnable(task_id, target_id, session_id);
-                    self.process_pending_tasks(task_id, &t);
+                TaskDescribe::PageEnable(common_fields) => {
+                    let t = TaskDescribe::PageEnable(common_fields);
+                    self.process_pending_tasks(&t);
                     return Some(t);
                 }
                 TaskDescribe::QuerySelector(query_selector) => {
                     match protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
                         Ok(query_select_return_object) => {
+                            let is_manual = query_selector.common_fields.is_manual;
                             let t = TaskDescribe::QuerySelector(tasks::QuerySelector {
                                     found_node_id: Some(query_select_return_object.node_id),
                                     ..query_selector
                                 });
-                            // self.feed_on_node_id(
-                            //     query_selector.task_id,
-                            //     Some(query_select_return_object.node_id),
-                            // );
-                            self.process_pending_tasks(query_selector.task_id, &t);
-                            if query_selector.is_manual {
+                            self.process_pending_tasks(&t);
+                            if is_manual {
                                 return Some(t);
                             }
                         }
@@ -470,11 +465,10 @@ impl ChromeDebugSession {
                 TaskDescribe::DescribeNode(mut describe_node) => {
                     match protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
                         Ok(describe_node_return_object) => {
-                            if describe_node.is_manual {
+                            if describe_node.common_fields.is_manual {
                                 describe_node.found_node = Some(describe_node_return_object.node);
-                                let task_id = describe_node.task_id;
                                 let t = TaskDescribe::DescribeNode(describe_node);
-                                self.process_pending_tasks(task_id, &t);
+                                self.process_pending_tasks(&t);
                                 return Some(t);
                             }
                         }
@@ -497,11 +491,11 @@ impl ChromeDebugSession {
                                 width: raw_model.width,
                                 height: raw_model.height,
                             };
-                            let is_manual = get_box_model.is_manual;
+                            let is_manual = get_box_model.common_fields.is_manual;
                             get_box_model.found_box = Some(model_box);
-                            let task_id = get_box_model.task_id;
+                            // let task_id = get_box_model.task_id;
                             let t = TaskDescribe::GetBoxModel(get_box_model);
-                            self.process_pending_tasks(task_id, &t);
+                            self.process_pending_tasks(&t);
                             // self.feed_on_box_model(get_box_model.task_id, model_box.clone());
                             if is_manual {
                                 return Some(t);
@@ -517,9 +511,9 @@ impl ChromeDebugSession {
                     match protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp) {
                         Ok(capture_screenshot_return_object) => {
                             screen_shot.base64 = Some(capture_screenshot_return_object.data);
-                            let task_id = screen_shot.task_id;
+                            // let task_id = screen_shot.task_id;
                             let t = TaskDescribe::ScreenShot(screen_shot);
-                            self.process_pending_tasks(task_id, &t);
+                            self.process_pending_tasks(&t);
                             return Some(t);
                         }
                         Err(remote_error) => {

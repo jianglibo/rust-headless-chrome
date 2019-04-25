@@ -45,7 +45,7 @@ impl Future for CaptureScreenShotTest {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds == 26 {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
+                                    // tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
                                 }
                         }
                         if seconds > 35 {

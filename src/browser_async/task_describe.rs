@@ -1,83 +1,106 @@
-use crate::protocol::{dom, target, page};
+use super::dev_tools_method_util::SessionId;
 use super::id_type as ids;
-use super::page_message::{PageEventName, ChangingFrame};
-use super::dev_tools_method_util::{SessionId};
-// use super::inner_event::{InnerEvent, inner_events};
+use super::page_message::{ChangingFrame, PageEventName};
 use crate::browser::tab::element::BoxModel;
-use log::*;
+use crate::browser_async::dev_tools_method_util::{ChromePageError, MethodUtil};
+use crate::protocol::{dom, page, target};
 use failure;
-use crate::browser_async::dev_tools_method_util::{MethodUtil, ChromePageError, MethodBeforSendResult, MethodTuple};
+use log::*;
 
 #[derive(Debug)]
 pub enum TaskDescribe {
-    QuerySelector(QuerySelector),
-    DescribeNode(DescribeNode),
-    ResolveNode(ResolveNode),
-    GetBoxModel(GetBoxModel),
-    SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
-    GetDocument(GetDocument),
-    PageEnable(ids::Task, target::TargetId, SessionId),
-    Interval,
-    PageEvent(PageEventName),
-    FrameNavigated(target::TargetId, ChangingFrame),
-    LoadEventFired(target::TargetId, f32),
-    TargetInfoChanged(target::TargetInfo),
-    PageCreated(target::TargetInfo, Option<&'static str>),
-    PageAttached(target::TargetInfo, SessionId),
-    ScreenShot(ScreenShot),
-    Fail,
+        QuerySelector(QuerySelector),
+        DescribeNode(DescribeNode),
+        ResolveNode(ResolveNode),
+        GetBoxModel(GetBoxModel),
+        SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
+        GetDocument(GetDocument),
+        PageEnable(CommonDescribeFields),
+        Interval,
+        PageEvent(PageEventName),
+        FrameNavigated(target::TargetId, ChangingFrame),
+        LoadEventFired(target::TargetId, f32),
+        TargetInfoChanged(target::TargetInfo),
+        PageCreated(target::TargetInfo, Option<&'static str>),
+        PageAttached(target::TargetInfo, SessionId),
+        ScreenShot(ScreenShot),
+        Fail,
 }
 
-impl std::convert::TryFrom<&TaskDescribe> for MethodTuple {
+impl TaskDescribe {
+        pub fn get_common_fields(&self) -> Option<&CommonDescribeFields> {
+                match &self {
+                        TaskDescribe::QuerySelector(query_selector) => {
+                                Some(&query_selector.common_fields)
+                        }
+                        TaskDescribe::DescribeNode(describe_node) => {
+                                Some(&describe_node.common_fields)
+                        }
+                        TaskDescribe::GetDocument(get_document) => {
+                                Some(&get_document.common_fields)
+                        }
+                        TaskDescribe::PageEnable(common_fields) => Some(&common_fields),
+                        _ => None,
+                }
+        }
+}
+
+impl std::convert::TryFrom<&TaskDescribe> for String {
         type Error = failure::Error;
 
         fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
                 match task_describe {
                         TaskDescribe::QuerySelector(QuerySelector {
                                 node_id: Some(node_id_value),
-                                session_id,
+                                common_fields,
                                 selector,
                                 ..
-                                }) => {
-                                        MethodUtil::create_msg_to_send_with_session_id(
-                                                dom::methods::QuerySelector {
-                                                node_id: *node_id_value,
-                                                selector,
-                                                },
-                                                &session_id,
-                                        )
-                                }
+                        }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
+                                dom::methods::QuerySelector {
+                                        node_id: *node_id_value,
+                                        selector,
+                                },
+                                &common_fields.session_id,
+                                common_fields.call_id,
+                        )),
                         TaskDescribe::DescribeNode(DescribeNode {
                                 node_id,
                                 backend_node_id,
                                 depth,
-                                session_id,
+                                common_fields,
                                 ..
-                                }) => {
-                                    MethodUtil::create_msg_to_send_with_session_id(
-                                        dom::methods::DescribeNode {
+                        }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
+                                dom::methods::DescribeNode {
                                         node_id: *node_id,
                                         backend_node_id: *backend_node_id,
                                         depth: *depth,
-                                        },
-                                        &session_id,
-                                        )
-                                }
-                        TaskDescribe::GetDocument(GetDocument{
+                                },
+                                &common_fields.session_id,
+                                common_fields.call_id,
+                        )),
+                        TaskDescribe::GetDocument(GetDocument {
                                 depth,
                                 pierce,
-                                session_id,
+                                common_fields,
                                 ..
-                        }) => {
-                                MethodUtil::create_msg_to_send_with_session_id(
+                        }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
                                 dom::methods::GetDocument {
                                         depth: depth.or(Some(1)),
                                         pierce: Some(*pierce),
                                 },
-                                &session_id,
-                                )
-                        }
-                        _ => {  
+                                &common_fields.session_id,
+                                common_fields.call_id,
+                        )),
+                        TaskDescribe::PageEnable(CommonDescribeFields {
+                                session_id,
+                                call_id,
+                                ..
+                        }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
+                                page::methods::Enable {},
+                                session_id,
+                                *call_id,
+                        )),
+                        _ => {
                                 error!("task describe to string failed. {:?}", task_describe);
                                 Err(ChromePageError::TaskDescribeConvert.into())
                         }
@@ -87,10 +110,7 @@ impl std::convert::TryFrom<&TaskDescribe> for MethodTuple {
 
 #[derive(Debug, Clone)]
 pub struct ScreenShot {
-        pub task_id: ids::Task,
-        pub target_id: target::TargetId,
-        pub session_id: Option<SessionId>,
-        pub is_manual: bool,
+        pub common_fields: CommonDescribeFields,
         pub selector: Option<&'static str>,
         pub format: page::ScreenshotFormat,
         pub clip: Option<page::Viewport>,
@@ -100,23 +120,17 @@ pub struct ScreenShot {
 
 #[derive(Debug)]
 pub struct GetBoxModel {
-        pub task_id: usize,
-        pub target_id: target::TargetId,
-        pub session_id: Option<SessionId>,
-        pub is_manual: bool,
+        pub common_fields: CommonDescribeFields,
         pub node_id: Option<dom::NodeId>,
         pub selector: Option<&'static str>,
         pub backend_node_id: Option<dom::NodeId>,
         pub object_id: Option<ids::RemoteObject>,
-        pub found_box: Option<BoxModel>
+        pub found_box: Option<BoxModel>,
 }
 
 #[derive(Debug)]
 pub struct ResolveNode {
-        pub task_id: usize,
-        pub target_id: target::TargetId,
-        pub session_id: Option<SessionId>,
-        pub is_manual: bool,
+        pub common_fields: CommonDescribeFields,
         pub selector: Option<&'static str>,
         pub node_id: Option<dom::NodeId>,
         pub backend_node_id: Option<dom::NodeId>,
@@ -126,10 +140,7 @@ pub struct ResolveNode {
 
 #[derive(Debug)]
 pub struct QuerySelector {
-        pub task_id: usize,
-        pub target_id: target::TargetId,
-        pub session_id: Option<SessionId>,
-        pub is_manual: bool,
+        pub common_fields: CommonDescribeFields,
         pub node_id: Option<dom::NodeId>,
         pub found_node_id: Option<dom::NodeId>,
         pub selector: &'static str,
@@ -137,10 +148,7 @@ pub struct QuerySelector {
 
 #[derive(Debug)]
 pub struct GetDocument {
-        pub task_id: usize,
-        pub target_id: target::TargetId,
-        pub session_id: Option<SessionId>,
-        pub is_manual: bool,
+        pub common_fields: CommonDescribeFields,
         pub depth: Option<u8>,
         pub pierce: bool,
         pub root_node: Option<dom::Node>,
@@ -148,10 +156,7 @@ pub struct GetDocument {
 
 #[derive(Debug)]
 pub struct DescribeNode {
-        pub task_id: usize,
-        pub session_id: Option<SessionId>,
-        pub target_id: target::TargetId,
-        pub is_manual: bool,
+        pub common_fields: CommonDescribeFields,
         pub node_id: Option<dom::NodeId>,
         pub backend_node_id: Option<dom::NodeId>,
         pub found_node: Option<dom::Node>,
@@ -159,4 +164,13 @@ pub struct DescribeNode {
         pub depth: Option<i8>,
         pub object_id: Option<ids::RemoteObject>,
         pub pierce: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct CommonDescribeFields {
+        pub task_id: ids::Task,
+        pub target_id: target::TargetId,
+        pub is_manual: bool,
+        pub session_id: Option<SessionId>,
+        pub call_id: usize,
 }

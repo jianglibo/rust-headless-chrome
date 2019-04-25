@@ -65,8 +65,8 @@ impl Future for DescribeNode {
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.describe_node_by_selector(self.selector, Some(2), Some(100));
-                                    tab.describe_node_by_selector("#not-existed", Some(2), Some(101));
+                                    // tab.describe_node_by_selector(self.selector, Some(2), Some(100));
+                                    // tab.describe_node_by_selector("#not-existed", Some(2), Some(101));
                                 }
                             }
                         }

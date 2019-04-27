@@ -20,10 +20,11 @@ pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
-    method_id_2_task_id: HashMap<ids::Method, ids::Task>,
-    task_id_2_task: HashMap<ids::Task, TaskDescribe>,
+    // method_id_2_task_id: HashMap<ids::Method, ids::Task>,
+    // task_id_2_task: HashMap<ids::Task, TaskDescribe>,
     unique_number: AtomicUsize,
-    pending_tasks: VecDeque<ids::Task>,
+    // pending_tasks: VecDeque<ids::Task>,
+    tasks_waiting_for_response: Vec<Vec<TaskDescribe>>,
 }
 
 impl ChromeDebugSession {
@@ -32,76 +33,409 @@ impl ChromeDebugSession {
             chrome_browser,
             target_info: None,
             session_id: None,
-            method_id_2_task_id: HashMap::new(),
-            task_id_2_task: HashMap::new(),
-            // waiting_for_me: HashMap::new(),
+            // method_id_2_task_id: HashMap::new(),
+            // task_id_2_task: HashMap::new(),
             unique_number: AtomicUsize::new(10000),
-            pending_tasks: VecDeque::new(),
+            // pending_tasks: VecDeque::new(),
+            tasks_waiting_for_response: Vec::new(),
         }
     }
 
-    pub fn method_id_2_task_id_remain(&self) -> usize {
-        info!("{:?}", self.method_id_2_task_id);
-        self.method_id_2_task_id.len()
+    pub fn tasks_waiting_for_response_count(&self) -> usize {
+        self.tasks_waiting_for_response.len()
     }
 
-    pub fn task_id_2_task_remain(&self) -> usize {
-        info!("{:?}", self.task_id_2_task);
-        self.task_id_2_task.len()
-    }
-
-    pub fn pending_tasks_remain(&self) -> usize {
-        info!("{:?}", self.pending_tasks);
-        self.pending_tasks.len()
-    }
-
-    pub fn send_message_and_save_task(&mut self, task: TaskDescribe) {
-        let cf = task.get_common_fields().unwrap();
-        
-        if self.pending_tasks.is_empty() {
-            match String::try_from(&task) {
-                Ok(method_str) => self.chrome_browser.send_message(method_str),
-                Err(err) => error!("{:?}", err),
+    pub fn execute_task(&mut self, tasks: Vec<TaskDescribe>) {
+        if let Some(task_ref) = tasks.get(0) {
+            match String::try_from(task_ref) {
+                Ok(method_str) => {
+                    self.tasks_waiting_for_response.push(tasks);
+                    self.chrome_browser.send_message(method_str);
+                }
+                Err(err) => error!("first task deserialize fail: {:?}", err)
             }
+        } else {
+            error!("empty tasks list.")
         }
-        
-        self.pending_tasks.push_back(cf.task_id);
-        self.add_task_and_method_map(
-                cf.call_id,
-                cf.task_id,
-                task,
-        );
-        trace!("current pending tasks: {:?}", self.pending_tasks);
     }
-
 
     pub fn send_message_direct(&mut self, method_str: String) {
-        trace!("**sending** directly: {:?}", method_str);
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn add_task(&mut self, task_id: ids::Task, task: TaskDescribe) {
-        info!("add task id and task: {:?}, {:?}", task_id, task);
-        self.task_id_2_task.insert(task_id, task);
+    pub fn resolve_node(&mut self) -> (Option<ids::Task>, Option<ids::RemoteObject>) {
+        (None, None)
     }
 
-    pub fn add_method_task_map(&mut self, mid: usize, task_id: ids::Task) {
-        if self.method_id_2_task_id.contains_key(&mid) {
-            warn!("mid already exists in map. {:?}", mid);
-        }
-        info!("insert mid task_id pair: ({:?}, {:?})", mid, task_id);
-        self.method_id_2_task_id.entry(mid).or_insert(task_id);
-    }
-
-    pub fn add_task_and_method_map(
+    #[allow(clippy::single_match_else)]
+    #[allow(unreachable_patterns)]
+    pub fn handle_inner_target_events(
         &mut self,
-        mid: ids::Method,
-        task_id: ids::Task,
-        task: TaskDescribe,
-    ) {
-        self.add_method_task_map(mid, task_id);
-        self.add_task(task_id, task);
+        inner_event: InnerEvent,
+        _raw_session_id: String,
+        target_id: target::TargetId,
+    ) -> Option<TaskDescribe> {
+        match inner_event {
+            InnerEvent::SetChildNodes(set_child_nodes_event) => {
+                let params = set_child_nodes_event.params;
+                return TaskDescribe::SetChildNodes(target_id, params.parent_id, params.nodes)
+                    .into();
+            }
+            InnerEvent::LoadEventFired(load_event_fired_event) => {
+                let params = load_event_fired_event.params;
+                return TaskDescribe::LoadEventFired(target_id, params.timestamp).into();
+            }
+            _ => {
+                info!("discard inner event: {:?}", inner_event);
+            }
+        }
+        None
     }
+
+    pub fn parse_response_error(response: protocol::Response) -> Result<protocol::Response, Error> {
+        if let Some(error) = response.error {
+            Err(error.into())
+        } else {
+            Ok(response)
+        }
+    }
+
+    
+
+    pub fn handle_response_1(
+        &mut self,
+        resp: protocol::Response,
+        _session_id: Option<String>,
+        _target_id: Option<String>,
+    ) -> Option<TaskDescribe> {
+        trace!("got **response**. {:?}", resp);
+        let call_id = resp.call_id;
+        if let Some(idx) = self.tasks_waiting_for_response.iter().position(|v| {
+            if let Some(it) = v.get(0) {
+                if let Some(cf) = it.get_common_fields() {
+                    cf.call_id == call_id
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }) {
+            let mut tasks = self.tasks_waiting_for_response.remove(idx);
+            let mut current_task = tasks.remove(0);
+
+            if let Err(err) = self.full_fill_task(resp, &mut current_task) {
+                error!("fulfill task failed. {:?}", err);
+                return Some(current_task);
+            }
+            if tasks.is_empty() {
+                return Some(current_task);
+            }
+            self.handle_next_task(current_task, tasks);
+        } else {
+            trace!("no matching task for call_id: {:?}", call_id);
+        }
+        None
+    }
+
+    fn handle_next_task(&mut self, current_task: TaskDescribe,mut tasks: Vec<TaskDescribe>) {
+        let mut next_task = tasks.get_mut(0).unwrap();
+        match (&current_task, &mut next_task) {
+            (TaskDescribe::GetDocument(get_document), TaskDescribe::QuerySelector(query_selector)) => {
+                query_selector.node_id = get_document.root_node.as_ref().and_then(|nd|Some(nd.node_id));
+                if let Ok(method_str) = String::try_from(&*next_task) {
+                    self.tasks_waiting_for_response.push(tasks);
+                    self.send_message_direct(method_str);
+                } else {
+                    error!("deseria");
+                }
+            }
+            (TaskDescribe::QuerySelector(query_selector), TaskDescribe::DescribeNode(describe_node)) => {
+                
+            }
+            _ => {
+                error!("unknow pair: {:?}, {:?}", current_task, next_task);
+            }
+        }
+
+    }
+
+    fn full_fill_task(&self, resp: protocol::Response, mut task: &mut TaskDescribe) -> Result<(), failure::Error> {
+            match &mut task {
+                TaskDescribe::GetDocument(get_document) => {
+                    let get_document_return_object = protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
+                    get_document.root_node = Some(get_document_return_object.root);
+                }
+                TaskDescribe::PageEnable(_common_fields) => {
+                }
+                TaskDescribe::QuerySelector(query_selector) => {
+                    let query_select_return_object = protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
+                    query_selector.found_node_id = Some(query_select_return_object.node_id);
+                }
+                TaskDescribe::DescribeNode(describe_node) => {
+                    let describe_node_return_object = protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
+                    describe_node.found_node = Some(describe_node_return_object.node);
+                }
+                TaskDescribe::GetBoxModel(get_box_model) => {
+                    let get_box_model_return_object = protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp)?;
+                    let raw_model = get_box_model_return_object.model;
+                    let model_box = BoxModel {
+                        content: ElementQuad::from_raw_points(&raw_model.content),
+                        padding: ElementQuad::from_raw_points(&raw_model.padding),
+                        border: ElementQuad::from_raw_points(&raw_model.border),
+                        margin: ElementQuad::from_raw_points(&raw_model.margin),
+                        width: raw_model.width,
+                        height: raw_model.height,
+                    };
+                    get_box_model.found_box = Some(model_box);
+                }
+                TaskDescribe::ScreenShot(screen_shot) => {
+                    let capture_screenshot_return_object = protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
+                    screen_shot.base64 = Some(capture_screenshot_return_object.data);
+                }
+                task_describe => {
+                    info!("got unprocessed task_describe: {:?}", task_describe);
+                }
+            }
+            Ok(())
+    }
+
+    fn handle_protocol_event(
+        &mut self,
+        protocol_event: protocol::Event,
+        _session_id: Option<String>,
+        target_id: Option<String>,
+    ) -> Option<TaskDescribe> {
+        match protocol_event {
+            protocol::Event::FrameNavigated(frame_navigated_event) => {
+                let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
+                return Some(TaskDescribe::FrameNavigated(
+                    target_id.unwrap(),
+                    changing_frame,
+                ));
+            }
+            protocol::Event::TargetInfoChanged(target_info_changed) => {
+                return Some(TaskDescribe::TargetInfoChanged(
+                    target_info_changed.params.target_info,
+                ));
+            }
+            protocol::Event::TargetCreated(target_created_event) => {
+                let target_type = &(target_created_event.params.target_info.target_type);
+                match target_type {
+                    protocol::target::TargetType::Page => {
+                        trace!(
+                            "receive page create event. {:?}",
+                            target_created_event.params.target_info
+                        );
+                        return Some(TaskDescribe::PageCreated(
+                            target_created_event.params.target_info,
+                            None,
+                        ));
+                    }
+                    _ => (),
+                }
+            }
+            protocol::Event::AttachedToTarget(event) => {
+                let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
+                    event.params;
+                let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
+
+                match target_info.target_type {
+                    protocol::target::TargetType::Page => {
+                        info!(
+                            "got attach to page event and sessionId: {}",
+                            attach_to_target_params.session_id
+                        );
+                        return Some(TaskDescribe::PageAttached(
+                            target_info,
+                            attach_to_target_params.session_id.into(),
+                        ));
+                        // return Some((attach_to_target_params.session_id, target_info));
+                    }
+                    _ => (),
+                }
+            }
+            _ => {
+                error!("unprocessed inner event: {:?}", protocol_event);
+            }
+        }
+        None
+    }
+}
+
+pub fn parse_raw_message(raw_message: &str) -> Result<inner_event::InnerEventWrapper, Error> {
+    Ok(serde_json::from_str::<inner_event::InnerEventWrapper>(
+        raw_message,
+    )?)
+}
+
+// The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
+impl Stream for ChromeDebugSession {
+    type Item = TaskDescribe;
+    type Error = failure::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        loop {
+            if let Some(value) = try_ready!(self.chrome_browser.poll()) {
+                match value {
+                    protocol::Message::Response(resp) => {
+                        if let Some(page_message) = self.handle_response_1(resp, None, None) {
+                            break Ok(Some(page_message).into());
+                        }
+                    }
+                    protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
+                        target_message_event,
+                    )) => {
+                        let event_params = &target_message_event.params;
+                        let session_id = event_params.session_id.clone();
+                        let target_id = event_params.target_id.clone();
+                        let message_field = &event_params.message;
+                        match protocol::parse_raw_message(&message_field) {
+                            Ok(protocol::Message::Response(resp)) => {
+                                if let Some(page_message) =
+                                    self.handle_response_1(resp, Some(session_id), Some(target_id))
+                                {
+                                    break Ok(Some(page_message).into());
+                                }
+                            }
+                            Ok(protocol::Message::Event(protocol_event)) => {
+                                if let Some(page_message) = self.handle_protocol_event(
+                                    protocol_event,
+                                    Some(session_id),
+                                    Some(target_id),
+                                ) {
+                                    break Ok(Some(page_message).into());
+                                }
+                            }
+                            _ => {
+                                if let Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) =
+                                    parse_raw_message(&message_field)
+                                {
+                                    info!("got inner event: {:?}", inner_event);
+                                    if let Some(page_message) = self.handle_inner_target_events(
+                                        inner_event,
+                                        session_id,
+                                        target_id,
+                                    ) {
+                                        break Ok(Some(page_message).into());
+                                    }
+                                } else {
+                                    error!("unprocessed ** {:?}", message_field);
+                                }
+                            }
+                        }
+                    }
+                    protocol::Message::Event(protocol_event) => {
+                        if let Some(page_message) =
+                            self.handle_protocol_event(protocol_event, None, None)
+                        {
+                            break Ok(Some(page_message).into());
+                        }
+
+                    }
+                    //                             pub enum Event {
+                    //     #[serde(rename = "Target.attachedToTarget")]
+                    //     AttachedToTarget(target::events::AttachedToTargetEvent),
+                    //     #[serde(rename = "Target.receivedMessageFromTarget")]
+                    //     ReceivedMessageFromTarget(target::events::ReceivedMessageFromTargetEvent),
+                    //     #[serde(rename = "Target.targetInfoChanged")]
+                    //     TargetInfoChanged(target::events::TargetInfoChangedEvent),
+                    //     #[serde(rename = "Target.targetCreated")]
+                    //     TargetCreated(target::events::TargetCreatedEvent),
+                    //     #[serde(rename = "Target.targetDestroyed")]
+                    //     TargetDestroyed(target::events::TargetDestroyedEvent),
+                    //     #[serde(rename = "Page.frameStartedLoading")]
+                    //     FrameStartedLoading(page::events::FrameStartedLoadingEvent),
+                    //     #[serde(rename = "Page.frameNavigated")]
+                    //     FrameNavigated(page::events::FrameNavigatedEvent),
+                    //     #[serde(rename = "Page.frameAttached")]
+                    //     FrameAttached(page::events::FrameAttachedEvent),
+                    //     #[serde(rename = "Page.frameStoppedLoading")]
+                    //     FrameStoppedLoading(page::events::FrameStoppedLoadingEvent),
+                    //     #[serde(rename = "Page.lifecycleEvent")]
+                    //     Lifecycle(page::events::LifecycleEvent),
+                    //     #[serde(rename = "Network.requestIntercepted")]
+                    //     RequestIntercepted(network::events::RequestInterceptedEvent),
+                    // }
+                    other => {
+                        error!("got unknown message1: {:?}", other);
+                    }
+                }
+            // trace!("receive message: {:?}", value);
+            // return Ok(Some(PageMessage::MessageAvailable(value)).into());
+            // }
+            // }
+            } else {
+                error!("got None, was stream ended?");
+            }
+        }
+    }
+}
+
+// pub type OnePageWithTimeout = TimeoutStream<OnePage>;
+// Page.frameAttached -> Page.frameStartedLoading(44) -> Page.frameNavigated(48) -> Page.domContentEventFired(64) -> Page.loadEventFired(131) -> Page.frameStoppedLoading(132)
+
+// target_id and browser_context_id keep unchanged.
+// Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams {
+// target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))
+// target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "https://pc", url: "https://pc", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))
+
+    // pub fn method_id_2_task_id_remain(&self) -> usize {
+    //     info!("{:?}", self.method_id_2_task_id);
+    //     self.method_id_2_task_id.len()
+    // }
+
+    // pub fn task_id_2_task_remain(&self) -> usize {
+    //     info!("{:?}", self.task_id_2_task);
+    //     self.task_id_2_task.len()
+    // }
+
+    // pub fn pending_tasks_remain(&self) -> usize {
+    //     info!("{:?}", self.pending_tasks);
+    //     self.pending_tasks.len()
+    // }
+
+    // pub fn send_message_and_save_task(&mut self, task: TaskDescribe) {
+    //     let cf = task.get_common_fields().unwrap();
+        
+    //     if self.pending_tasks.is_empty() {
+    //         match String::try_from(&task) {
+    //             Ok(method_str) => self.chrome_browser.send_message(method_str),
+    //             Err(err) => error!("{:?}", err),
+    //         }
+    //     }
+        
+    //     self.pending_tasks.push_back(cf.task_id);
+    //     self.add_task_and_method_map(
+    //             cf.call_id,
+    //             cf.task_id,
+    //             task,
+    //     );
+    //     trace!("current pending tasks: {:?}", self.pending_tasks);
+    // }
+
+    // pub fn add_task(&mut self, task_id: ids::Task, task: TaskDescribe) {
+    //     info!("add task id and task: {:?}, {:?}", task_id, task);
+    //     self.task_id_2_task.insert(task_id, task);
+    // }
+
+    // pub fn add_method_task_map(&mut self, mid: usize, task_id: ids::Task) {
+    //     if self.method_id_2_task_id.contains_key(&mid) {
+    //         warn!("mid already exists in map. {:?}", mid);
+    //     }
+    //     info!("insert mid task_id pair: ({:?}, {:?})", mid, task_id);
+    //     self.method_id_2_task_id.entry(mid).or_insert(task_id);
+    // }
+
+    // pub fn add_task_and_method_map(
+    //     &mut self,
+    //     mid: ids::Method,
+    //     task_id: ids::Task,
+    //     task: TaskDescribe,
+    // ) {
+    //     self.add_method_task_map(mid, task_id);
+    //     self.add_task(task_id, task);
+    // }
 
     // pub fn add_waiting_task(
     //     &mut self,
@@ -211,11 +545,6 @@ impl ChromeDebugSession {
     //     }
     // }
 
-    pub fn resolve_node(&mut self) -> (Option<ids::Task>, Option<ids::RemoteObject>) {
-        (None, None)
-    }
-
-
     // pub fn feed_on_node_id(&mut self, task_id: ids::Task, node_id: Option<dom::NodeId>) -> Option<TaskDescribe> {
     //     let mut waiting_tasks = self.get_waiting_tasks(task_id);
     //     while let Some(mut task) = waiting_tasks.pop() {
@@ -269,445 +598,232 @@ impl ChromeDebugSession {
     //         }
     //     }
     // }
+    // fn invoke_next_task(&mut self) -> bool {
+    //     let next_task_id = self.pending_tasks.front().unwrap();
+    //     if let Some(next_task) = self.task_id_2_task.get(next_task_id){
+    //         match String::try_from(next_task) {
+    //             Ok(method_str) => {
+    //                 self.send_message_direct(method_str);
+    //                 true
+    //             }
+    //             Err(err) => {
+    //                 trace!("unfulfilled task describe. {:?}", err);
+    //                 false
+    //             }
+    //         } 
+    //     } else {
+    //         warn!("no following method to invoke, maybe there is logic problem.");
+    //         true
+    //     }
+    // }
 
-    #[allow(clippy::single_match_else)]
-    #[allow(unreachable_patterns)]
-    pub fn handle_inner_target_events(
-        &mut self,
-        inner_event: InnerEvent,
-        _raw_session_id: String,
-        target_id: target::TargetId,
-    ) -> Option<TaskDescribe> {
-        match inner_event {
-            InnerEvent::SetChildNodes(set_child_nodes_event) => {
-                let params = set_child_nodes_event.params;
-                return TaskDescribe::SetChildNodes(target_id, params.parent_id, params.nodes)
-                    .into();
-            }
-            InnerEvent::LoadEventFired(load_event_fired_event) => {
-                let params = load_event_fired_event.params;
-                return TaskDescribe::LoadEventFired(target_id, params.timestamp).into();
-            }
-            _ => {
-                info!("discard inner event: {:?}", inner_event);
-            }
-        }
-        None
-    }
+    // pub fn after_get_document(&mut self, node_id: dom::NodeId) {
+    //     // feed node_id to waiting invokes. then get first invoke and invoke it.
+    //     let it = self.pending_tasks.clone();
+    //     it.iter().for_each(|task_id|{
+    //         if let Some(mut next_task) = self.task_id_2_task.get_mut(&task_id){
+    //             match &mut next_task {
+    //                 tasks::TaskDescribe::QuerySelector(query_selector) => {
+    //                     query_selector.node_id = Some(node_id);
+    //                 }
+    //                 tasks::TaskDescribe::DescribeNode(_describe_node) => {
+    //                     // describe_node.node_id = Some(node_id);
+    //                 }
+    //                 _ => (),
+    //             }
+    //         } else {
+    //             error!("cannot find task in task_id_2_task: {:?}", task_id);
+    //         }
+    //     });
+    //     self.invoke_next_task();
+    // }
 
-    pub fn parse_response_error(response: protocol::Response) -> Result<protocol::Response, Error> {
-        if let Some(error) = response.error {
-            Err(error.into())
-        } else {
-            Ok(response)
-        }
-    }
+    // #[allow(clippy::single_match_else)]
+    // fn process_pending_tasks(&mut self, current_task: &TaskDescribe) {
+    //     if let Some(cf) = current_task.get_common_fields() {
+    //         let task_id = cf.task_id;
+    //         if let Some(pending_task_id) = self.pending_tasks.pop_front() { // remove current completed task id.
+    //             if pending_task_id == task_id {
+    //                 if self.pending_tasks.is_empty() {
+    //                     trace!("no pending tasks.");
+    //                 } else {
+    //                         // try to invoke next task, if next task describe is fulfilled it runs or it will fail.
+    //                         if self.invoke_next_task() {
+    //                             trace!("got fulfilled task, run it.");
+    //                         } else {
+    //                             match current_task {
+    //                                 TaskDescribe::GetDocument(get_document) => {
+    //                                     let nd = get_document.root_node.as_ref().unwrap().node_id;
+    //                                     self.after_get_document(nd);
+    //                                 }
+    //                                 TaskDescribe::QuerySelector(_query_selector) => {
 
-    fn invoke_next_task(&mut self) -> bool {
-        let next_task_id = self.pending_tasks.front().unwrap();
-        if let Some(next_task) = self.task_id_2_task.get(next_task_id){
-            match String::try_from(next_task) {
-                Ok(method_str) => {
-                    self.send_message_direct(method_str);
-                    true
-                }
-                Err(err) => {
-                    trace!("unfulfilled task describe. {:?}", err);
-                    false
-                }
-            } 
-        } else {
-            warn!("no following method to invoke, maybe there is logic problem.");
-            true
-        }
-    }
-
-    pub fn after_get_document(&mut self, node_id: dom::NodeId) {
-        // feed node_id to waiting invokes. then get first invoke and invoke it.
-        let it = self.pending_tasks.clone();
-        it.iter().for_each(|task_id|{
-            if let Some(mut next_task) = self.task_id_2_task.get_mut(&task_id){
-                match &mut next_task {
-                    tasks::TaskDescribe::QuerySelector(query_selector) => {
-                        query_selector.node_id = Some(node_id);
-                    }
-                    tasks::TaskDescribe::DescribeNode(_describe_node) => {
-                        // describe_node.node_id = Some(node_id);
-                    }
-                    _ => (),
-                }
-            } else {
-                error!("cannot find task in task_id_2_task: {:?}", task_id);
-            }
-        });
-        self.invoke_next_task();
-    }
-
-    #[allow(clippy::single_match_else)]
-    fn process_pending_tasks(&mut self, current_task: &TaskDescribe) {
-        if let Some(cf) = current_task.get_common_fields() {
-            let task_id = cf.task_id;
-            if let Some(pending_task_id) = self.pending_tasks.pop_front() { // remove current completed task id.
-                if pending_task_id == task_id {
-                    if self.pending_tasks.is_empty() {
-                        trace!("no pending tasks.");
-                    } else {
-                            // try to invoke next task, if next task describe is fulfilled it runs or it will fail.
-                            if self.invoke_next_task() {
-                                trace!("got fulfilled task, run it.");
-                            } else {
-                                match current_task {
-                                    TaskDescribe::GetDocument(get_document) => {
-                                        let nd = get_document.root_node.as_ref().unwrap().node_id;
-                                        self.after_get_document(nd);
-                                    }
-                                    TaskDescribe::QuerySelector(_query_selector) => {
-
-                                    }
-                                    _ => {
-                                        warn!("unprocessed after task: {:?}", current_task);
-                                    }
-                                }
-                            }
-                    }
-                } else {
-                    error!("unmatched task ids, pending_task_id: {:?}, this task id: {:?}", pending_task_id, task_id);
-                }
-            } else {
-                error!("missing pending task_id: {:?}", task_id);
-            }
-        } else {
-            error!("no common fields for task: {:?}", current_task);
-        }
-    }
+    //                                 }
+    //                                 _ => {
+    //                                     warn!("unprocessed after task: {:?}", current_task);
+    //                                 }
+    //                             }
+    //                         }
+    //                 }
+    //             } else {
+    //                 error!("unmatched task ids, pending_task_id: {:?}, this task id: {:?}", pending_task_id, task_id);
+    //             }
+    //         } else {
+    //             error!("missing pending task_id: {:?}", task_id);
+    //         }
+    //     } else {
+    //         error!("no common fields for task: {:?}", current_task);
+    //     }
+    // }
 
 
-    pub fn handle_response(
-        &mut self,
-        resp: protocol::Response,
-        _session_id: Option<String>,
-        _target_id: Option<String>,
-    ) -> Option<TaskDescribe> {
-        trace!("got **response**. {:?}", resp);
-        let call_id = resp.call_id;
-        // remove method id and task from page scope hashmap.
-        let maybe_matched_task = self
-            .method_id_2_task_id
-            .remove(&call_id)
-            .and_then(|task_id| self.task_id_2_task.remove(&task_id))
-            .or_else(|| {
-                error!(
-                    "not matching task_id to call_id {}. resp {:?}",
-                    call_id, resp
-                );
-                None
-            });
-        // already remove from method_id_2_task_id and task_id_2_task!!!
+
+    // pub fn handle_response(
+    //     &mut self,
+    //     resp: protocol::Response,
+    //     _session_id: Option<String>,
+    //     _target_id: Option<String>,
+    // ) -> Option<TaskDescribe> {
+    //     trace!("got **response**. {:?}", resp);
+    //     let call_id = resp.call_id;
+    //     // remove method id and task from page scope hashmap.
+    //     let maybe_matched_task = self
+    //         .method_id_2_task_id
+    //         .remove(&call_id)
+    //         .and_then(|task_id| self.task_id_2_task.remove(&task_id))
+    //         .or_else(|| {
+    //             error!(
+    //                 "not matching task_id to call_id {}. resp {:?}",
+    //                 call_id, resp
+    //             );
+    //             None
+    //         });
+    //     // already remove from method_id_2_task_id and task_id_2_task!!!
         
-        // if let Some(error) = resp.error {
-        //     return Err(error.into());
-        // }
+    //     // if let Some(error) = resp.error {
+    //     //     return Err(error.into());
+    //     // }
 
-        // message: "{\"id\":6,\"result\":{\"root\":{\"nodeId\":1,\"backendNodeId\":3,\"nodeType\":9,\"nodeName\":\"#document\",\"localName\":\"\",\"nodeValue\":\"\",\"childNodeCount\":2,\"documentURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"baseURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"xmlVersion\":\"\"}}}"
-        // if json_assistor::response_result_field_has_properties(&resp, "root", vec!["nodeId", "backendNodeId"]) {
-        //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
-        // }
+    //     // message: "{\"id\":6,\"result\":{\"root\":{\"nodeId\":1,\"backendNodeId\":3,\"nodeType\":9,\"nodeName\":\"#document\",\"localName\":\"\",\"nodeValue\":\"\",\"childNodeCount\":2,\"documentURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"baseURL\":\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\",\"xmlVersion\":\"\"}}}"
+    //     // if json_assistor::response_result_field_has_properties(&resp, "root", vec!["nodeId", "backendNodeId"]) {
+    //     //    let node: dom::methods::GetDocumentReturnObject = serde_json::from_value(resp.result.unwrap()).unwrap();
+    //     // }
 
-        if let Some(task) = maybe_matched_task {
-            match task {
-                TaskDescribe::GetDocument(get_document) => {
-                    // it must be a GetDocumentReturnObject or else something must go wrong.
-                    match protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp) {
-                        Ok(get_document_return_object) => {
-                            // let node_id = get_document_return_object.root.node_id;
-                            // self.feed_on_root_node_id(task_id, node_id);
-                            let t = TaskDescribe::GetDocument(tasks::GetDocument {
-                                root_node: Some(get_document_return_object.root),
-                                ..get_document
-                            });
-                            self.process_pending_tasks(&t);
-                            return Some(t);
-                        }
-                        Err(remote_error) => panic!("{:?}", remote_error)
-                    }
-                }
-                TaskDescribe::PageEnable(common_fields) => {
-                    let t = TaskDescribe::PageEnable(common_fields);
-                    self.process_pending_tasks(&t);
-                    return Some(t);
-                }
-                TaskDescribe::QuerySelector(query_selector) => {
-                    match protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
-                        Ok(query_select_return_object) => {
-                            let is_manual = query_selector.common_fields.is_manual;
-                            let t = TaskDescribe::QuerySelector(tasks::QuerySelector {
-                                    found_node_id: Some(query_select_return_object.node_id),
-                                    ..query_selector
-                                });
-                            self.process_pending_tasks(&t);
-                            if is_manual {
-                                return Some(t);
-                            }
-                        }
-                        Err(remote_error) => {
-                            error!("{:?}, {:?}", query_selector, remote_error);
-                            // if let Some(tk) = self.feed_on_node_id(
-                            //     query_selector.task_id,
-                            //     None,
-                            // ) {
-                            //     return Some(tk);
-                            // }
-                            return Some(TaskDescribe::QuerySelector(query_selector));
-                        }
-                    }
-                }
+    //     if let Some(task) = maybe_matched_task {
+    //         match task {
+    //             TaskDescribe::GetDocument(get_document) => {
+    //                 // it must be a GetDocumentReturnObject or else something must go wrong.
+    //                 match protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp) {
+    //                     Ok(get_document_return_object) => {
+    //                         // let node_id = get_document_return_object.root.node_id;
+    //                         // self.feed_on_root_node_id(task_id, node_id);
+    //                         let t = TaskDescribe::GetDocument(tasks::GetDocument {
+    //                             root_node: Some(get_document_return_object.root),
+    //                             ..get_document
+    //                         });
+    //                         self.process_pending_tasks(&t);
+    //                         return Some(t);
+    //                     }
+    //                     Err(remote_error) => panic!("{:?}", remote_error)
+    //                 }
+    //             }
+    //             TaskDescribe::PageEnable(common_fields) => {
+    //                 let t = TaskDescribe::PageEnable(common_fields);
+    //                 self.process_pending_tasks(&t);
+    //                 return Some(t);
+    //             }
+    //             TaskDescribe::QuerySelector(query_selector) => {
+    //                 match protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp) {
+    //                     Ok(query_select_return_object) => {
+    //                         let is_manual = query_selector.common_fields.is_manual;
+    //                         let t = TaskDescribe::QuerySelector(tasks::QuerySelector {
+    //                                 found_node_id: Some(query_select_return_object.node_id),
+    //                                 ..query_selector
+    //                             });
+    //                         self.process_pending_tasks(&t);
+    //                         if is_manual {
+    //                             return Some(t);
+    //                         }
+    //                     }
+    //                     Err(remote_error) => {
+    //                         error!("{:?}, {:?}", query_selector, remote_error);
+    //                         // if let Some(tk) = self.feed_on_node_id(
+    //                         //     query_selector.task_id,
+    //                         //     None,
+    //                         // ) {
+    //                         //     return Some(tk);
+    //                         // }
+    //                         return Some(TaskDescribe::QuerySelector(query_selector));
+    //                     }
+    //                 }
+    //             }
 
-                TaskDescribe::DescribeNode(mut describe_node) => {
-                    match protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
-                        Ok(describe_node_return_object) => {
-                            if describe_node.common_fields.is_manual {
-                                describe_node.found_node = Some(describe_node_return_object.node);
-                                let t = TaskDescribe::DescribeNode(describe_node);
-                                self.process_pending_tasks(&t);
-                                return Some(t);
-                            }
-                        }
-                        Err(remote_error) => {
-                            error!("{:?}, {:?}",describe_node, remote_error);
-                            return Some(TaskDescribe::DescribeNode(describe_node));
-                        }
-                    }
-                }
+    //             TaskDescribe::DescribeNode(mut describe_node) => {
+    //                 match protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp) {
+    //                     Ok(describe_node_return_object) => {
+    //                         if describe_node.common_fields.is_manual {
+    //                             describe_node.found_node = Some(describe_node_return_object.node);
+    //                             let t = TaskDescribe::DescribeNode(describe_node);
+    //                             self.process_pending_tasks(&t);
+    //                             return Some(t);
+    //                         }
+    //                     }
+    //                     Err(remote_error) => {
+    //                         error!("{:?}, {:?}",describe_node, remote_error);
+    //                         return Some(TaskDescribe::DescribeNode(describe_node));
+    //                     }
+    //                 }
+    //             }
 
-                TaskDescribe::GetBoxModel(mut get_box_model) => {
-                    match protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp) {
-                        Ok(get_box_model_return_object) => {
-                            let raw_model = get_box_model_return_object.model;
-                            let model_box = BoxModel {
-                                content: ElementQuad::from_raw_points(&raw_model.content),
-                                padding: ElementQuad::from_raw_points(&raw_model.padding),
-                                border: ElementQuad::from_raw_points(&raw_model.border),
-                                margin: ElementQuad::from_raw_points(&raw_model.margin),
-                                width: raw_model.width,
-                                height: raw_model.height,
-                            };
-                            let is_manual = get_box_model.common_fields.is_manual;
-                            get_box_model.found_box = Some(model_box);
-                            // let task_id = get_box_model.task_id;
-                            let t = TaskDescribe::GetBoxModel(get_box_model);
-                            self.process_pending_tasks(&t);
-                            // self.feed_on_box_model(get_box_model.task_id, model_box.clone());
-                            if is_manual {
-                                return Some(t);
-                            }
-                        }
-                        Err(remote_error) => {
-                            error!("{:?}", remote_error);
-                            return Some(TaskDescribe::GetBoxModel(get_box_model));
-                        }
-                    }
-                }
-                TaskDescribe::ScreenShot(mut screen_shot) => {
-                    match protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp) {
-                        Ok(capture_screenshot_return_object) => {
-                            screen_shot.base64 = Some(capture_screenshot_return_object.data);
-                            // let task_id = screen_shot.task_id;
-                            let t = TaskDescribe::ScreenShot(screen_shot);
-                            self.process_pending_tasks(&t);
-                            return Some(t);
-                        }
-                        Err(remote_error) => {
-                            error!("{:?}", remote_error);
-                            return Some(TaskDescribe::ScreenShot(screen_shot));
-                        }
-                    }
-                }
-                task_describe => {
-                    info!("got task_describe: {:?}", task_describe);
-                }
-            }
-        } else {
-            error!("method id {:?} has no task matched. {:?}", call_id, resp);
-        }
-        None
-    }
-
-    fn handle_protocol_event(
-        &mut self,
-        protocol_event: protocol::Event,
-        _session_id: Option<String>,
-        target_id: Option<String>,
-    ) -> Option<TaskDescribe> {
-        match protocol_event {
-            protocol::Event::FrameNavigated(frame_navigated_event) => {
-                let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
-                return Some(TaskDescribe::FrameNavigated(
-                    target_id.unwrap(),
-                    changing_frame,
-                ));
-            }
-            protocol::Event::TargetInfoChanged(target_info_changed) => {
-                return Some(TaskDescribe::TargetInfoChanged(
-                    target_info_changed.params.target_info,
-                ));
-            }
-            protocol::Event::TargetCreated(target_created_event) => {
-                let target_type = &(target_created_event.params.target_info.target_type);
-                match target_type {
-                    protocol::target::TargetType::Page => {
-                        trace!(
-                            "receive page create event. {:?}",
-                            target_created_event.params.target_info
-                        );
-                        return Some(TaskDescribe::PageCreated(
-                            target_created_event.params.target_info,
-                            None,
-                        ));
-                    }
-                    _ => (),
-                }
-            }
-            protocol::Event::AttachedToTarget(event) => {
-                let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
-                    event.params;
-                let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
-
-                match target_info.target_type {
-                    protocol::target::TargetType::Page => {
-                        info!(
-                            "got attach to page event and sessionId: {}",
-                            attach_to_target_params.session_id
-                        );
-                        return Some(TaskDescribe::PageAttached(
-                            target_info,
-                            attach_to_target_params.session_id.into(),
-                        ));
-                        // return Some((attach_to_target_params.session_id, target_info));
-                    }
-                    _ => (),
-                }
-            }
-            _ => {
-                error!("unprocessed inner event: {:?}", protocol_event);
-            }
-        }
-        None
-    }
-}
-
-pub fn parse_raw_message(raw_message: &str) -> Result<inner_event::InnerEventWrapper, Error> {
-    Ok(serde_json::from_str::<inner_event::InnerEventWrapper>(
-        raw_message,
-    )?)
-}
-
-// The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
-impl Stream for ChromeDebugSession {
-    type Item = TaskDescribe;
-    type Error = failure::Error;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            if let Some(value) = try_ready!(self.chrome_browser.poll()) {
-                match value {
-                    protocol::Message::Response(resp) => {
-                        if let Some(page_message) = self.handle_response(resp, None, None) {
-                            break Ok(Some(page_message).into());
-                        }
-                    }
-                    protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
-                        target_message_event,
-                    )) => {
-                        let event_params = &target_message_event.params;
-                        let session_id = event_params.session_id.clone();
-                        let target_id = event_params.target_id.clone();
-                        let message_field = &event_params.message;
-                        match protocol::parse_raw_message(&message_field) {
-                            Ok(protocol::Message::Response(resp)) => {
-                                if let Some(page_message) =
-                                    self.handle_response(resp, Some(session_id), Some(target_id))
-                                {
-                                    break Ok(Some(page_message).into());
-                                }
-                            }
-                            Ok(protocol::Message::Event(protocol_event)) => {
-                                if let Some(page_message) = self.handle_protocol_event(
-                                    protocol_event,
-                                    Some(session_id),
-                                    Some(target_id),
-                                ) {
-                                    break Ok(Some(page_message).into());
-                                }
-                            }
-                            _ => {
-                                if let Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) =
-                                    parse_raw_message(&message_field)
-                                {
-                                    info!("got inner event: {:?}", inner_event);
-                                    if let Some(page_message) = self.handle_inner_target_events(
-                                        inner_event,
-                                        session_id,
-                                        target_id,
-                                    ) {
-                                        break Ok(Some(page_message).into());
-                                    }
-                                } else {
-                                    error!("unprocessed ** {:?}", message_field);
-                                }
-                            }
-                        }
-                    }
-                    protocol::Message::Event(protocol_event) => {
-                        if let Some(page_message) =
-                            self.handle_protocol_event(protocol_event, None, None)
-                        {
-                            break Ok(Some(page_message).into());
-                        }
-
-                    }
-                    //                             pub enum Event {
-                    //     #[serde(rename = "Target.attachedToTarget")]
-                    //     AttachedToTarget(target::events::AttachedToTargetEvent),
-                    //     #[serde(rename = "Target.receivedMessageFromTarget")]
-                    //     ReceivedMessageFromTarget(target::events::ReceivedMessageFromTargetEvent),
-                    //     #[serde(rename = "Target.targetInfoChanged")]
-                    //     TargetInfoChanged(target::events::TargetInfoChangedEvent),
-                    //     #[serde(rename = "Target.targetCreated")]
-                    //     TargetCreated(target::events::TargetCreatedEvent),
-                    //     #[serde(rename = "Target.targetDestroyed")]
-                    //     TargetDestroyed(target::events::TargetDestroyedEvent),
-                    //     #[serde(rename = "Page.frameStartedLoading")]
-                    //     FrameStartedLoading(page::events::FrameStartedLoadingEvent),
-                    //     #[serde(rename = "Page.frameNavigated")]
-                    //     FrameNavigated(page::events::FrameNavigatedEvent),
-                    //     #[serde(rename = "Page.frameAttached")]
-                    //     FrameAttached(page::events::FrameAttachedEvent),
-                    //     #[serde(rename = "Page.frameStoppedLoading")]
-                    //     FrameStoppedLoading(page::events::FrameStoppedLoadingEvent),
-                    //     #[serde(rename = "Page.lifecycleEvent")]
-                    //     Lifecycle(page::events::LifecycleEvent),
-                    //     #[serde(rename = "Network.requestIntercepted")]
-                    //     RequestIntercepted(network::events::RequestInterceptedEvent),
-                    // }
-                    other => {
-                        error!("got unknown message1: {:?}", other);
-                    }
-                }
-            // trace!("receive message: {:?}", value);
-            // return Ok(Some(PageMessage::MessageAvailable(value)).into());
-            // }
-            // }
-            } else {
-                error!("got None, was stream ended?");
-            }
-        }
-    }
-}
-
-// pub type OnePageWithTimeout = TimeoutStream<OnePage>;
-// Page.frameAttached -> Page.frameStartedLoading(44) -> Page.frameNavigated(48) -> Page.domContentEventFired(64) -> Page.loadEventFired(131) -> Page.frameStoppedLoading(132)
-
-// target_id and browser_context_id keep unchanged.
-// Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams {
-// target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))
-// target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "https://pc", url: "https://pc", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))
+    //             TaskDescribe::GetBoxModel(mut get_box_model) => {
+    //                 match protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp) {
+    //                     Ok(get_box_model_return_object) => {
+    //                         let raw_model = get_box_model_return_object.model;
+    //                         let model_box = BoxModel {
+    //                             content: ElementQuad::from_raw_points(&raw_model.content),
+    //                             padding: ElementQuad::from_raw_points(&raw_model.padding),
+    //                             border: ElementQuad::from_raw_points(&raw_model.border),
+    //                             margin: ElementQuad::from_raw_points(&raw_model.margin),
+    //                             width: raw_model.width,
+    //                             height: raw_model.height,
+    //                         };
+    //                         let is_manual = get_box_model.common_fields.is_manual;
+    //                         get_box_model.found_box = Some(model_box);
+    //                         // let task_id = get_box_model.task_id;
+    //                         let t = TaskDescribe::GetBoxModel(get_box_model);
+    //                         self.process_pending_tasks(&t);
+    //                         // self.feed_on_box_model(get_box_model.task_id, model_box.clone());
+    //                         if is_manual {
+    //                             return Some(t);
+    //                         }
+    //                     }
+    //                     Err(remote_error) => {
+    //                         error!("{:?}", remote_error);
+    //                         return Some(TaskDescribe::GetBoxModel(get_box_model));
+    //                     }
+    //                 }
+    //             }
+    //             TaskDescribe::ScreenShot(mut screen_shot) => {
+    //                 match protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp) {
+    //                     Ok(capture_screenshot_return_object) => {
+    //                         screen_shot.base64 = Some(capture_screenshot_return_object.data);
+    //                         // let task_id = screen_shot.task_id;
+    //                         let t = TaskDescribe::ScreenShot(screen_shot);
+    //                         self.process_pending_tasks(&t);
+    //                         return Some(t);
+    //                     }
+    //                     Err(remote_error) => {
+    //                         error!("{:?}", remote_error);
+    //                         return Some(TaskDescribe::ScreenShot(screen_shot));
+    //                     }
+    //                 }
+    //             }
+    //             task_describe => {
+    //                 info!("got task_describe: {:?}", task_describe);
+    //             }
+    //         }
+    //     } else {
+    //         error!("method id {:?} has no task matched. {:?}", call_id, resp);
+    //     }
+    //     None
+    // }

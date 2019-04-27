@@ -70,7 +70,7 @@ impl Future for QuerySelector {
                         self.call_count += 1;
                         if task_id == Some(102) {
                             assert_eq!(selector, "#not-existed");
-                            assert_eq!(node_id, Some(0));
+                            assert_eq!(node_id, None);
                         } else if task_id == Some(100) {
                             self.task_id_100_called = true;
                         } else {

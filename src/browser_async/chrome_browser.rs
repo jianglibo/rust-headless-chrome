@@ -18,6 +18,7 @@ use websocket::message::OwnedMessage;
 use websocket::r#async::client::{Client, ClientNew};
 use websocket::r#async::TcpStream;
 use websocket::ClientBuilder;
+use std::collections::VecDeque;
 
 
 use crate::protocol::target;
@@ -53,6 +54,7 @@ pub struct ChromeBrowser {
     ws_client: Option<WsClient>,
     process: Option<Process>,
     last_be_polled: Instant,
+    waiting_to_send: VecDeque<String>,
 }
 
 impl std::fmt::Debug for ChromeBrowser {
@@ -78,11 +80,19 @@ impl ChromeBrowser {
             ws_client: None,
             process: None,
             last_be_polled: Instant::now(),
+            waiting_to_send: VecDeque::new(),
         }
     }
     pub fn send_message(&mut self, method_str: String) {
         trace!("**sending** : {:?}", method_str);
-        self.state = BrowserState::StartSend(method_str);
+        match self.state {
+            BrowserState::StartSend(_) | BrowserState::Sending => {
+                self.waiting_to_send.push_back(method_str);
+            }
+            _ => {
+                self.state = BrowserState::StartSend(method_str);
+            }
+        }
     }
 
     pub fn have_not_be_polled_for(&self, duration: Duration) -> bool {
@@ -181,7 +191,11 @@ impl Stream for ChromeBrowser {
                     match self.ws_client.as_mut().unwrap().poll_complete() {
                         Ok(Async::Ready(_)) => {
                             info!("switch to receiving state.");
-                            self.state = BrowserState::Receiving;
+                            if let Some(first) = self.waiting_to_send.pop_front() {
+                                self.state = BrowserState::StartSend(first);
+                            } else {
+                                self.state = BrowserState::Receiving;
+                            }
                         }
                         Ok(Async::NotReady) => {
                             trace!("sending not ready.");

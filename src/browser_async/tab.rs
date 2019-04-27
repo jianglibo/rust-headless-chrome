@@ -90,38 +90,90 @@ impl Tab {
         }).find(|frame| filter(frame))
     }
 
-    pub fn get_document(
-        &mut self,
-        depth: Option<u8>,
-        manual_task_id: Option<ids::Task>,
-    ) -> (Option<ids::Task>, Option<dom::NodeId>) {
-        if let Some(root_node) = &self.root_node {
-            (None, Some(root_node.node_id))
-        } else if self.get_document_task_id.is_none() {
-                let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
-                let call_id = next_call_id();
-                let common_fields = CommonDescribeFields {
-                    task_id: this_task_id,
-                    call_id,
-                    target_id: self.target_info.target_id.clone(),
-                    session_id: self.session_id.clone(),
-                    is_manual,
-                };
-                let dc = tasks::GetDocument {
-                    common_fields,
-                    depth,
-                    pierce: false,
-                    root_node: None,
-                };
-                let task = TaskDescribe::GetDocument(dc); 
-                // let method_str = String::try_from(&task).unwrap();
-                self.chrome_session.lock().unwrap().send_message_and_save_task(task);
-                self.get_document_task_id = Some(this_task_id);
-                (Some(this_task_id), None)
-            } else {
-                (self.get_document_task_id, None)
-            }
+    fn t_s_id(&self) -> (target::TargetId, Option<SessionId>) {
+        (self.target_info.target_id.clone(), self.session_id.clone())
     }
+
+    pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<ids::Task>) {
+        let (t_id, s_id) = self.t_s_id();
+        let task = tasks::GetDocumentTaskBuilder::new(t_id, s_id).task_id_opt(manual_task_id).depth_opt(depth).build();
+        self.chrome_session.lock().unwrap().execute_task(vec![task]);
+    }
+
+    pub fn dom_query_selector_by_selector(
+        &mut self,
+        selector: &'static str,
+        manual_task_id: Option<usize>,
+    ) {
+        let (t_id, s_id) = self.t_s_id();
+        let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
+        let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id, s_id, selector).task_id_opt(manual_task_id).build();
+        self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task]);
+    }
+
+    pub fn page_enable(&mut self) {
+        let (t_id, s_id) = self.t_s_id();
+        let page_enable_task = tasks::PageEnableTaskBuilder::new(t_id, s_id).build();
+        self.chrome_session.lock().unwrap().execute_task(vec![page_enable_task]);
+    }
+
+    // pub fn get_document(
+    //     &mut self,
+    //     depth: Option<u8>,
+    //     manual_task_id: Option<ids::Task>,
+    // ) -> (Option<ids::Task>, Option<dom::NodeId>) {
+    //     if let Some(root_node) = &self.root_node {
+    //         (None, Some(root_node.node_id))
+    //     } else if self.get_document_task_id.is_none() {
+    //             let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+    //             let call_id = next_call_id();
+    //             let common_fields = CommonDescribeFields {
+    //                 task_id: this_task_id,
+    //                 call_id,
+    //                 target_id: self.target_info.target_id.clone(),
+    //                 session_id: self.session_id.clone(),
+    //                 is_manual,
+    //             };
+    //             let dc = tasks::GetDocument {
+    //                 common_fields,
+    //                 depth,
+    //                 pierce: false,
+    //                 root_node: None,
+    //             };
+    //             let task = TaskDescribe::GetDocument(dc); 
+    //             self.chrome_session.lock().unwrap().send_message_and_save_task(task);
+    //             self.get_document_task_id = Some(this_task_id);
+    //             (Some(this_task_id), None)
+    //         } else {
+    //             (self.get_document_task_id, None)
+    //         }
+    // }
+
+    // pub fn get_document_raw(
+    //     &mut self,
+    //     depth: Option<u8>,
+    //     manual_task_id: Option<ids::Task>,
+    // ) -> (Option<ids::Task>, Option<dom::NodeId>) {
+    //         let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+    //         let call_id = next_call_id();
+    //         let common_fields = CommonDescribeFields {
+    //             task_id: this_task_id,
+    //             call_id,
+    //             target_id: self.target_info.target_id.clone(),
+    //             session_id: self.session_id.clone(),
+    //             is_manual,
+    //         };
+    //         let dc = tasks::GetDocument {
+    //             common_fields,
+    //             depth,
+    //             pierce: false,
+    //             root_node: None,
+    //         };
+    //         let task = TaskDescribe::GetDocument(dc);
+    //         let method_str = String::try_from(&task).unwrap();
+    //         self.chrome_session.lock().unwrap().send_message_direct(method_str);
+    //         (Some(this_task_id), None)
+    // }
 
     // pub fn capture_screenshot_by_selector (
     //     &mut self,
@@ -309,40 +361,40 @@ impl Tab {
     //     this_task_id
     // }
 
-    pub fn dom_query_selector_by_selector(
-        &mut self,
-        selector: &'static str,
-        manual_task_id: Option<usize>,
-    ) -> (Option<ids::Task>, Option<dom::NodeId>) {
-        let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
-        let common_fields = CommonDescribeFields {
-            is_manual,
-            session_id: self.session_id.clone(),
-            target_id: self.target_info.target_id.clone(),
-            task_id: this_task_id,
-            call_id: next_call_id(),
-        };
-        let mut qs = tasks::QuerySelector {
-            common_fields,
-            selector,
-            node_id: None,
-            found_node_id: None,
-        };
-        match self.get_document(None, None) {
-            (Some(_get_document_task_id), _) => {
-                self.chrome_session.lock().unwrap().send_message_and_save_task(TaskDescribe::QuerySelector(qs));
-            }
-            (_, Some(node_id)) => {
-                qs.node_id = Some(node_id);
-                let task = TaskDescribe::QuerySelector(qs);
-                self.chrome_session.lock().unwrap().send_message_and_save_task(task);
-            }
-            _ => {
-                error!("get_document return impossible value combination.");
-            }
-        }
-        (Some(this_task_id), None)
-    }
+    // pub fn dom_query_selector_by_selector(
+    //     &mut self,
+    //     selector: &'static str,
+    //     manual_task_id: Option<usize>,
+    // ) -> (Option<ids::Task>, Option<dom::NodeId>) {
+    //     let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
+    //     let common_fields = CommonDescribeFields {
+    //         is_manual,
+    //         session_id: self.session_id.clone(),
+    //         target_id: self.target_info.target_id.clone(),
+    //         task_id: this_task_id,
+    //         call_id: next_call_id(),
+    //     };
+    //     let mut qs = tasks::QuerySelector {
+    //         common_fields,
+    //         selector,
+    //         node_id: None,
+    //         found_node_id: None,
+    //     };
+    //     match self.get_document(None, None) {
+    //         (Some(_get_document_task_id), _) => {
+    //             self.chrome_session.lock().unwrap().send_message_and_save_task(TaskDescribe::QuerySelector(qs));
+    //         }
+    //         (_, Some(node_id)) => {
+    //             qs.node_id = Some(node_id);
+    //             let task = TaskDescribe::QuerySelector(qs);
+    //             self.chrome_session.lock().unwrap().send_message_and_save_task(task);
+    //         }
+    //         _ => {
+    //             error!("get_document return impossible value combination.");
+    //         }
+    //     }
+    //     (Some(this_task_id), None)
+    // }
 
     pub fn attach_to_page(&mut self) {
         let method_str = MethodUtil::create_msg_to_send(
@@ -357,16 +409,4 @@ impl Tab {
         self.chrome_session.lock().unwrap().send_message_direct(method_str);
     }
 
-    pub fn page_enable(&mut self) {
-        let this_task_id = unique_number::create_one();
-        let common_fields = CommonDescribeFields {
-            is_manual: false,
-            session_id: self.session_id.clone(),
-            target_id: self.target_info.target_id.clone(),
-            task_id: this_task_id,
-            call_id: next_call_id(),
-        };
-
-        self.chrome_session.lock().unwrap().send_message_and_save_task(TaskDescribe::PageEnable(common_fields));
-    }
 }

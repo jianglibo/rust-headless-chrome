@@ -59,10 +59,8 @@ impl Future for LoadEventFired {
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
-                            assert_eq!(self.debug_session.chrome_debug_session.lock().unwrap().method_id_2_task_id_remain(), 0);
-                            assert_eq!(self.debug_session.chrome_debug_session.lock().unwrap().task_id_2_task_remain(), 0);
-                            assert_eq!(self.debug_session.chrome_debug_session.lock().unwrap().pending_tasks_remain(), 0);
-                            assert_eq!(self.call_count, 1); // if send same get_document method to server successively, only response to last request.
+                            assert_eq!(self.debug_session.chrome_debug_session.lock().unwrap().tasks_waiting_for_response_count(), 0);
+                            assert_eq!(self.call_count, 3);
                             let tab = self.debug_session.main_tab_mut().unwrap();
                             assert_eq!(tab.changing_frames.len(), 8);
                             if let Some(frame) = tab.main_frame() {
@@ -71,7 +69,6 @@ impl Future for LoadEventFired {
                                 panic!("test failed.");
                             }
                             assert!(self.root_node.is_some());
-                            // assert!(tab.temporary_node_holder.len() > 2);
                             break Ok(().into())
                         }
                     }

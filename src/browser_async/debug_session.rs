@@ -4,8 +4,8 @@ use super::id_type as ids;
 use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{response_object, PageResponse, PageResponsePlusTabId};
 use super::tab::Tab;
-use super::task_describe::{TaskDescribe, CommonDescribeFields};
-use crate::protocol::{target};
+use super::task_describe::{CommonDescribeFields, TaskDescribe};
+use crate::protocol::target;
 use failure;
 use futures::{Async, Poll};
 use log::*;
@@ -98,19 +98,27 @@ impl DebugSession {
 
     fn send_fail_1(
         &mut self,
-        common_fields: Option<&CommonDescribeFields>
+        common_fields: Option<&CommonDescribeFields>,
     ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
         if let Some(cf) = common_fields {
-            let pr = (Some(cf.target_id.clone()), Some(cf.task_id), PageResponse::Fail);
+            let pr = (
+                Some(cf.target_id.clone()),
+                Some(cf.task_id),
+                PageResponse::Fail,
+            );
             Ok(Some(pr).into())
         } else {
             let pr = (None, None, PageResponse::Fail);
             Ok(Some(pr).into())
         }
-
     }
 
-    fn convert_to_page_response(&self, common_fields: Option<&CommonDescribeFields>, page_response: PageResponse) -> Option<PageResponsePlusTabId> {
+    fn convert_to_page_response(
+        &self,
+        common_fields: Option<&CommonDescribeFields>,
+        page_response: PageResponse,
+    ) -> Option<PageResponsePlusTabId> {
+        trace!("got page response: {:?}", page_response);
         if let Some(cf) = common_fields {
             Some((Some(cf.target_id.clone()), Some(cf.task_id), page_response))
         } else {
@@ -166,7 +174,8 @@ impl DebugSession {
                 }
             }
             TaskDescribe::PageEnable(page_enable) => {
-                let resp = self.convert_to_page_response(Some(&page_enable), PageResponse::PageEnable);
+                let resp =
+                    self.convert_to_page_response(Some(&page_enable), PageResponse::PageEnable);
                 Ok(resp.into())
             }
             TaskDescribe::FrameNavigated(target_id, changing_frame) => {
@@ -187,11 +196,15 @@ impl DebugSession {
                 let common_fields = &get_document.common_fields;
                 if let Some(tab) = self.get_tab_by_id_mut(&common_fields.target_id) {
                     tab.root_node = get_document.root_node;
-                    let resp = self.convert_to_page_response(Some(common_fields), PageResponse::GetDocument);
+                    let resp = self
+                        .convert_to_page_response(Some(common_fields), PageResponse::GetDocument);
                     Ok(resp.into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    self.send_fail(Some(common_fields.target_id.clone()), Some(common_fields.task_id))
+                    self.send_fail(
+                        Some(common_fields.target_id.clone()),
+                        Some(common_fields.task_id),
+                    )
                 }
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
@@ -211,9 +224,9 @@ impl DebugSession {
             }
             TaskDescribe::QuerySelector(query_selector) => {
                 let pr = PageResponse::QuerySelector(
-                        query_selector.selector,
-                        query_selector.found_node_id,
-                    );
+                    query_selector.selector,
+                    query_selector.found_node_id,
+                );
                 let resp = self.convert_to_page_response(Some(&query_selector.common_fields), pr);
                 Ok(resp.into())
             }
@@ -225,7 +238,10 @@ impl DebugSession {
                     .and_then(|n| Some(n.node_id));
                 if let Some(tab) = self.get_tab_by_id_mut(&common_fields.target_id) {
                     tab.node_returned(describe_node.found_node);
-                    let resp = self.convert_to_page_response(Some(&common_fields), PageResponse::DescribeNode(describe_node.selector, node_id));
+                    let resp = self.convert_to_page_response(
+                        Some(&common_fields),
+                        PageResponse::DescribeNode(describe_node.selector, node_id),
+                    );
                     Ok(resp.into())
                 } else {
                     error!("got describe_node event, but cannot find target.");
@@ -234,7 +250,10 @@ impl DebugSession {
             }
             TaskDescribe::GetBoxModel(get_box_model) => {
                 let common_fields = &get_box_model.common_fields;
-                let resp = self.convert_to_page_response(Some(&common_fields), PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box));
+                let resp = self.convert_to_page_response(
+                    Some(&common_fields),
+                    PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box),
+                );
                 Ok(resp.into())
             }
             TaskDescribe::LoadEventFired(target_id, timestamp) => {
@@ -251,11 +270,12 @@ impl DebugSession {
                     selector: screen_shot.selector,
                     base64: screen_shot.base64,
                 };
-                let resp = self.convert_to_page_response(Some(&common_fields), PageResponse::Screenshot(ro));
+                let resp = self
+                    .convert_to_page_response(Some(&common_fields), PageResponse::Screenshot(ro));
                 Ok(resp.into())
             }
             _ => {
-                error!("task unknown {:?}", item);
+                warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)
             }
         }

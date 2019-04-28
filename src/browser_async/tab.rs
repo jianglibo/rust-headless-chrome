@@ -70,7 +70,7 @@ impl Tab {
             if let Some(parent_id) = nd.parent_id {
                 self.temporary_node_holder.entry(parent_id).or_insert_with(||vec![]).push(nd);
             } else {
-                error!("node_returned has no parent_id. treat as 0.");
+                warn!("node_returned has no parent_id. treat as 0.");
                 self.temporary_node_holder.entry(0_u16).or_insert_with(||vec![]).push(nd);
             }
         } else {
@@ -109,6 +109,23 @@ impl Tab {
         let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
         let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id, s_id, selector).task_id_opt(manual_task_id).build();
         self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task]);
+    }
+
+    pub fn describe_node_by_selector(&mut self, selector: &'static str, depth: Option<i8>, manual_task_id: Option<ids::Task>) {
+        let (t_id, s_id) = self.t_s_id();
+        let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
+        let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id.clone(), s_id.clone(), selector).build();
+        let describe_node_task = tasks::DescribeNodeTaskBuilder::new(t_id, s_id, selector).task_id_opt(manual_task_id).depth_opt(depth).build();
+        self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task, describe_node_task]);
+    }
+
+    pub fn get_box_model_by_selector(&mut self, selector: &'static str, manual_task_id: Option<ids::Task>) {
+        let (t_id, s_id) = self.t_s_id();
+        let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
+        let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id.clone(), s_id.clone(), selector).build();
+        let common_fields = tasks::get_common_fields_builder(t_id.clone(), s_id.clone(), manual_task_id).build().unwrap();
+        let get_box_model = tasks::GetBoxModelBuilder::default().common_fields(common_fields).selector(selector).build().unwrap();
+        self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task, get_box_model.into()]);
     }
 
     pub fn page_enable(&mut self) {
@@ -239,34 +256,7 @@ impl Tab {
     //     self.chrome_session.lock().unwrap().send_message(method_str);
     // }
 
-    // pub fn describe_node_by_selector(&mut self, selector: &'static str, depth: Option<i8>, manual_task_id: Option<ids::Task>) {
-    //     match self.dom_query_selector_by_selector(selector, None) {
-    //         (_, Some(node_id)) => {
-    //             self.describe_node(manual_task_id, Some(node_id), None, None, depth, false, Some(selector));
-    //         }
-    //         (Some(dom_query_selector_task_id), _) => {
-    //             let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
-    //             let ds = tasks::DescribeNode {
-    //                 task_id: this_task_id,
-    //                 target_id: self.target_info.target_id.clone(),
-    //                 session_id: self.session_id.clone(),
-    //                 is_manual,
-    //                 node_id: None,
-    //                 backend_node_id: None,
-    //                 object_id: None,
-    //                 depth,
-    //                 pierce: false,
-    //                 selector: Some(selector),
-    //                 found_node: None,
-    //             };
-    //             self.chrome_session.lock().unwrap().add_task(ds.task_id, tasks::TaskDescribe::DescribeNode(ds));
-    //             // self.chrome_session.lock().unwrap().add_waiting_task(dom_query_selector_task_id, this_task_id);
-    //         }
-    //         _ => {
-    //             panic!("impossile result in describe_node_by_selector");
-    //         }
-    //     }
-    // }
+
 
     // #[allow(clippy::too_many_arguments)]
     // pub fn describe_node(&mut self, manual_task_id: Option<ids::Task>, node_id: Option<dom::NodeId>, backend_node_id: Option<dom::NodeId>,
@@ -301,33 +291,6 @@ impl Tab {
 
     // }
 
-    // pub fn get_box_model_by_selector(&mut self, selector: &'static str, manual_task_id: Option<ids::Task>) -> ids::Task {
-    //     match self.dom_query_selector_by_selector(selector, None) { // task_id cannot share between tasks.
-    //         (_, Some(node_id)) => {
-    //             self.get_box_model_by_node_id(Some(node_id), manual_task_id)
-    //         }
-    //         (Some(query_selector_task_id), _) => {
-    //             let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
-    //             let gb = tasks::GetBoxModel {
-    //                 task_id: this_task_id,
-    //                 target_id: self.target_info.target_id.clone(),
-    //                 session_id: self.session_id.clone(),
-    //                 is_manual,
-    //                 node_id: None,
-    //                 backend_node_id: None,
-    //                 object_id: None,
-    //                 selector: Some(selector),
-    //                 found_box: None,
-    //             };
-    //             self.chrome_session.lock().unwrap().add_task(gb.task_id, tasks::TaskDescribe::GetBoxModel(gb));
-    //             // self.chrome_session.lock().unwrap().add_waiting_task(query_selector_task_id, this_task_id);
-    //             this_task_id
-    //         }
-    //         _ => {
-    //             panic!("impossible result in get_box_model_by_selector");
-    //         }
-    //     }
-    // }
 
     // pub fn get_box_model_by_node_id(&mut self, node_id: Option<dom::NodeId>, manual_task_id: Option<ids::Task>) -> ids::Task {
     //     self.get_box_model(manual_task_id, None, node_id, None, None)

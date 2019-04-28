@@ -51,7 +51,7 @@ impl Future for GetBoxModelTest {
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    // tab.get_box_model_by_selector(self.selector, Some(100));
+                                    tab.get_box_model_by_selector(self.selector, Some(100));
                                 }
                             }
                         }

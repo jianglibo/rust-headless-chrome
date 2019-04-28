@@ -5,6 +5,7 @@ use log::*;
 
 use serde_json;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use super::task_describe::{TaskDescribe};
 pub type MethodTuple = (usize, String);
 pub type MethodBeforSendResult = Result<MethodTuple, failure::Error>;
 
@@ -74,6 +75,11 @@ pub enum ChromePageError {
     WaitTimeout { seconds: usize },
     #[fail(display = "task describe convert to string fail.")]
     TaskDescribeConvert,
+    #[fail(display = "next task execution failed.")]
+    NextTaskExecution {
+        tasks: Vec<TaskDescribe>,
+        error: failure::Error,
+    },
 }
 
 #[derive(Debug)]

@@ -4,8 +4,6 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
-use headless_chrome::protocol::{page};
-
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse, response_object};

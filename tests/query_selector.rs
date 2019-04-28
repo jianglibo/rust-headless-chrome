@@ -106,9 +106,9 @@ fn t_dom_query_selector() {
     ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-    let mut selector = "#ddlogin-iframe #qrcode";
+    // let mut selector = "#ddlogin-iframe #qrcode";
 
-    selector = "#ddlogin-iframe";
+    let selector = "#ddlogin-iframe";
     let my_page = QuerySelector {
         debug_session: Default::default(),
         url,

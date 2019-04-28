@@ -1,15 +1,13 @@
 
 use super::chrome_debug_session::ChromeDebugSession;
-use super::dev_tools_method_util::{MethodDestination, MethodUtil, SessionId, MethodTuple, next_call_id};
+use super::dev_tools_method_util::{MethodDestination, MethodUtil, SessionId, next_call_id};
 use super::id_type as ids;
-use crate::browser_async::unique_number::{self, create_if_no_manual_input};
 use super::page_message::{ChangingFrame};
-use super::task_describe::{self as tasks, TaskDescribe, CommonDescribeFields};
+use super::task_describe::{self as tasks, TaskDescribe};
 use crate::protocol::{self, dom, page, target};
 use log::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::convert::TryFrom;
 
 
 #[derive(Debug)]
@@ -90,14 +88,9 @@ impl Tab {
         }).find(|frame| filter(frame))
     }
 
-    fn t_s_id(&self) -> (target::TargetId, Option<SessionId>) {
-        (self.target_info.target_id.clone(), self.session_id.clone())
-    }
-
     pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<ids::Task>) {
-        let (t_id, s_id) = self.t_s_id();
-        let task = tasks::GetDocumentTaskBuilder::new(t_id, s_id).task_id_opt(manual_task_id).depth_opt(depth).build();
-        self.chrome_session.lock().unwrap().execute_task(vec![task]);
+        let task = tasks::GetDocumentBuilder::default().common_fields(self.get_c_f(manual_task_id)).depth(depth).build().unwrap();
+        self.chrome_session.lock().unwrap().execute_task(vec![task.into()]);
     }
 
     pub fn dom_query_selector_by_selector(
@@ -105,33 +98,31 @@ impl Tab {
         selector: &'static str,
         manual_task_id: Option<usize>,
     ) {
-        let (t_id, s_id) = self.t_s_id();
-        let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
-        let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id, s_id, selector).task_id_opt(manual_task_id).build();
-        self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task]);
+        let get_document = tasks::GetDocumentBuilder::default().common_fields(self.get_c_f(None)).build().unwrap();
+        let query_select = tasks::QuerySelectorBuilder::default().common_fields(self.get_c_f(manual_task_id)).selector(selector).build().unwrap();
+        self.chrome_session.lock().unwrap().execute_task(vec![get_document.into(), query_select.into()]);
     }
 
     pub fn describe_node_by_selector(&mut self, selector: &'static str, depth: Option<i8>, manual_task_id: Option<ids::Task>) {
-        let (t_id, s_id) = self.t_s_id();
-        let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
-        let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id.clone(), s_id.clone(), selector).build();
-        let describe_node_task = tasks::DescribeNodeTaskBuilder::new(t_id, s_id, selector).task_id_opt(manual_task_id).depth_opt(depth).build();
-        self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task, describe_node_task]);
+        let get_document = tasks::GetDocumentBuilder::default().common_fields(self.get_c_f(None)).build().unwrap();
+        let query_select = tasks::QuerySelectorBuilder::default().common_fields(self.get_c_f(None)).selector(selector).build().unwrap();
+        let describe_node = tasks::DescribeNodeBuilder::default().common_fields(self.get_c_f(manual_task_id)).selector(selector).depth(depth).build().unwrap();
+        self.chrome_session.lock().unwrap().execute_task(vec![get_document.into(), query_select.into(), describe_node.into()]);
     }
 
     pub fn get_box_model_by_selector(&mut self, selector: &'static str, manual_task_id: Option<ids::Task>) {
-        let (t_id, s_id) = self.t_s_id();
-        let get_document_task = tasks::GetDocumentTaskBuilder::new(t_id.clone(), s_id.clone()).build();
-        let query_select_task = tasks::QuerySelectorTaskBuilder::new(t_id.clone(), s_id.clone(), selector).build();
-        let common_fields = tasks::get_common_fields_builder(t_id.clone(), s_id.clone(), manual_task_id).build().unwrap();
-        let get_box_model = tasks::GetBoxModelBuilder::default().common_fields(common_fields).selector(selector).build().unwrap();
-        self.chrome_session.lock().unwrap().execute_task(vec![get_document_task, query_select_task, get_box_model.into()]);
+        let get_document = tasks::GetDocumentBuilder::default().common_fields(self.get_c_f(None)).build().unwrap();
+        let query_select = tasks::QuerySelectorBuilder::default().common_fields(self.get_c_f(None)).selector(selector).build().unwrap();
+        let get_box_model = tasks::GetBoxModelBuilder::default().common_fields(self.get_c_f(manual_task_id)).selector(selector).build().unwrap();
+        self.chrome_session.lock().unwrap().execute_task(vec![get_document.into(), query_select.into(), get_box_model.into()]);
+    }
+
+    fn get_c_f(&self, task_id: Option<ids::Task>) -> tasks::CommonDescribeFields {
+        tasks::get_common_fields_builder(self.target_info.target_id.clone(), self.session_id.clone(), task_id).build().unwrap()
     }
 
     pub fn page_enable(&mut self) {
-        let (t_id, s_id) = self.t_s_id();
-        let page_enable_task = tasks::PageEnableTaskBuilder::new(t_id, s_id).build();
-        self.chrome_session.lock().unwrap().execute_task(vec![page_enable_task]);
+        self.chrome_session.lock().unwrap().execute_task(vec![TaskDescribe::PageEnable(self.get_c_f(None))]);
     }
 
     // pub fn get_document(
@@ -367,7 +358,6 @@ impl Tab {
             },
             MethodDestination::Browser,
             next_call_id(),
-            None,
         );
         self.chrome_session.lock().unwrap().send_message_direct(method_str);
     }

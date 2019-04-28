@@ -17,6 +17,12 @@ impl IntervalPageMessage {
     } 
 }
 
+impl Default for IntervalPageMessage {
+    fn default() -> Self {
+        Self::new()
+    }   
+}
+
 impl Stream for IntervalPageMessage {
     type Item = TaskDescribe;
     type Error = failure::Error;

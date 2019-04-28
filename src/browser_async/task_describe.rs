@@ -147,7 +147,8 @@ pub struct ResolveNode {
         pub execution_context_id: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Builder, Default)]
+#[builder(setter(into))]
 pub struct QuerySelector {
         pub common_fields: CommonDescribeFields,
         pub node_id: Option<dom::NodeId>,
@@ -155,196 +156,47 @@ pub struct QuerySelector {
         pub selector: &'static str,
 }
 
-#[derive(Debug)]
+impl From<QuerySelector> for TaskDescribe {
+        fn from(query_selector: QuerySelector) -> Self {
+                TaskDescribe::QuerySelector(query_selector)
+        }
+}
+
+#[derive(Debug, Builder, Default)]
+#[builder(setter(into))]
 pub struct GetDocument {
         pub common_fields: CommonDescribeFields,
+        #[builder(default="Some(0)")]
         pub depth: Option<u8>,
         pub pierce: bool,
+        #[builder(setter(skip))]
         pub root_node: Option<dom::Node>,
 }
 
-fn default_common_fields(
-        target_id: target::TargetId,
-        session_id: Option<SessionId>,
-) -> CommonDescribeFields {
-        CommonDescribeFields {
-                target_id,
-                task_id: 0,
-                is_manual: false,
-                session_id,
-                call_id: next_call_id(),
-        }
+impl From<GetDocument> for TaskDescribe {
+    fn from(get_document: GetDocument) -> Self {
+        TaskDescribe::GetDocument(get_document)
+    }
 }
 
-#[derive(Debug)]
-pub struct PageEnableTaskBuilder {
-        common_fields: CommonDescribeFields,
-}
-
-impl PageEnableTaskBuilder {
-        pub fn new(target_id: target::TargetId, session_id: Option<SessionId>) -> Self {
-                Self {
-                        common_fields: default_common_fields(target_id, session_id),
-                }
-        }
-
-        pub fn build(mut self) -> TaskDescribe {
-                if self.common_fields.task_id == 0 {
-                        self.common_fields.task_id = unique_number::create_one();
-                }
-                TaskDescribe::PageEnable(self.common_fields)
-        }
-}
-
-#[derive(Debug, Default)]
-pub struct QuerySelectorTaskBuilder {
-        common_fields: CommonDescribeFields,
-        node_id: Option<dom::NodeId>,
-        found_node_id: Option<dom::NodeId>,
-        selector: &'static str,
-}
-
-impl QuerySelectorTaskBuilder {
-        pub fn new(
-                target_id: target::TargetId,
-                session_id: Option<SessionId>,
-                selector: &'static str,
-        ) -> Self {
-                Self {
-                        common_fields: default_common_fields(target_id, session_id),
-                        selector,
-                        ..Default::default()
-                }
-        }
-
-        pub fn task_id_opt(mut self, task_id: Option<ids::Task>) -> Self {
-                self.common_fields.task_id = task_id.map_or_else(unique_number::create_one, |v| v);
-                self
-        }
-
-        pub fn build(mut self) -> TaskDescribe {
-                if self.common_fields.task_id == 0 {
-                        self.common_fields.task_id = unique_number::create_one();
-                }
-                let qs = QuerySelector {
-                        common_fields: self.common_fields,
-                        selector: self.selector,
-                        node_id: self.node_id,
-                        found_node_id: self.found_node_id,
-                };
-                TaskDescribe::QuerySelector(qs)
-        }
-}
-
-#[derive(Debug, Default)]
-pub struct GetDocumentTaskBuilder {
-        common_fields: CommonDescribeFields,
-        depth: Option<u8>,
-        pierce: bool,
-        root_node: Option<dom::Node>,
-}
-
-impl GetDocumentTaskBuilder {
-        pub fn new(target_id: target::TargetId, session_id: Option<SessionId>) -> Self {
-                Self {
-                        common_fields: default_common_fields(target_id, session_id),
-                        ..Default::default()
-                }
-        }
-
-        pub fn task_id_opt(mut self, task_id: Option<ids::Task>) -> Self {
-                self.common_fields.task_id = task_id.map_or_else(unique_number::create_one, |v| v);
-                self
-        }
-
-        pub fn depth_opt(mut self, depth: Option<u8>) -> Self {
-                self.depth = depth;
-                self
-        }
-
-        pub fn depth(mut self, depth: u8) -> Self {
-                self.depth = Some(depth);
-                self
-        }
-
-        pub fn pierce(mut self, pierce: bool) -> Self {
-                self.pierce = pierce;
-                self
-        }
-
-        pub fn build(mut self) -> TaskDescribe {
-                if self.common_fields.task_id == 0 {
-                        self.common_fields.task_id = unique_number::create_one();
-                }
-                let gd = GetDocument {
-                        common_fields: self.common_fields,
-                        depth: self.depth.or(Some(0)),
-                        pierce: self.pierce,
-                        root_node: self.root_node,
-                };
-                TaskDescribe::GetDocument(gd)
-        }
-}
-
-#[derive(Debug, Default)]
-pub struct DescribeNodeTaskBuilder {
-        common_fields: CommonDescribeFields,
-        node_id: Option<dom::NodeId>,
-        selector: &'static str,
-        found_node: Option<dom::Node>,
-        pub backend_node_id: Option<dom::NodeId>,
-        pub depth: Option<i8>,
-        pub object_id: Option<ids::RemoteObject>,
-        pub pierce: bool,
-}
-
-impl DescribeNodeTaskBuilder {
-        pub fn new(
-                target_id: target::TargetId,
-                session_id: Option<SessionId>,
-                selector: &'static str,
-        ) -> Self {
-                Self {
-                        common_fields: default_common_fields(target_id, session_id),
-                        selector,
-                        ..Default::default()
-                }
-        }
-
-        pub fn task_id_opt(mut self, task_id: Option<ids::Task>) -> Self {
-                self.common_fields.task_id = task_id.map_or_else(unique_number::create_one, |v| v);
-                self
-        }
-
-        pub fn depth_opt(mut self, depth: Option<i8>) -> Self {
-                self.depth = depth;
-                self
-        }
-
-        pub fn build(mut self) -> TaskDescribe {
-                if self.common_fields.task_id == 0 {
-                        self.common_fields.task_id = unique_number::create_one();
-                }
-                let qs = DescribeNode {
-                        common_fields: self.common_fields,
-                        selector: Some(self.selector),
-                        depth: self.depth.or(Some(0)),
-                        ..Default::default()
-                };
-                TaskDescribe::DescribeNode(qs)
-        }
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug, Builder, Default)]
+#[builder(setter(into))]
 pub struct DescribeNode {
         pub common_fields: CommonDescribeFields,
         pub node_id: Option<dom::NodeId>,
         pub backend_node_id: Option<dom::NodeId>,
         pub found_node: Option<dom::Node>,
         pub selector: Option<&'static str>,
+        #[builder(default="Some(0)")]
         pub depth: Option<i8>,
         pub object_id: Option<ids::RemoteObject>,
         pub pierce: bool,
+}
+
+impl From<DescribeNode> for TaskDescribe {
+        fn from(describe_node: DescribeNode) -> Self {
+                TaskDescribe::DescribeNode(describe_node)
+        }
 }
 
 #[derive(Debug, Clone, Default, Builder)]

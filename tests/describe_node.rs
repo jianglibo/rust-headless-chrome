@@ -125,8 +125,5 @@ fn t_dom_describe_node() {
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    match runtime.block_on(my_page.into_future()) {
-        Err(error) => error!("{:?}", error),
-        _ => ()
-    }
+    if let Err(error) = runtime.block_on(my_page.into_future()) { error!("{:?}", error) }
 }

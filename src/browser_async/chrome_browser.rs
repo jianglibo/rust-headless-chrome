@@ -137,7 +137,6 @@ impl Stream for ChromeBrowser {
                         target::methods::SetDiscoverTargets { discover: true },
                         MethodDestination::Browser,
                         next_call_id(),
-                        None,
                     );
                     self.state = BrowserState::StartSend(method_str);
                 }

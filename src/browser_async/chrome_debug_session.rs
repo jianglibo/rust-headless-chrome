@@ -1,4 +1,4 @@
-use super::task_describe::{self as tasks, TaskDescribe};
+use super::task_describe::{TaskDescribe};
 use super::id_type as ids;
 
 use super::inner_event::{self, InnerEvent};
@@ -10,7 +10,6 @@ use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use failure::Error;
 use log::*;
-use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize};
 use websocket::futures::{Poll, Stream};
 use std::convert::TryFrom;
@@ -159,10 +158,10 @@ impl ChromeDebugSession {
                 self.send_message_direct(method_str);
                 Ok(())
             }
-            Err(err) => {
+            Err(error) => {
                 Err(ChromePageError::NextTaskExecution {
-                    tasks: tasks,
-                    error: err,
+                    tasks,
+                    error,
                 }.into())
             } 
         }
@@ -226,6 +225,7 @@ impl ChromeDebugSession {
             Ok(())
     }
 
+    #[allow(clippy::single_match)]
     fn handle_protocol_event(
         &mut self,
         protocol_event: protocol::Event,

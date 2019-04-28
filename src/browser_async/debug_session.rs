@@ -68,10 +68,10 @@ impl DebugSession {
             },
         }
     }
-    pub fn get_tab_by_id_mut(&mut self, tab_id: &String) -> Option<&mut Tab> {
+    pub fn get_tab_by_id_mut(&mut self, tab_id: &str) -> Option<&mut Tab> {
         self.tabs
             .values_mut()
-            .find(|t| &t.target_info.target_id == tab_id)
+            .find(|t| t.target_info.target_id == tab_id)
     }
 
     pub fn get_tab_by_id(&self, tab_id: String) -> Option<&Tab> {

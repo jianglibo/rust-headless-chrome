@@ -1,11 +1,7 @@
-// use super::element_async::{BoxModel, Element, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use crate::browser::tab::element::{BoxModel};
 use super::id_type as ids;
 use super::dev_tools_method_util::{SessionId};
-use super::tab::Tab;
-use std::default::Default;
-use std::convert::TryInto;
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
@@ -14,55 +10,6 @@ pub enum ChangingFrame {
     Navigated(page::Frame),
     StoppedLoading(page::Frame),
 }
-
-// #[derive(Debug)]
-// pub struct ChangingFrameTree {
-//     pub changing_frame: Option<ChangingFrame>,
-//     pub child_changing_frames: ::std::collections::HashMap<String, ChangingFrame>,
-// }
-
-// impl Default for ChangingFrameTree {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
-
-// impl ChangingFrameTree {
-//     pub fn new() -> Self {
-//         Self {
-//             changing_frame: None,
-//             child_changing_frames: ::std::collections::HashMap::new(),
-//         }
-//     }
-
-//     pub fn count(&self) -> usize {
-//         self.child_changing_frames.len()
-//     }
-// }
-
-// struct SearchVisitor<'a, F> {
-//     predicate: F,
-//     item: Option<&'a mut ChangingFrame>,
-// }
-
-// impl<'a, F: FnMut(&ChangingFrame) -> bool> SearchVisitor<'a, F> {
-//     fn new(predicate: F) -> Self {
-//         SearchVisitor {
-//             predicate,
-//             item: None,
-//         }
-//     }
-
-//     fn visit(&mut self, n: &'a ChangingFrame) {
-//         if (self.predicate)(n) {
-//             self.item = Some(n);
-//         } else if self.item.is_none() {
-//             if let Some(c) = &n.child_changing_frames {
-//                 c.iter().for_each(|n| self.visit(n))
-//             }
-//         }
-//     }
-// }
 
 #[derive(Debug)]
 pub enum PageEventName {

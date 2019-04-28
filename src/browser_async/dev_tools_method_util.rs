@@ -6,8 +6,6 @@ use log::*;
 use serde_json;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use super::task_describe::{TaskDescribe};
-pub type MethodTuple = (usize, String);
-pub type MethodBeforSendResult = Result<MethodTuple, failure::Error>;
 
 pub static GLOBAL_METHOD_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -48,7 +46,7 @@ pub enum ChannelBridgeError {
 impl std::convert::From<futures::sync::mpsc::SendError<websocket::message::OwnedMessage>>
     for ChannelBridgeError
 {
-    fn from(t: futures::sync::mpsc::SendError<websocket::message::OwnedMessage>) -> Self {
+    fn from(_t: futures::sync::mpsc::SendError<websocket::message::OwnedMessage>) -> Self {
         ChannelBridgeError::Receiving
     }
 }
@@ -86,22 +84,6 @@ pub enum ChromePageError {
 pub struct MethodUtil;
 
 impl MethodUtil {
-
-    // pub fn create_msg_to_send_with_session_id<C>(
-    //     method: C,
-    //     session_id: &Option<SessionId>,
-    // ) -> MethodBeforSendResult
-    // where
-    //     C: protocol::Method + serde::Serialize,
-    // {
-    //     if let Some(s_id) = session_id {
-    //         Self::create_msg_to_send(method, MethodDestination::Target(s_id.clone()), None)
-    //     } else {
-    //         error!("no session_id exists.");
-    //         panic!("no session_id exists.");
-    //     }
-    // }
-
     pub fn create_msg_to_send_with_session_id<C>(
         method: C,
         session_id: &Option<SessionId>,
@@ -111,7 +93,7 @@ impl MethodUtil {
         C: protocol::Method + serde::Serialize,
     {
         if let Some(s_id) = session_id {
-            Self::create_msg_to_send(method, MethodDestination::Target(s_id.clone()), call_id, None)
+            Self::create_msg_to_send(method, MethodDestination::Target(s_id.clone()), call_id)
         } else {
             error!("no session_id exists.");
             panic!("no session_id exists.");
@@ -123,7 +105,6 @@ impl MethodUtil {
         method: C,
         destination: MethodDestination,
         call_id: usize,
-        inner_call_id: Option<usize>,
     ) -> String
     where
         C: protocol::Method + serde::Serialize,
@@ -138,19 +119,11 @@ impl MethodUtil {
                     session_id: Some(session_id.as_str()),
                     message: &message_text,
                 };
-                Self::create_msg_to_send(target_method, MethodDestination::Browser, GLOBAL_METHOD_CALL_COUNT.fetch_add(1, Ordering::SeqCst), Some(call_id))
+                Self::create_msg_to_send(target_method, MethodDestination::Browser, GLOBAL_METHOD_CALL_COUNT.fetch_add(1, Ordering::SeqCst))
             }
             MethodDestination::Browser => {
                 let call = method.to_method_call(call_id);
-                // let message_text = 
                 serde_json::to_string(&call).unwrap()
-                
-                // if let Some(inner_cid) = inner_call_id {
-                //     Ok((inner_cid, message_text))
-                // } else {
-                //     Ok((call_id, message_text))
-                // }
-                
             }
         }
     }

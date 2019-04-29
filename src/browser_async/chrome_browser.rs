@@ -189,7 +189,7 @@ impl Stream for ChromeBrowser {
                     trace!("enter sending.");
                     match self.ws_client.as_mut().unwrap().poll_complete() {
                         Ok(Async::Ready(_)) => {
-                            info!("switch to receiving state.");
+                            trace!("switch to receiving state.");
                             if let Some(first) = self.waiting_to_send.pop_front() {
                                 self.state = BrowserState::StartSend(first);
                             } else {

@@ -61,7 +61,7 @@ impl Future for CaptureScreenShotTest {
                         }
                     }
                     PageResponse::FrameNavigated(changing_frame) => {
-                        info!("got frame: {:?}", changing_frame);
+                        trace!("got frame: {:?}", changing_frame);
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {

@@ -369,7 +369,7 @@ impl Stream for ChromeDebugSession {
                                 if let Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) =
                                     parse_raw_message(&message_field)
                                 {
-                                    info!("got inner event: {:?}", inner_event);
+                                    trace!("got inner event: {:?}", inner_event);
                                     if let Some(page_message) = self.handle_inner_target_events(
                                         inner_event,
                                         session_id,

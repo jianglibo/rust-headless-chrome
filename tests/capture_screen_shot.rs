@@ -9,6 +9,7 @@ use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse, response_object};
 use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
+use headless_chrome::protocol::{page};
 use std::default::Default;
 use std::fs;
 use std::path::Path;
@@ -41,12 +42,12 @@ impl Future for CaptureScreenShotTest {
                     },
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
-                        if seconds == 26 {
+                        if seconds == 19 {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    // tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
+                                    tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
                                 }
                         }
-                        if seconds > 35 {
+                        if seconds > 25 {
                             assert!(self.ro.is_some());
                             
                             let file_name = "target/abc.png";
@@ -63,9 +64,9 @@ impl Future for CaptureScreenShotTest {
                         info!("got frame: {:?}", changing_frame);
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
-                                // if let Some(tab) = self.debug_session.main_tab_mut() {
-                                //     tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
-                                // }
+                                if let Some(tab) = self.debug_session.main_tab_mut() {
+                                    tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
+                                }
                             }
                         }
                     }
@@ -91,15 +92,7 @@ fn t_take_screen_shot() {
     ::std::env::set_var("RUST_LOG", "headless_chrome=info,capture_screen_shot=info");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-    let mut selector = "#ddlogin-iframe #qrcode";
-    let _my_page = CaptureScreenShotTest {
-        debug_session: Default::default(),
-        url,
-        selector,
-        ro: None,
-    };
-
-    selector = "#ddlogin-iframe";
+    let selector = "#ddlogin-iframe";
     let my_page = CaptureScreenShotTest {
         debug_session: Default::default(),
         url,

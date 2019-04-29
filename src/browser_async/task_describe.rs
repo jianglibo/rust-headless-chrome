@@ -34,14 +34,25 @@ impl TaskDescribe {
                         TaskDescribe::QuerySelector(query_selector) => {
                                 Some(&query_selector.common_fields)
                         }
+
                         TaskDescribe::DescribeNode(describe_node) => {
                                 Some(&describe_node.common_fields)
                         }
+
                         TaskDescribe::GetDocument(get_document) => {
                                 Some(&get_document.common_fields)
                         }
+                        TaskDescribe::GetBoxModel(get_box_model) => {
+                                Some(&get_box_model.common_fields)
+                        }
+                        TaskDescribe::ScreenShot(screen_shot) => {
+                                Some(&screen_shot.common_fields)
+                        }
                         TaskDescribe::PageEnable(common_fields) => Some(&common_fields),
-                        _ => None,
+                        _ => {
+                                error!("get_common_fields got queried. but it doesn't implement that.");
+                                None
+                        }
                 }
         }
 }
@@ -79,6 +90,54 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                                 &common_fields.session_id,
                                 common_fields.call_id,
                         )),
+                        TaskDescribe::GetBoxModel(GetBoxModel {
+                                node_id,
+                                backend_node_id,
+                                common_fields,
+                                object_id,
+                                ..
+                        }) => {
+                                let s = if let Some(sv) = object_id {
+                                        Some(sv.as_str())
+                                } else {
+                                        None
+                                };
+                                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                                        dom::methods::GetBoxModel {
+                                                node_id: *node_id,
+                                                backend_node_id: *backend_node_id,
+                                                object_id: s,
+                                        },
+                                        &common_fields.session_id,
+                                        common_fields.call_id,
+                                ))
+                        }
+                        TaskDescribe::ScreenShot(ScreenShot {
+                                clip,
+                                format,
+                                common_fields,
+                                from_surface,
+                                ..
+                        }) => {
+                                let (format, quality) = match format {
+                                        page::ScreenshotFormat::JPEG(quality) => {
+                                                (page::InternalScreenshotFormat::JPEG, *quality)
+                                        }
+                                        page::ScreenshotFormat::PNG => {
+                                                (page::InternalScreenshotFormat::PNG, None)
+                                        }
+                                };
+                                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                                        page::methods::CaptureScreenshot {
+                                                clip: clip.as_ref().cloned(),
+                                                format,
+                                                quality,
+                                                from_surface: *from_surface,
+                                        },
+                                        &common_fields.session_id,
+                                        common_fields.call_id,
+                                ))
+                        }
                         TaskDescribe::GetDocument(GetDocument {
                                 depth,
                                 pierce,
@@ -109,32 +168,46 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
         }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Builder, Clone)]
+#[builder(setter(into))]
 pub struct ScreenShot {
         pub common_fields: CommonDescribeFields,
         pub selector: Option<&'static str>,
         pub format: page::ScreenshotFormat,
+        #[builder(default = "None")]
         pub clip: Option<page::Viewport>,
+        #[builder(default = "false")]
         pub from_surface: bool,
+        #[builder(default = "None")]
         pub base64: Option<String>,
+}
+
+impl From<ScreenShot> for TaskDescribe {
+        fn from(screen_shot: ScreenShot) -> Self {
+                TaskDescribe::ScreenShot(screen_shot)
+        }
 }
 
 #[derive(Debug, Builder, Default)]
 #[builder(setter(into))]
 pub struct GetBoxModel {
         pub common_fields: CommonDescribeFields,
+        #[builder(default = "None")]
         pub node_id: Option<dom::NodeId>,
+        #[builder(default = "None")]
         pub selector: Option<&'static str>,
+        #[builder(default = "None")]
         pub backend_node_id: Option<dom::NodeId>,
+        #[builder(default = "None")]
         pub object_id: Option<ids::RemoteObject>,
         #[builder(setter(skip))]
         pub found_box: Option<BoxModel>,
 }
 
 impl From<GetBoxModel> for TaskDescribe {
-    fn from(get_box_model: GetBoxModel) -> Self {
-        TaskDescribe::GetBoxModel(get_box_model)
-    }
+        fn from(get_box_model: GetBoxModel) -> Self {
+                TaskDescribe::GetBoxModel(get_box_model)
+        }
 }
 
 #[derive(Debug)]
@@ -151,7 +224,9 @@ pub struct ResolveNode {
 #[builder(setter(into))]
 pub struct QuerySelector {
         pub common_fields: CommonDescribeFields,
+        #[builder(default = "None")]
         pub node_id: Option<dom::NodeId>,
+        #[builder(default = "None")]
         pub found_node_id: Option<dom::NodeId>,
         pub selector: &'static str,
 }
@@ -166,30 +241,36 @@ impl From<QuerySelector> for TaskDescribe {
 #[builder(setter(into))]
 pub struct GetDocument {
         pub common_fields: CommonDescribeFields,
-        #[builder(default="Some(0)")]
+        #[builder(default = "Some(0)")]
         pub depth: Option<u8>,
+        #[builder(default = "false")]
         pub pierce: bool,
         #[builder(setter(skip))]
         pub root_node: Option<dom::Node>,
 }
 
 impl From<GetDocument> for TaskDescribe {
-    fn from(get_document: GetDocument) -> Self {
-        TaskDescribe::GetDocument(get_document)
-    }
+        fn from(get_document: GetDocument) -> Self {
+                TaskDescribe::GetDocument(get_document)
+        }
 }
 
 #[derive(Debug, Builder, Default)]
 #[builder(setter(into))]
 pub struct DescribeNode {
         pub common_fields: CommonDescribeFields,
+        #[builder(default = "None")]
         pub node_id: Option<dom::NodeId>,
+        #[builder(default = "None")]
         pub backend_node_id: Option<dom::NodeId>,
+        #[builder(default = "None")]
         pub found_node: Option<dom::Node>,
         pub selector: Option<&'static str>,
-        #[builder(default="Some(0)")]
+        #[builder(default = "Some(0)")]
         pub depth: Option<i8>,
+        #[builder(default = "None")]
         pub object_id: Option<ids::RemoteObject>,
+        #[builder(default = "false")]
         pub pierce: bool,
 }
 
@@ -204,15 +285,20 @@ impl From<DescribeNode> for TaskDescribe {
 pub struct CommonDescribeFields {
         pub task_id: ids::Task,
         pub target_id: target::TargetId,
-        pub is_manual: bool,
         pub session_id: Option<SessionId>,
-        #[builder(default="next_call_id()")]
+        #[builder(default = "next_call_id()")]
         pub call_id: usize,
 }
 
-pub fn get_common_fields_builder(target_id: target::TargetId, session_id: Option<SessionId>, task_id: Option<ids::Task>) -> CommonDescribeFieldsBuilder {
+pub fn get_common_fields_builder(
+        target_id: target::TargetId,
+        session_id: Option<SessionId>,
+        task_id: Option<ids::Task>,
+) -> CommonDescribeFieldsBuilder {
         let mut builder = CommonDescribeFieldsBuilder::default();
-        let t_id = task_id.map_or_else(unique_number::create_one, |v|v);
-        builder.target_id(target_id).session_id(session_id).task_id(t_id);
+        let t_id = task_id.map_or_else(unique_number::create_one, |v| v);
+        builder.target_id(target_id)
+                .session_id(session_id)
+                .task_id(t_id);
         builder
 }

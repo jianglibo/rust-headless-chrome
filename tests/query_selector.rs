@@ -28,7 +28,7 @@ impl QuerySelector {
         let tab = self.debug_session.main_tab().unwrap();
         assert_eq!(self.call_count, 3);
         assert!(self.task_id_100_called);
-        assert_eq!(tab.temporary_node_holder.len() , 7);
+        assert!(tab.temporary_node_holder.len() >= 7);
         info!("all nodes: {:?}", tab.temporary_node_holder);
         // tab.temporary_node_holder.values().for_each(|v| v.iter().for_each(|nd| assert_eq!(nd.node_name, "IFRAME")));
         assert!(self.found_node_id.is_some());
@@ -106,7 +106,6 @@ fn t_dom_query_selector() {
     ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-    // let mut selector = "#ddlogin-iframe #qrcode";
 
     let selector = "#ddlogin-iframe";
     let my_page = QuerySelector {

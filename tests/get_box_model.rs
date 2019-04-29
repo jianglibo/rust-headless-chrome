@@ -76,18 +76,10 @@ impl Future for GetBoxModelTest {
 
 #[test]
 fn t_get_model_box() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,get_box_model=info");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,get_box_model=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-    let mut selector = "#ddlogin-iframe #qrcode";
-    let _my_page = GetBoxModelTest {
-        debug_session: Default::default(),
-        url,
-        selector,
-        box_model: None,
-    };
-
-    selector = "#ddlogin-iframe";
+    let selector = "#ddlogin-iframe";
     let my_page = GetBoxModelTest {
         debug_session: Default::default(),
         url,

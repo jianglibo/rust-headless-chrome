@@ -95,11 +95,8 @@ fn t_load_event_fired() {
         root_node: None,
         call_count: 0,
     };
-    // tokio::run(my_page.map_err(|e| error!("{:?}", e)));
-    // let result = run_one(my_page).unwrap();
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
     runtime.block_on(my_page.into_future()).unwrap();
-    // assert!(my_page.root_node.is_some());
 }
 
 // enum Thing {

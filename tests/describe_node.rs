@@ -90,32 +90,12 @@ impl Future for DescribeNode {
     }
 }
 
-// fn run_one<F>(f: F) -> Result<F::Item, F::Error>
-// where
-//     F: IntoFuture,
-//     F::Future: Send + 'static,
-//     F::Item: Send + 'static,
-//     F::Error: Send + 'static,
-// {
-//         let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-//         runtime.block_on(f.into_future())
-// }
-
 #[test]
 fn t_dom_describe_node() {
     ::std::env::set_var("RUST_LOG", "headless_chrome=trace,describe_node=info");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
-    let mut selector = "#ddlogin-iframe #qrcode";
-    let _my_page = DescribeNode {
-        debug_session: Default::default(),
-        url,
-        selector,
-        node_id: None,
-        node: None,
-    };
-
-    selector = "#ddlogin-iframe";
+    let selector = "#ddlogin-iframe";
     let my_page = DescribeNode {
         debug_session: Default::default(),
         url,

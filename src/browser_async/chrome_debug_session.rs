@@ -1,8 +1,8 @@
-use super::task_describe::{TaskDescribe};
 use super::id_type as ids;
+use super::task_describe::TaskDescribe;
 
+use super::dev_tools_method_util::ChromePageError;
 use super::inner_event::{self, InnerEvent};
-use super::dev_tools_method_util::{ChromePageError};
 use super::page_message::ChangingFrame;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
@@ -10,20 +10,16 @@ use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::protocol::{self, dom, page, target};
 use failure::Error;
 use log::*;
-use std::sync::atomic::{AtomicUsize};
-use websocket::futures::{Poll, Stream};
 use std::convert::TryFrom;
-
+use std::sync::atomic::AtomicUsize;
+use websocket::futures::{Poll, Stream};
 
 #[derive(Debug)]
 pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
     target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
-    // method_id_2_task_id: HashMap<ids::Method, ids::Task>,
-    // task_id_2_task: HashMap<ids::Task, TaskDescribe>,
     unique_number: AtomicUsize,
-    // pending_tasks: VecDeque<ids::Task>,
     tasks_waiting_for_response: Vec<Vec<TaskDescribe>>,
 }
 
@@ -33,10 +29,7 @@ impl ChromeDebugSession {
             chrome_browser,
             target_info: None,
             session_id: None,
-            // method_id_2_task_id: HashMap::new(),
-            // task_id_2_task: HashMap::new(),
             unique_number: AtomicUsize::new(10000),
-            // pending_tasks: VecDeque::new(),
             tasks_waiting_for_response: Vec::new(),
         }
     }
@@ -52,7 +45,7 @@ impl ChromeDebugSession {
                     self.tasks_waiting_for_response.push(tasks);
                     self.chrome_browser.send_message(method_str);
                 }
-                Err(err) => error!("first task deserialize fail: {:?}", err)
+                Err(err) => error!("first task deserialize fail: {:?}", err),
             }
         } else {
             error!("empty tasks list.")
@@ -100,8 +93,6 @@ impl ChromeDebugSession {
         }
     }
 
-    
-
     pub fn handle_response(
         &mut self,
         resp: protocol::Response,
@@ -110,6 +101,10 @@ impl ChromeDebugSession {
     ) -> Option<TaskDescribe> {
         trace!("got **response**. {:?}", resp);
         let call_id = resp.call_id;
+        trace!(
+            "tasks_waiting_for_response: {:?}",
+            self.tasks_waiting_for_response
+        );
         if let Some(idx) = self.tasks_waiting_for_response.iter().position(|v| {
             if let Some(it) = v.get(0) {
                 if let Some(cf) = it.get_common_fields() {
@@ -137,7 +132,9 @@ impl ChromeDebugSession {
                 return Some(current_task);
             }
             if let Err(mut err) = self.handle_next_task(current_task, tasks) {
-                if let Some(ChromePageError::NextTaskExecution{tasks, error}) = err.downcast_mut::<ChromePageError>() {
+                if let Some(ChromePageError::NextTaskExecution { tasks, error }) =
+                    err.downcast_mut::<ChromePageError>()
+                {
                     error!("handle next task fail. {:?}, {:?}", tasks, error);
                     return (*tasks).pop();
                 } else {
@@ -150,7 +147,10 @@ impl ChromeDebugSession {
         None
     }
 
-    fn tk(&mut self, tasks: Vec<TaskDescribe>) -> Result<(), failure::Error> {
+    fn execute_next_and_return_remains(
+        &mut self,
+        tasks: Vec<TaskDescribe>,
+    ) -> Result<(), failure::Error> {
         let next_task = tasks.get(0).unwrap();
         match String::try_from(next_task) {
             Ok(method_str) => {
@@ -158,71 +158,103 @@ impl ChromeDebugSession {
                 self.send_message_direct(method_str);
                 Ok(())
             }
-            Err(error) => {
-                Err(ChromePageError::NextTaskExecution {
-                    tasks,
-                    error,
-                }.into())
-            } 
+            Err(error) => Err(ChromePageError::NextTaskExecution { tasks, error }.into()),
         }
     }
 
-    fn handle_next_task(&mut self, current_task: TaskDescribe,mut tasks: Vec<TaskDescribe>) -> Result<(), failure::Error> {
+    fn handle_next_task(
+        &mut self,
+        current_task: TaskDescribe,
+        mut tasks: Vec<TaskDescribe>,
+    ) -> Result<(), failure::Error> {
         let mut next_task = tasks.get_mut(0).unwrap();
         match (&current_task, &mut next_task) {
-            (TaskDescribe::GetDocument(get_document), TaskDescribe::QuerySelector(query_selector)) => {
-                query_selector.node_id = get_document.root_node.as_ref().and_then(|nd|Some(nd.node_id));
-                return self.tk(tasks);
+            (
+                TaskDescribe::GetDocument(get_document),
+                TaskDescribe::QuerySelector(query_selector),
+            ) => {
+                query_selector.node_id = get_document
+                    .root_node
+                    .as_ref()
+                    .and_then(|nd| Some(nd.node_id));
+                return self.execute_next_and_return_remains(tasks);
             }
-            (TaskDescribe::QuerySelector(query_selector), TaskDescribe::DescribeNode(describe_node)) => {
+            (
+                TaskDescribe::QuerySelector(query_selector),
+                TaskDescribe::DescribeNode(describe_node),
+            ) => {
                 describe_node.node_id = query_selector.found_node_id;
-                return self.tk(tasks);
+                return self.execute_next_and_return_remains(tasks);
+            }
+            (
+                TaskDescribe::QuerySelector(query_selector),
+                TaskDescribe::GetBoxModel(get_box_model),
+            ) => {
+                get_box_model.node_id = query_selector.found_node_id;
+                return self.execute_next_and_return_remains(tasks);
+            }
+            (TaskDescribe::GetBoxModel(get_box_model), TaskDescribe::ScreenShot(screen_shot)) => {
+                if let Some(mb) = &get_box_model.found_box {
+                    let viewport = mb.content_viewport();
+                    screen_shot.clip = Some(viewport);
+                    return self.execute_next_and_return_remains(tasks);
+                } else {
+                    failure::bail!("found_box is None!");
+                }
             }
             _ => {
-                warn!("unknown pair: {:?}, {:?}", current_task, next_task);
+                error!("unknown pair: {:?}, {:?}", current_task, next_task);
             }
         }
         Ok(())
     }
 
-    fn full_fill_task(&self, resp: protocol::Response, mut task: &mut TaskDescribe) -> Result<(), failure::Error> {
-            match &mut task {
-                TaskDescribe::GetDocument(get_document) => {
-                    let get_document_return_object = protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
-                    get_document.root_node = Some(get_document_return_object.root);
-                }
-                TaskDescribe::PageEnable(_common_fields) => {
-                }
-                TaskDescribe::QuerySelector(query_selector) => {
-                    let query_select_return_object = protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
-                    query_selector.found_node_id = Some(query_select_return_object.node_id);
-                }
-                TaskDescribe::DescribeNode(describe_node) => {
-                    let describe_node_return_object = protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
-                    describe_node.found_node = Some(describe_node_return_object.node);
-                }
-                TaskDescribe::GetBoxModel(get_box_model) => {
-                    let get_box_model_return_object = protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp)?;
-                    let raw_model = get_box_model_return_object.model;
-                    let model_box = BoxModel {
-                        content: ElementQuad::from_raw_points(&raw_model.content),
-                        padding: ElementQuad::from_raw_points(&raw_model.padding),
-                        border: ElementQuad::from_raw_points(&raw_model.border),
-                        margin: ElementQuad::from_raw_points(&raw_model.margin),
-                        width: raw_model.width,
-                        height: raw_model.height,
-                    };
-                    get_box_model.found_box = Some(model_box);
-                }
-                TaskDescribe::ScreenShot(screen_shot) => {
-                    let capture_screenshot_return_object = protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
-                    screen_shot.base64 = Some(capture_screenshot_return_object.data);
-                }
-                task_describe => {
-                    info!("got unprocessed task_describe: {:?}", task_describe);
-                }
+    fn full_fill_task(
+        &self,
+        resp: protocol::Response,
+        mut task: &mut TaskDescribe,
+    ) -> Result<(), failure::Error> {
+        match &mut task {
+            TaskDescribe::GetDocument(get_document) => {
+                let get_document_return_object =
+                    protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
+                get_document.root_node = Some(get_document_return_object.root);
             }
-            Ok(())
+            TaskDescribe::PageEnable(_common_fields) => {}
+            TaskDescribe::QuerySelector(query_selector) => {
+                let query_select_return_object =
+                    protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
+                query_selector.found_node_id = Some(query_select_return_object.node_id);
+            }
+            TaskDescribe::DescribeNode(describe_node) => {
+                let describe_node_return_object =
+                    protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
+                describe_node.found_node = Some(describe_node_return_object.node);
+            }
+            TaskDescribe::GetBoxModel(get_box_model) => {
+                let get_box_model_return_object =
+                    protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp)?;
+                let raw_model = get_box_model_return_object.model;
+                let model_box = BoxModel {
+                    content: ElementQuad::from_raw_points(&raw_model.content),
+                    padding: ElementQuad::from_raw_points(&raw_model.padding),
+                    border: ElementQuad::from_raw_points(&raw_model.border),
+                    margin: ElementQuad::from_raw_points(&raw_model.margin),
+                    width: raw_model.width,
+                    height: raw_model.height,
+                };
+                get_box_model.found_box = Some(model_box);
+            }
+            TaskDescribe::ScreenShot(screen_shot) => {
+                let capture_screenshot_return_object =
+                    protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
+                screen_shot.base64 = Some(capture_screenshot_return_object.data);
+            }
+            task_describe => {
+                info!("got unprocessed task_describe: {:?}", task_describe);
+            }
+        }
+        Ok(())
     }
 
     #[allow(clippy::single_match)]
@@ -357,9 +389,8 @@ impl Stream for ChromeDebugSession {
                         {
                             break Ok(Some(page_message).into());
                         }
-
                     }
-                    //                             pub enum Event {
+                    //   pub enum Event {
                     //     #[serde(rename = "Target.attachedToTarget")]
                     //     AttachedToTarget(target::events::AttachedToTargetEvent),
                     //     #[serde(rename = "Target.receivedMessageFromTarget")]
@@ -384,7 +415,7 @@ impl Stream for ChromeDebugSession {
                     //     RequestIntercepted(network::events::RequestInterceptedEvent),
                     // }
                     other => {
-                       warn!("got unknown message1: {:?}", other);
+                        warn!("got unknown message1: {:?}", other);
                     }
                 }
             // trace!("receive message: {:?}", value);

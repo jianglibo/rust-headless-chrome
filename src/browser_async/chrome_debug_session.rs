@@ -390,6 +390,9 @@ impl Stream for ChromeDebugSession {
                             break Ok(Some(page_message).into());
                         }
                     }
+                    protocol::Message::Connected => {
+                        break Ok(Some(TaskDescribe::ChromeConnected).into());
+                    }
                     //   pub enum Event {
                     //     #[serde(rename = "Target.attachedToTarget")]
                     //     AttachedToTarget(target::events::AttachedToTargetEvent),

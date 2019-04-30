@@ -3,7 +3,7 @@ use super::id_type as ids;
 use super::page_message::{ChangingFrame, PageEventName};
 use super::unique_number;
 use crate::browser::tab::element::BoxModel;
-use crate::browser_async::dev_tools_method_util::{next_call_id, ChromePageError, MethodUtil};
+use crate::browser_async::dev_tools_method_util::{next_call_id, ChromePageError, MethodUtil, MethodDestination};
 use crate::protocol::{dom, page, target};
 use failure;
 use log::*;
@@ -25,6 +25,8 @@ pub enum TaskDescribe {
         PageCreated(target::TargetInfo, Option<&'static str>),
         PageAttached(target::TargetInfo, SessionId),
         ScreenShot(ScreenShot),
+        TargetSetDiscoverTargets(bool, CommonDescribeFields),
+        ChromeConnected,
         Fail,
 }
 
@@ -45,10 +47,9 @@ impl TaskDescribe {
                         TaskDescribe::GetBoxModel(get_box_model) => {
                                 Some(&get_box_model.common_fields)
                         }
-                        TaskDescribe::ScreenShot(screen_shot) => {
-                                Some(&screen_shot.common_fields)
-                        }
+                        TaskDescribe::ScreenShot(screen_shot) => Some(&screen_shot.common_fields),
                         TaskDescribe::PageEnable(common_fields) => Some(&common_fields),
+                        // TaskDescribe::TargetSetDiscoverTargets(_, task_id) => Some(task_id),
                         _ => {
                                 error!("get_common_fields got queried. but it doesn't implement that.");
                                 None
@@ -160,6 +161,13 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                                 session_id,
                                 *call_id,
                         )),
+                        TaskDescribe::TargetSetDiscoverTargets(enable, task_id) => {
+                                Ok(MethodUtil::create_msg_to_send(
+                                        target::methods::SetDiscoverTargets { discover: *enable },
+                                        MethodDestination::Browser,
+                                        next_call_id(),
+                                ))
+                        }
                         _ => {
                                 error!("task describe to string failed. {:?}", task_describe);
                                 Err(ChromePageError::TaskDescribeConvert.into())

@@ -20,17 +20,11 @@ use websocket::r#async::TcpStream;
 use websocket::ClientBuilder;
 use std::collections::VecDeque;
 
-
-use crate::protocol::target;
-
-use crate::browser_async::dev_tools_method_util::{MethodDestination, MethodUtil, next_call_id};
-
 type WsClient = Client<TcpStream>;
 
 enum BrowserState {
     Unconnected,
     Connecting(ClientNew<TcpStream>),
-    EnableDiscover,
     Receiving,
     StartSend(String),
     Sending,
@@ -41,7 +35,6 @@ impl fmt::Debug for BrowserState {
         match self {
             BrowserState::Connecting(_) => write!(f, "connecting"),
             BrowserState::Unconnected => write!(f, "Unconnected"),
-            BrowserState::EnableDiscover => write!(f, "EnableDiscover"),
             BrowserState::Receiving => write!(f, "Receiving"),
             BrowserState::StartSend(content) => write!(f, "start sending: {}", content),
             BrowserState::Sending => write!(f, "Sending"),
@@ -129,16 +122,8 @@ impl Stream for ChromeBrowser {
                     let framed = try_ready!(client_new.poll());
                     info!("connected.");
                     self.ws_client = Some(framed.0);
-                    self.state = BrowserState::EnableDiscover;
-                }
-                BrowserState::EnableDiscover => {
-                    trace!("enter enable discover state.");
-                    let method_str = MethodUtil::create_msg_to_send(
-                        target::methods::SetDiscoverTargets { discover: true },
-                        MethodDestination::Browser,
-                        next_call_id(),
-                    );
-                    self.state = BrowserState::StartSend(method_str);
+                    self.state = BrowserState::Receiving;
+                    return Ok(Some(protocol::Message::Connected).into());
                 }
                 BrowserState::Receiving => {
                     match self.ws_client.as_mut().unwrap().poll() {

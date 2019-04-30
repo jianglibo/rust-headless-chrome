@@ -16,7 +16,7 @@ pub fn json_has_properties(json_value: &serde_json::Value, field_names: Vec<&str
 
 pub fn json_field_has_properties(json_value: &serde_json::Value, field_name: &str, field_names: Vec<&str>) -> bool {
     if let serde_json::Value::Object(mp) = json_value {
-        if let Some(serde_json::Value::Object(root_map)) = mp.get(field_name) {
+        if let Some(serde_json::Value::Object(_root_map)) = mp.get(field_name) {
             json_has_properties(json_value, field_names)
         } else {
             error!("json object's {} field isn't an object. {:?}", field_name, json_value);

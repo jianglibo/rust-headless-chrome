@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::sync::{Arc, Mutex};
 use websocket::futures::Stream;
+use super::unique_number;
 
 const DEFAULT_TAB_NAME: &str = "_default_tab_";
 
@@ -94,6 +95,13 @@ impl DebugSession {
     ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
         let pr = (target_id, task_id, PageResponse::Fail);
         Ok(Some(pr).into())
+    }
+
+    pub fn set_discover_targets(&mut self, enable: bool) {
+        self.chrome_debug_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![TaskDescribe::TargetSetDiscoverTargets(enable, unique_number::create_one())]);
     }
 
     fn send_fail_1(
@@ -272,6 +280,10 @@ impl DebugSession {
                 };
                 let resp = self
                     .convert_to_page_response(Some(&common_fields), PageResponse::Screenshot(ro));
+                Ok(resp.into())
+            }
+            TaskDescribe::ChromeConnected => {
+                let resp = Some((None, None, PageResponse::ChromeConnected));
                 Ok(resp.into())
             }
             _ => {

@@ -1,4 +1,4 @@
-use crate::protocol::{self, dom, page, target};
+use crate::protocol::{dom, page, target};
 use crate::browser::tab::element::{BoxModel};
 use super::id_type as ids;
 use super::dev_tools_method_util::{SessionId};
@@ -31,14 +31,12 @@ pub type PageResponsePlusTabId = (Option<target::TargetId>, Option<ids::Task>, P
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
 pub enum PageResponse {
-    EnablePageDone(String),
+    ChromeConnected,
     SecondsElapsed(usize),
-    PageEvent(PageEventName),
     PageCreated(Option<&'static str>),
     QuerySelector(&'static str, Option<dom::NodeId>),
     PageAttached(target::TargetInfo, SessionId),
     PageEnable,
-    TargetInfoChanged(target::TargetInfo),
     FrameNavigated(ChangingFrame),
     LoadEventFired(f32),
     DescribeNode(Option<&'static str>, Option<dom::NodeId>),
@@ -46,10 +44,13 @@ pub enum PageResponse {
     SetChildNodes(dom::NodeId, Vec<dom::Node>),
     GetDocument,
     Screenshot(response_object::CaptureScreenshot),
-    MessageAvailable(protocol::Message),
-    GetFrameTree(protocol::page::methods::FrameTree),
     Fail,
-    Interval,
+    // MessageAvailable(protocol::Message),
+    // GetFrameTree(protocol::page::methods::FrameTree),
+    // TargetInfoChanged(target::TargetInfo),
+    // PageEvent(PageEventName),
+    // EnablePageDone(String),
+    // Interval,
 }
 
 pub mod response_object {

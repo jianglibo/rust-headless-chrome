@@ -299,7 +299,12 @@ impl Transport {
                                                     break;
                                                 }
                                             }
-                                            Message::ConnectionShutdown => {}
+                                            Message::ConnectionShutdown => {
+                                                info!("connect shutdown received.");
+                                            }
+                                            Message::Connected => {
+                                                info!("connect established.");
+                                            }
                                         }
                                     } else {
                                         trace!(
@@ -325,6 +330,9 @@ impl Transport {
                                     }
                                 }
                             },
+                            Message::Connected => {
+
+                            }
                         }
                     }
                 }

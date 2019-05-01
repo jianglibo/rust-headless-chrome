@@ -36,6 +36,9 @@ impl Future for GetBoxModelTest {
                     None
                 };
                 match value {
+                    PageResponse::ChromeConnected => {
+                        self.debug_session.set_discover_targets(true);
+                    },
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         tab.unwrap().navigate_to(self.url);

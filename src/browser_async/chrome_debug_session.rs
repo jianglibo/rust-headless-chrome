@@ -119,6 +119,16 @@ impl ChromeDebugSession {
             let mut tasks = self.tasks_waiting_for_response.remove(idx);
             let mut current_task = tasks.remove(0);
 
+            // if has remote error.
+            if resp.error.is_some() {
+                error!("got remote error: {:?}", resp);
+                if let Some(tk) = tasks.pop() {
+                    return Some(tk);
+                } else {
+                    return Some(current_task);
+                }
+            }
+
             if let Err(err) = self.full_fill_task(resp, &mut current_task) {
                 error!("fulfill task failed. {:?}", err);
                 // return last task (not fulfilled) in vec.

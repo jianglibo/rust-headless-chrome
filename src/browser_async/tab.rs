@@ -220,6 +220,13 @@ impl Tab {
             .execute_task(vec![TaskDescribe::PageEnable(self.get_c_f(None))]);
     }
 
+    pub fn runtime_enable(&mut self) {
+        self.chrome_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![TaskDescribe::RuntimeEnable(self.get_c_f(None))]);
+    }
+
     // pub fn capture_screenshot(
     //     &mut self,
     //     format: page::ScreenshotFormat,

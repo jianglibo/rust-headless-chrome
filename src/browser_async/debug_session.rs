@@ -100,6 +100,14 @@ impl DebugSession {
         Ok(Some(pr).into())
     }
 
+    pub fn runtime_enable(&mut self) {
+        let cf = tasks::CommonDescribeFieldsBuilder::default().build().unwrap();
+        self.chrome_debug_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![TaskDescribe::RuntimeEnable(cf)]);
+    }
+
     pub fn set_discover_targets(&mut self, enable: bool) {
         let cf = tasks::CommonDescribeFieldsBuilder::default().build().unwrap();
         self.chrome_debug_session

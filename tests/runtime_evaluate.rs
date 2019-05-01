@@ -49,17 +49,23 @@ impl Future for RuntimeEvaluate {
                     None
                 };
                 match value {
+                    PageResponse::ChromeConnected => {
+                        self.debug_session.set_discover_targets(true);
+                        // self.debug_session.runtime_enable();
+                    },
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
                         let tab = tab.unwrap();
                         tab.navigate_to(self.url);
+                        
                     },
                     PageResponse::FrameNavigated(changing_frame) => {
                         info!("got frame: {:?}", changing_frame);
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
+                                    tab.runtime_enable();
                                     tab.describe_node_by_selector(self.selector, Some(10), Some(100));
                                 }
                             }
@@ -94,7 +100,7 @@ impl Future for RuntimeEvaluate {
 
 #[test]
 fn t_runtime_evaluate() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,runtime_evaluate=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,runtime_evaluate=info");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 

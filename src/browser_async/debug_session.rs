@@ -4,7 +4,7 @@ use super::id_type as ids;
 use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{response_object, PageResponse, PageResponsePlusTabId};
 use super::tab::Tab;
-use super::task_describe::{CommonDescribeFields, TaskDescribe};
+use super::task_describe::{self as tasks, CommonDescribeFields, TaskDescribe};
 use crate::protocol::target;
 use failure;
 use futures::{Async, Poll};
@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::sync::{Arc, Mutex};
 use websocket::futures::Stream;
-use super::unique_number;
 
 const DEFAULT_TAB_NAME: &str = "_default_tab_";
 
@@ -69,10 +68,14 @@ impl DebugSession {
             },
         }
     }
-    pub fn get_tab_by_id_mut(&mut self, tab_id: &str) -> Option<&mut Tab> {
-        self.tabs
-            .values_mut()
-            .find(|t| t.target_info.target_id == tab_id)
+    pub fn get_tab_by_id_mut<T: AsRef<str>>(&mut self, tab_id: impl Into<Option<T>>) -> Option<&mut Tab> {
+        if let Some(v) = tab_id.into() {
+            let tid = v.as_ref();
+            return self.tabs
+                .values_mut()
+                .find(|t| t.target_info.target_id.as_str() == tid);
+        }
+        None
     }
 
     pub fn get_tab_by_id(&self, tab_id: String) -> Option<&Tab> {
@@ -98,10 +101,11 @@ impl DebugSession {
     }
 
     pub fn set_discover_targets(&mut self, enable: bool) {
+        let cf = tasks::CommonDescribeFieldsBuilder::default().build().unwrap();
         self.chrome_debug_session
             .lock()
             .unwrap()
-            .execute_task(vec![TaskDescribe::TargetSetDiscoverTargets(enable, unique_number::create_one())]);
+            .execute_task(vec![TaskDescribe::TargetSetDiscoverTargets(enable, cf)]);
     }
 
     fn send_fail_1(
@@ -110,7 +114,7 @@ impl DebugSession {
     ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
         if let Some(cf) = common_fields {
             let pr = (
-                Some(cf.target_id.clone()),
+                cf.target_id.clone(),
                 Some(cf.task_id),
                 PageResponse::Fail,
             );
@@ -128,7 +132,7 @@ impl DebugSession {
     ) -> Option<PageResponsePlusTabId> {
         trace!("got page response: {:?}", page_response);
         if let Some(cf) = common_fields {
-            Some((Some(cf.target_id.clone()), Some(cf.task_id), page_response))
+            Some((cf.target_id.clone(), Some(cf.task_id), page_response))
         } else {
             Some((None, None, page_response))
         }
@@ -202,7 +206,7 @@ impl DebugSession {
             }
             TaskDescribe::GetDocument(get_document) => {
                 let common_fields = &get_document.common_fields;
-                if let Some(tab) = self.get_tab_by_id_mut(&common_fields.target_id) {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap()) {
                     tab.root_node = get_document.root_node;
                     let resp = self
                         .convert_to_page_response(Some(common_fields), PageResponse::GetDocument);
@@ -210,7 +214,7 @@ impl DebugSession {
                 } else {
                     error!("got get document event, but cannot find target.");
                     self.send_fail(
-                        Some(common_fields.target_id.clone()),
+                        common_fields.target_id.clone(),
                         Some(common_fields.task_id),
                     )
                 }
@@ -244,7 +248,7 @@ impl DebugSession {
                     .found_node
                     .as_ref()
                     .and_then(|n| Some(n.node_id));
-                if let Some(tab) = self.get_tab_by_id_mut(&common_fields.target_id) {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap()) {
                     tab.node_returned(describe_node.found_node);
                     let resp = self.convert_to_page_response(
                         Some(&common_fields),

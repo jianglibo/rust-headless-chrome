@@ -48,8 +48,7 @@ impl TaskDescribe {
                                 Some(&get_box_model.common_fields)
                         }
                         TaskDescribe::ScreenShot(screen_shot) => Some(&screen_shot.common_fields),
-                        TaskDescribe::PageEnable(common_fields) => Some(&common_fields),
-                        // TaskDescribe::TargetSetDiscoverTargets(_, task_id) => Some(task_id),
+                        TaskDescribe::PageEnable(common_fields) | TaskDescribe::TargetSetDiscoverTargets(_, common_fields) => Some(&common_fields),
                         _ => {
                                 error!("get_common_fields got queried. but it doesn't implement that.");
                                 None
@@ -161,11 +160,11 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                                 session_id,
                                 *call_id,
                         )),
-                        TaskDescribe::TargetSetDiscoverTargets(enable, task_id) => {
+                        TaskDescribe::TargetSetDiscoverTargets(enable, common_fields) => {
                                 Ok(MethodUtil::create_msg_to_send(
                                         target::methods::SetDiscoverTargets { discover: *enable },
                                         MethodDestination::Browser,
-                                        next_call_id(),
+                                        common_fields.call_id,
                                 ))
                         }
                         _ => {
@@ -291,22 +290,36 @@ impl From<DescribeNode> for TaskDescribe {
 #[derive(Debug, Clone, Default, Builder)]
 #[builder(setter(into))]
 pub struct CommonDescribeFields {
-        pub task_id: ids::Task,
-        pub target_id: target::TargetId,
+        #[builder(default = "None")]
+        pub target_id: Option<target::TargetId>,
+        #[builder(default = "None")]
         pub session_id: Option<SessionId>,
+        #[builder(default = "unique_number::create_one()")]
+        #[builder(setter(prefix = "_abc"))]
+        pub task_id: ids::Task,
         #[builder(default = "next_call_id()")]
         pub call_id: usize,
 }
 
-pub fn get_common_fields_builder(
-        target_id: target::TargetId,
-        session_id: Option<SessionId>,
-        task_id: Option<ids::Task>,
-) -> CommonDescribeFieldsBuilder {
-        let mut builder = CommonDescribeFieldsBuilder::default();
-        let t_id = task_id.map_or_else(unique_number::create_one, |v| v);
-        builder.target_id(target_id)
-                .session_id(session_id)
-                .task_id(t_id);
-        builder
+impl CommonDescribeFieldsBuilder {
+        pub fn task_id(&mut self, task_id: impl Into<Option<ids::Task>>) -> &mut Self {
+                let o = task_id.into();
+                if o.is_some() {
+                        self.task_id = o;
+                }
+                self
+        }
 }
+
+// pub fn get_common_fields_builder(
+//         target_id: target::TargetId,
+//         session_id: Option<SessionId>,
+//         task_id: Option<ids::Task>,
+// ) -> CommonDescribeFieldsBuilder {
+//         let mut builder = CommonDescribeFieldsBuilder::default();
+//         let t_id = task_id.map_or_else(unique_number::create_one, |v| v);
+//         builder.target_id(target_id)
+//                 .session_id(session_id)
+//                 .task_id(t_id);
+//         builder
+// }

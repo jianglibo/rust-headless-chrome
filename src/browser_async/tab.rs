@@ -210,13 +210,7 @@ impl Tab {
     }
 
     fn get_c_f(&self, task_id: Option<ids::Task>) -> tasks::CommonDescribeFields {
-        tasks::get_common_fields_builder(
-            self.target_info.target_id.clone(),
-            self.session_id.clone(),
-            task_id,
-        )
-        .build()
-        .unwrap()
+        tasks::CommonDescribeFieldsBuilder::default().target_id(self.target_info.target_id.clone()).session_id(self.session_id.clone()).task_id(task_id).build().unwrap()
     }
 
     pub fn page_enable(&mut self) {

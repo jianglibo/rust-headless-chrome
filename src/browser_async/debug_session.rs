@@ -200,11 +200,11 @@ impl DebugSession {
             }
             TaskDescribe::FrameNavigated(target_id, changing_frame) => {
                 if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
-                    tab._frame_navigated(changing_frame.clone());
+                    tab._frame_navigated(*changing_frame.clone());
                     let pr = (
                         Some(target_id),
                         None,
-                        PageResponse::FrameNavigated(changing_frame),
+                        PageResponse::FrameNavigated(*changing_frame),
                     );
                     Ok(Some(pr).into())
                 } else {
@@ -272,7 +272,7 @@ impl DebugSession {
                 let common_fields = &get_box_model.common_fields;
                 let resp = self.convert_to_page_response(
                     Some(&common_fields),
-                    PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box),
+                    PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box.map(Box::new)),
                 );
                 Ok(resp.into())
             }

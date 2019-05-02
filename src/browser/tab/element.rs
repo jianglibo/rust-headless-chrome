@@ -271,7 +271,7 @@ impl<'a> Element<'a> {
         &self,
         function_declaration: &str,
         await_promise: bool,
-    ) -> Result<runtime::methods::RemoteObject, Error> {
+    ) -> Result<runtime::types::RemoteObject, Error> {
         let result = self
             .parent
             .call_method(runtime::methods::CallFunctionOn {

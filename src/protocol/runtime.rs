@@ -1,10 +1,42 @@
-pub type ExecutionContextId = u16;
-pub type TimeDelta = u32;
 
-pub mod methods {
-    use crate::protocol::Method;
+pub mod types {
     use serde::{Deserialize, Serialize};
-    use super::*;
+
+    pub type ExecutionContextId = u16;
+    pub type TimeDelta = u32;
+    pub type ScriptId = String;
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CallFrame {
+        pub function_name: String,
+        pub script_id: ScriptId,
+        pub url: String,
+        pub line_number: u16,
+        pub column_number: u16,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct StackTrace {
+        pub description: Option<String>,
+        pub call_frames: Vec<CallFrame>,
+        pub parent: Option<Box<StackTrace>>,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ExceptionDetails {
+        pub exception_id: u16,
+        pub text: String,
+        pub line_number: u16,
+        pub column_number: u16,
+        pub script_id: Option<ScriptId>,
+        pub url: Option<String>,
+        pub stack_trace: Option<StackTrace>,
+        pub exception: Option<RemoteObject>,
+        pub execution_context_id: Option<ExecutionContextId>,
+    }
 
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
@@ -40,6 +72,12 @@ pub mod methods {
         pub unserializable_value: Option<String>,
         pub preview: Option<ObjectPreview>,
     }
+}
+
+pub mod methods {
+    use crate::protocol::Method;
+    use serde::{Deserialize, Serialize};
+    use super::types;
 
     #[derive(Serialize, Debug, Default)]
     #[serde(rename_all = "camelCase")]
@@ -54,7 +92,7 @@ pub mod methods {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct CallFunctionOnReturnObject {
-        pub result: RemoteObject,
+        pub result: types::RemoteObject,
     }
     impl<'a> Method for CallFunctionOn<'a> {
         const NAME: &'static str = "Runtime.callFunctionOn";
@@ -66,20 +104,21 @@ pub mod methods {
     pub struct Evaluate<'a> {
         pub expression: &'a str,
         pub object_group: Option<&'a str>,
-        pub include_command_line_a_p_i: bool,
-        pub silent: bool,
-        pub context_id: ExecutionContextId,
-        pub return_by_value: bool,
-        pub generate_preview: bool,
-        pub user_gesture: bool,
-        pub await_promise: bool,
-        pub throw_on_side_effect: bool,
-        pub time_out: TimeDelta,
+        pub include_command_line_a_p_i: Option<bool>,
+        pub silent: Option<bool>,
+        pub context_id: Option<types::ExecutionContextId>,
+        pub return_by_value: Option<bool>,
+        pub generate_preview: Option<bool>,
+        pub user_gesture: Option<bool>,
+        pub await_promise: Option<bool>,
+        pub throw_on_side_effect: Option<bool>,
+        pub time_out: Option<types::TimeDelta>,
     }
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct EvaluateReturnObject {
-        pub result: RemoteObject,
+        pub result: types::RemoteObject,
+        exception_details: Option<types::ExceptionDetails>,
     }
 
     impl<'a> Method for Evaluate<'a> {

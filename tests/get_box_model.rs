@@ -20,7 +20,7 @@ struct GetBoxModelTest {
     debug_session: DebugSession,
     url: &'static str,
     selector: &'static str,
-    box_model: Option<BoxModel>,
+    box_model: Option<Box<BoxModel>>,
 }
 
 impl Future for GetBoxModelTest {

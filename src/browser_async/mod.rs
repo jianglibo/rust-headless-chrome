@@ -1,7 +1,6 @@
 pub mod dev_tools_method_util;
 pub mod chrome_browser;
 pub mod chrome_debug_session;
-pub mod point_async;
 pub mod interval_page_message;
 pub mod debug_session;
 pub mod page_message;

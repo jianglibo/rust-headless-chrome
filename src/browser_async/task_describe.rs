@@ -13,16 +13,16 @@ use log::*;
 #[derive(Debug)]
 pub enum TaskDescribe {
     QuerySelector(QuerySelector),
-    DescribeNode(DescribeNode),
+    DescribeNode(Box<DescribeNode>),
     ResolveNode(ResolveNode),
-    GetBoxModel(GetBoxModel),
+    GetBoxModel(Box<GetBoxModel>),
     SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
-    GetDocument(GetDocument),
+    GetDocument(Box<GetDocument>),
     PageEnable(CommonDescribeFields),
     RuntimeEnable(CommonDescribeFields),
     Interval,
     PageEvent(PageEventName),
-    FrameNavigated(target::TargetId, ChangingFrame),
+    FrameNavigated(target::TargetId, Box<ChangingFrame>),
     LoadEventFired(target::TargetId, f32),
     TargetInfoChanged(target::TargetInfo),
     PageCreated(target::TargetInfo, Option<&'static str>),
@@ -31,6 +31,7 @@ pub enum TaskDescribe {
     TargetSetDiscoverTargets(bool, CommonDescribeFields),
     ChromeConnected,
     Fail,
+    RuntimeEvaluate(RuntimeEvaluate),
 }
 
 impl TaskDescribe {
@@ -46,6 +47,9 @@ impl TaskDescribe {
             TaskDescribe::PageEnable(common_fields)
             | TaskDescribe::TargetSetDiscoverTargets(_, common_fields)
             | TaskDescribe::RuntimeEnable(common_fields) => Some(&common_fields),
+            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
+                Some(&runtime_evaluate.common_fields)
+            }
             _ => {
                 error!("get_common_fields got queried. but it doesn't implement that.");
                 None
@@ -72,41 +76,26 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 &common_fields.session_id,
                 common_fields.call_id,
             )),
-            TaskDescribe::DescribeNode(DescribeNode {
-                node_id,
-                backend_node_id,
-                depth,
-                common_fields,
-                ..
-            }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::DescribeNode {
-                    node_id: *node_id,
-                    backend_node_id: *backend_node_id,
-                    depth: *depth,
-                },
-                &common_fields.session_id,
-                common_fields.call_id,
-            )),
-            TaskDescribe::GetBoxModel(GetBoxModel {
-                node_id,
-                backend_node_id,
-                common_fields,
-                object_id,
-                ..
-            }) => {
-                let s = if let Some(sv) = object_id {
-                    Some(sv.as_str())
-                } else {
-                    None
-                };
+            TaskDescribe::DescribeNode(describe_node) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    dom::methods::DescribeNode {
+                        node_id: describe_node.node_id,
+                        backend_node_id: describe_node.backend_node_id,
+                        depth: describe_node.depth,
+                    },
+                    &describe_node.common_fields.session_id,
+                    describe_node.common_fields.call_id,
+                ))
+            }
+            TaskDescribe::GetBoxModel(get_box_model) => {
                 Ok(MethodUtil::create_msg_to_send_with_session_id(
                     dom::methods::GetBoxModel {
-                        node_id: *node_id,
-                        backend_node_id: *backend_node_id,
-                        object_id: s,
+                        node_id: get_box_model.node_id,
+                        backend_node_id: get_box_model.backend_node_id,
+                        object_id: get_box_model.object_id.as_ref().map(Self::as_str),
                     },
-                    &common_fields.session_id,
-                    common_fields.call_id,
+                    &get_box_model.common_fields.session_id,
+                    get_box_model.common_fields.call_id,
                 ))
             }
             TaskDescribe::ScreenShot(ScreenShot {
@@ -133,19 +122,16 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                     common_fields.call_id,
                 ))
             }
-            TaskDescribe::GetDocument(GetDocument {
-                depth,
-                pierce,
-                common_fields,
-                ..
-            }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::GetDocument {
-                    depth: depth.or(Some(1)),
-                    pierce: Some(*pierce),
-                },
-                &common_fields.session_id,
-                common_fields.call_id,
-            )),
+            TaskDescribe::GetDocument(get_document) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    dom::methods::GetDocument {
+                        depth: get_document.depth.or(Some(0)),
+                        pierce: Some(get_document.pierce),
+                    },
+                    &get_document.common_fields.session_id,
+                    get_document.common_fields.call_id,
+                ))
+            }
             TaskDescribe::PageEnable(CommonDescribeFields {
                 session_id,
                 call_id,
@@ -155,11 +141,11 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 session_id,
                 *call_id,
             )),
-            TaskDescribe::RuntimeEnable(common_fields) => {Ok(MethodUtil::create_msg_to_send(
+            TaskDescribe::RuntimeEnable(common_fields) => Ok(MethodUtil::create_msg_to_send(
                 runtime::methods::Enable {},
                 MethodDestination::Browser,
                 common_fields.call_id,
-            ))}
+            )),
             TaskDescribe::TargetSetDiscoverTargets(enable, common_fields) => {
                 Ok(MethodUtil::create_msg_to_send(
                     target::methods::SetDiscoverTargets { discover: *enable },
@@ -167,11 +153,63 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                     common_fields.call_id,
                 ))
             }
+            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    runtime::methods::Evaluate {
+                        expression: runtime_evaluate.expression.as_str(),
+                        object_group: runtime_evaluate.object_group.as_ref().map(Self::as_str),
+                        include_command_line_a_p_i: runtime_evaluate.include_command_line_a_p_i,
+                        silent: runtime_evaluate.silent,
+                        context_id: runtime_evaluate.context_id,
+                        return_by_value: runtime_evaluate.return_by_value,
+                        generate_preview: runtime_evaluate.generate_preview,
+                        user_gesture: runtime_evaluate.user_gesture,
+                        await_promise: runtime_evaluate.await_promise,
+                        throw_on_side_effect: runtime_evaluate.throw_on_side_effect,
+                        time_out: runtime_evaluate.time_out,
+                    },
+                    &runtime_evaluate.common_fields.session_id,
+                    runtime_evaluate.common_fields.call_id,
+                ))
+            }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);
                 Err(ChromePageError::TaskDescribeConvert.into())
             }
         }
+    }
+}
+
+#[derive(Debug, Builder, Clone)]
+#[builder(setter(into))]
+pub struct RuntimeEvaluate {
+    pub common_fields: CommonDescribeFields,
+    pub expression: String,
+    #[builder(default = "None")]
+    pub object_group: Option<String>,
+    #[builder(default = "None")]
+    pub include_command_line_a_p_i: Option<bool>,
+    #[builder(default = "None")]
+    pub silent: Option<bool>,
+    #[builder(default = "None")]
+    pub context_id: Option<runtime::types::ExecutionContextId>,
+    #[builder(default = "None")]
+    pub return_by_value: Option<bool>,
+    #[builder(default = "None")]
+    pub generate_preview: Option<bool>,
+    #[builder(default = "None")]
+    pub user_gesture: Option<bool>,
+    #[builder(default = "None")]
+    pub await_promise: Option<bool>,
+    #[builder(default = "None")]
+    pub throw_on_side_effect: Option<bool>,
+    #[builder(default = "None")]
+    pub time_out: Option<runtime::types::TimeDelta>,
+}
+
+impl From<RuntimeEvaluate> for TaskDescribe {
+    fn from(runtime_evaluate: RuntimeEvaluate) -> Self {
+        TaskDescribe::RuntimeEvaluate(runtime_evaluate)
     }
 }
 
@@ -213,7 +251,7 @@ pub struct GetBoxModel {
 
 impl From<GetBoxModel> for TaskDescribe {
     fn from(get_box_model: GetBoxModel) -> Self {
-        TaskDescribe::GetBoxModel(get_box_model)
+        TaskDescribe::GetBoxModel(Box::new(get_box_model))
     }
 }
 
@@ -258,7 +296,7 @@ pub struct GetDocument {
 
 impl From<GetDocument> for TaskDescribe {
     fn from(get_document: GetDocument) -> Self {
-        TaskDescribe::GetDocument(get_document)
+        TaskDescribe::GetDocument(Box::new(get_document))
     }
 }
 
@@ -283,7 +321,7 @@ pub struct DescribeNode {
 
 impl From<DescribeNode> for TaskDescribe {
     fn from(describe_node: DescribeNode) -> Self {
-        TaskDescribe::DescribeNode(describe_node)
+        TaskDescribe::DescribeNode(Box::new(describe_node))
     }
 }
 

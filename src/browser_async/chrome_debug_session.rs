@@ -279,7 +279,7 @@ impl ChromeDebugSession {
                 let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
                 return Some(TaskDescribe::FrameNavigated(
                     target_id.unwrap(),
-                    changing_frame,
+                    Box::new(changing_frame),
                 ));
             }
             protocol::Event::TargetInfoChanged(target_info_changed) => {

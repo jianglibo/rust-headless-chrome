@@ -40,7 +40,7 @@ pub enum PageResponse {
     FrameNavigated(ChangingFrame),
     LoadEventFired(f32),
     DescribeNode(Option<&'static str>, Option<dom::NodeId>),
-    GetBoxModel(Option<&'static str>, Option<BoxModel>),
+    GetBoxModel(Option<&'static str>, Option<Box<BoxModel>>),
     SetChildNodes(dom::NodeId, Vec<dom::Node>),
     GetDocument,
     Screenshot(response_object::CaptureScreenshot),

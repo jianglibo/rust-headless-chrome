@@ -210,7 +210,12 @@ impl Tab {
     }
 
     fn get_c_f(&self, task_id: Option<ids::Task>) -> tasks::CommonDescribeFields {
-        tasks::CommonDescribeFieldsBuilder::default().target_id(self.target_info.target_id.clone()).session_id(self.session_id.clone()).task_id(task_id).build().unwrap()
+        tasks::CommonDescribeFieldsBuilder::default()
+            .target_id(self.target_info.target_id.clone())
+            .session_id(self.session_id.clone())
+            .task_id(task_id)
+            .build()
+            .unwrap()
     }
 
     pub fn page_enable(&mut self) {
@@ -227,45 +232,6 @@ impl Tab {
             .execute_task(vec![TaskDescribe::RuntimeEnable(self.get_c_f(None))]);
     }
 
-    // pub fn capture_screenshot(
-    //     &mut self,
-    //     format: page::ScreenshotFormat,
-    //     clip: Option<page::Viewport>,
-    //     from_surface: bool,
-    //     manual_task_id: Option<ids::Task>
-    // ) {
-    //     let (format, quality) = match format {
-    //         page::ScreenshotFormat::JPEG(quality) => {
-    //             (page::InternalScreenshotFormat::JPEG, quality)
-    //         }
-    //         page::ScreenshotFormat::PNG => (page::InternalScreenshotFormat::PNG, None),
-    //     };
-    //     let (this_task_id, is_manual) = create_if_no_manual_input(manual_task_id);
-    //     let (_, method_str, mid) = MethodUtil::create_msg_to_send_with_session_id(page::methods::CaptureScreenshot {
-    //             format,
-    //             clip,
-    //             quality,
-    //             from_surface,
-    //         }, &self.session_id)
-    //         .unwrap();
-    //         let dn = tasks::ScreenShot {
-    //             task_id: this_task_id,
-    //             target_id: self.target_info.target_id.clone(),
-    //             session_id: self.session_id.clone(),
-    //             is_manual,
-    //             format,
-    //             clip,
-    //             quality,
-    //             from_surface,
-    //             base64: None,
-    //         };
-    //         self.chrome_session.lock().unwrap().add_task_and_method_map(
-    //             mid.unwrap(),
-    //             this_task_id,
-    //             tasks::TaskDescribe::ScreenShot(dn),
-    //         );
-    //     self.chrome_session.lock().unwrap().send_message(method_str);
-    // }
     pub fn attach_to_page(&mut self) {
         let method_str = MethodUtil::create_msg_to_send(
             target::methods::AttachToTarget {

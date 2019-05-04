@@ -209,11 +209,11 @@ impl Tab {
         self.chrome_session.lock().unwrap().execute_task(pre_tasks);
     }
 
-    fn get_c_f(&self, task_id: Option<ids::Task>) -> tasks::CommonDescribeFields {
+    fn get_c_f(&self, manual_task_id: Option<ids::Task>) -> tasks::CommonDescribeFields {
         tasks::CommonDescribeFieldsBuilder::default()
             .target_id(self.target_info.target_id.clone())
             .session_id(self.session_id.clone())
-            .task_id(task_id)
+            .task_id(manual_task_id)
             .build()
             .unwrap()
     }
@@ -225,11 +225,19 @@ impl Tab {
             .execute_task(vec![TaskDescribe::PageEnable(self.get_c_f(None))]);
     }
 
-    pub fn runtime_enable(&mut self) {
+    pub fn runtime_enable(&mut self, manual_task_id: Option<ids::Task>) {
         self.chrome_session
             .lock()
             .unwrap()
-            .execute_task(vec![TaskDescribe::RuntimeEnable(self.get_c_f(None))]);
+            .execute_task(vec![TaskDescribe::RuntimeEnable(self.get_c_f(manual_task_id))]);
+    }
+
+    pub fn runtime_evaluate(&mut self, expression: String, manual_task_id: Option<ids::Task>) {
+        let rt = tasks::RuntimeEvaluateBuilder::default().expression(expression).common_fields(self.get_c_f(manual_task_id)).build().unwrap();
+        self.chrome_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![rt.into()]);
     }
 
     pub fn attach_to_page(&mut self) {

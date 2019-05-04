@@ -7,7 +7,7 @@ use super::page_message::ChangingFrame;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
-use crate::protocol::{self, dom, page, target};
+use crate::protocol::{self, dom, page, target, runtime};
 use failure::Error;
 use log::*;
 use std::convert::TryFrom;
@@ -259,6 +259,12 @@ impl ChromeDebugSession {
                 let capture_screenshot_return_object =
                     protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
                 screen_shot.base64 = Some(capture_screenshot_return_object.data);
+            }
+            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
+                let evaluate_return_object =
+                    protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
+                    runtime_evaluate.result = Some(evaluate_return_object.result);
+                    runtime_evaluate.exception_details = evaluate_return_object.exception_details;
             }
             task_describe => {
                 info!("got unprocessed task_describe: {:?}", task_describe);

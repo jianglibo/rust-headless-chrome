@@ -2,7 +2,7 @@ use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::id_type as ids;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{response_object, PageResponse, PageResponsePlusTabId};
+use super::page_message::{response_object, PageResponse, PageResponseWithTargetIdTaskId};
 use super::tab::Tab;
 use super::task_describe::{self as tasks, CommonDescribeFields, TaskDescribe};
 use crate::protocol::target;
@@ -68,10 +68,14 @@ impl DebugSession {
             },
         }
     }
-    pub fn get_tab_by_id_mut<T: AsRef<str>>(&mut self, tab_id: impl Into<Option<T>>) -> Option<&mut Tab> {
+    pub fn get_tab_by_id_mut<T: AsRef<str>>(
+        &mut self,
+        tab_id: impl Into<Option<T>>,
+    ) -> Option<&mut Tab> {
         if let Some(v) = tab_id.into() {
             let tid = v.as_ref();
-            return self.tabs
+            return self
+                .tabs
                 .values_mut()
                 .find(|t| t.target_info.target_id.as_str() == tid);
         }
@@ -95,13 +99,15 @@ impl DebugSession {
         &mut self,
         target_id: Option<target::TargetId>,
         task_id: Option<ids::Task>,
-    ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
+    ) -> Poll<Option<PageResponseWithTargetIdTaskId>, failure::Error> {
         let pr = (target_id, task_id, PageResponse::Fail);
         Ok(Some(pr).into())
     }
 
     pub fn runtime_enable(&mut self) {
-        let cf = tasks::CommonDescribeFieldsBuilder::default().build().unwrap();
+        let cf = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
         self.chrome_debug_session
             .lock()
             .unwrap()
@@ -109,7 +115,9 @@ impl DebugSession {
     }
 
     pub fn set_discover_targets(&mut self, enable: bool) {
-        let cf = tasks::CommonDescribeFieldsBuilder::default().build().unwrap();
+        let cf = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
         self.chrome_debug_session
             .lock()
             .unwrap()
@@ -119,13 +127,9 @@ impl DebugSession {
     fn send_fail_1(
         &mut self,
         common_fields: Option<&CommonDescribeFields>,
-    ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
+    ) -> Poll<Option<PageResponseWithTargetIdTaskId>, failure::Error> {
         if let Some(cf) = common_fields {
-            let pr = (
-                cf.target_id.clone(),
-                Some(cf.task_id),
-                PageResponse::Fail,
-            );
+            let pr = (cf.target_id.clone(), Some(cf.task_id), PageResponse::Fail);
             Ok(Some(pr).into())
         } else {
             let pr = (None, None, PageResponse::Fail);
@@ -137,7 +141,7 @@ impl DebugSession {
         &self,
         common_fields: Option<&CommonDescribeFields>,
         page_response: PageResponse,
-    ) -> Option<PageResponsePlusTabId> {
+    ) -> Option<PageResponseWithTargetIdTaskId> {
         trace!("got page response: {:?}", page_response);
         if let Some(cf) = common_fields {
             Some((cf.target_id.clone(), Some(cf.task_id), page_response))
@@ -149,7 +153,7 @@ impl DebugSession {
     pub fn send_page_message(
         &mut self,
         item: TaskDescribe,
-    ) -> Poll<Option<PageResponsePlusTabId>, failure::Error> {
+    ) -> Poll<Option<PageResponseWithTargetIdTaskId>, failure::Error> {
         match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
@@ -214,17 +218,15 @@ impl DebugSession {
             }
             TaskDescribe::GetDocument(get_document) => {
                 let common_fields = &get_document.common_fields;
-                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap()) {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap())
+                {
                     tab.root_node = get_document.root_node;
                     let resp = self
                         .convert_to_page_response(Some(common_fields), PageResponse::GetDocument);
                     Ok(resp.into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    self.send_fail(
-                        common_fields.target_id.clone(),
-                        Some(common_fields.task_id),
-                    )
+                    self.send_fail(common_fields.target_id.clone(), Some(common_fields.task_id))
                 }
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
@@ -256,7 +258,8 @@ impl DebugSession {
                     .found_node
                     .as_ref()
                     .and_then(|n| Some(n.node_id));
-                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap()) {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap())
+                {
                     tab.node_returned(describe_node.found_node);
                     let resp = self.convert_to_page_response(
                         Some(&common_fields),
@@ -272,7 +275,10 @@ impl DebugSession {
                 let common_fields = &get_box_model.common_fields;
                 let resp = self.convert_to_page_response(
                     Some(&common_fields),
-                    PageResponse::GetBoxModel(get_box_model.selector, get_box_model.found_box.map(Box::new)),
+                    PageResponse::GetBoxModel(
+                        get_box_model.selector,
+                        get_box_model.found_box.map(Box::new),
+                    ),
                 );
                 Ok(resp.into())
             }
@@ -294,8 +300,26 @@ impl DebugSession {
                     .convert_to_page_response(Some(&common_fields), PageResponse::Screenshot(ro));
                 Ok(resp.into())
             }
+            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
+                let common_fields = &runtime_evaluate.common_fields;
+                let resp = self.convert_to_page_response(
+                    Some(&common_fields),
+                    PageResponse::RuntimeEvaluate(
+                        runtime_evaluate.result.map(Box::new),
+                        runtime_evaluate.exception_details.map(Box::new),
+                    ),
+                );
+                Ok(resp.into())
+            }
             TaskDescribe::ChromeConnected => {
                 let resp = Some((None, None, PageResponse::ChromeConnected));
+                Ok(resp.into())
+            }
+            TaskDescribe::RuntimeEnable(common_fields) => {
+                let resp = self.convert_to_page_response(
+                    Some(&common_fields),
+                    PageResponse::RuntimeEnable
+                );
                 Ok(resp.into())
             }
             _ => {
@@ -307,7 +331,7 @@ impl DebugSession {
 }
 
 impl Stream for DebugSession {
-    type Item = PageResponsePlusTabId;
+    type Item = PageResponseWithTargetIdTaskId;
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {

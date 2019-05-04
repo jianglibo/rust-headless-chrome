@@ -4,8 +4,6 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
-use headless_chrome::protocol::{dom, page};
-
 use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse};
@@ -13,26 +11,18 @@ use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
 use tokio;
 use std::default::Default;
-use serde_json;
 
 struct RuntimeEvaluate {
     debug_session: DebugSession,
     url: &'static str,
-    selector: &'static str,
-    node_id: Option<dom::NodeId>,
-    node: Option<dom::Node>,
-    ddlogin_frame: Option<page::Frame>,
+    task_100_called: bool,
+    task_101_called: bool,
 }
 
 impl RuntimeEvaluate {
     fn assert_result(&self) {
-        let tab = self.debug_session.main_tab().unwrap();
-        // assert!(tab.temporary_node_holder.len() >= 7);
-        // tab.temporary_node_holder.values().for_each(|n|{
-        //     info!("all nodes: {:?}", n);
-        // });
-        // let message_text = serde_json::to_string(&tab.temporary_node_holder).unwrap();
-        // info!("json: {:?}", message_text);
+        assert!(self.task_100_called);
+        assert!(self.task_101_called);
     }
 }
 
@@ -40,6 +30,7 @@ impl Future for RuntimeEvaluate {
     type Item = ();
     type Error = failure::Error;
 
+    #[allow(clippy::cognitive_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
@@ -65,18 +56,44 @@ impl Future for RuntimeEvaluate {
                         if let ChangingFrame::Navigated(frame) = changing_frame {
                             if frame.name == Some("ddlogin-iframe".into()) {
                                 if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.runtime_enable();
-                                    tab.describe_node_by_selector(self.selector, Some(10), Some(100));
+                                    tab.runtime_evaluate("3+3".into(), Some(100));
+                                    tab.runtime_evaluate("3::0".into(), Some(101));
+                                    // tab.runtime_evaluate(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument.body.innerHTML;"#.into(), Some(102));
+                                    tab.runtime_enable(Some(102));
+                                    tab.runtime_evaluate(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#.into(), Some(103));
                                 }
                             }
-                            self.ddlogin_frame = Some(frame);
                         }
                     }
-                    PageResponse::DescribeNode(_selector, node_id) => {
-                        self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
-                        assert_eq!(Some(&self.ddlogin_frame.as_ref().unwrap().id), self.node.as_ref().unwrap().frame_id.as_ref());
-                        info!("node content: {:?}", self.node);
-                        info!("content document: {:?}", self.node.as_ref().unwrap().content_document);
+                    PageResponse::RuntimeEvaluate(result, exception_details) => {
+                        match task_id {
+                            Some(100) => {
+                                self.task_100_called = true;
+                                assert!(result.is_some());
+                                let ro = result.unwrap();
+                                assert_eq!(ro.object_type, "number");
+                                assert_eq!(ro.value, Some(6.into()));
+                                assert_eq!(ro.description, Some("6".into()));
+                                assert!(exception_details.is_none());
+                            }
+                            Some(101) => {
+                                self.task_101_called = true;
+                                assert!(result.is_some());
+                                let ro = result.unwrap();
+                                assert_eq!(ro.object_type, "object");
+                                assert_eq!(ro.subtype, Some("error".into()));
+                                assert_eq!(ro.class_name, Some("SyntaxError".into()));
+                                assert_eq!(ro.description, Some("SyntaxError: Unexpected token :".into()));
+                                assert!(exception_details.is_some());
+                            }
+                            Some(102) | Some(103) => {
+                                info!("task id: {:?}, {:?}", task_id, result);
+                                info!("task id: {:?}, {:?}", task_id, exception_details);
+                            }
+                            _ => {
+                                unreachable!()
+                            }
+                        }
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
@@ -100,21 +117,16 @@ impl Future for RuntimeEvaluate {
 
 #[test]
 fn t_runtime_evaluate() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,runtime_evaluate=info");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,runtime_evaluate=info");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
-    let selector = "#ddlogin-iframe";
     let my_page = RuntimeEvaluate {
         debug_session: Default::default(),
         url,
-        selector,
-        node_id: None,
-        node: None,
-        ddlogin_frame: None,
+        task_100_called: false,
+        task_101_called: false,
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    if let Err(err) = runtime.block_on(my_page.into_future()) {
-        error!("err: {:?}", err);
-    }
+    runtime.block_on(my_page.into_future()).unwrap();
 }

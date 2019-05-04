@@ -31,7 +31,7 @@ pub enum TaskDescribe {
     TargetSetDiscoverTargets(bool, CommonDescribeFields),
     ChromeConnected,
     Fail,
-    RuntimeEvaluate(RuntimeEvaluate),
+    RuntimeEvaluate(Box<RuntimeEvaluate>),
 }
 
 impl TaskDescribe {
@@ -132,20 +132,20 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                     get_document.common_fields.call_id,
                 ))
             }
-            TaskDescribe::PageEnable(CommonDescribeFields {
-                session_id,
-                call_id,
-                ..
-            }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
-                page::methods::Enable {},
-                session_id,
-                *call_id,
-            )),
-            TaskDescribe::RuntimeEnable(common_fields) => Ok(MethodUtil::create_msg_to_send(
-                runtime::methods::Enable {},
-                MethodDestination::Browser,
-                common_fields.call_id,
-            )),
+            TaskDescribe::PageEnable(common_fields) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    page::methods::Enable {},
+                    &common_fields.session_id,
+                    common_fields.call_id,
+                ))
+            }
+            TaskDescribe::RuntimeEnable(common_fields) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    runtime::methods::Enable {},
+                    &common_fields.session_id,
+                    common_fields.call_id,
+                ))
+            }
             TaskDescribe::TargetSetDiscoverTargets(enable, common_fields) => {
                 Ok(MethodUtil::create_msg_to_send(
                     target::methods::SetDiscoverTargets { discover: *enable },
@@ -205,11 +205,15 @@ pub struct RuntimeEvaluate {
     pub throw_on_side_effect: Option<bool>,
     #[builder(default = "None")]
     pub time_out: Option<runtime::types::TimeDelta>,
+    #[builder(default = "None")]
+    pub result: Option<runtime::types::RemoteObject>,
+    #[builder(default = "None")]
+    pub exception_details: Option<runtime::types::ExceptionDetails>,
 }
 
 impl From<RuntimeEvaluate> for TaskDescribe {
     fn from(runtime_evaluate: RuntimeEvaluate) -> Self {
-        TaskDescribe::RuntimeEvaluate(runtime_evaluate)
+        TaskDescribe::RuntimeEvaluate(Box::new(runtime_evaluate))
     }
 }
 

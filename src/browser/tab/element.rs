@@ -275,12 +275,13 @@ impl<'a> Element<'a> {
         let result = self
             .parent
             .call_method(runtime::methods::CallFunctionOn {
-                object_id: &self.remote_object_id,
+                object_id: Some(self.remote_object_id.clone()),
                 function_declaration,
-                return_by_value: false,
-                generate_preview: true,
-                silent: false,
-                await_promise,
+                return_by_value: Some(false),
+                generate_preview: Some(true),
+                silent: Some(false),
+                await_promise: Some(await_promise),
+                ..Default::default()
             })?
             .result;
 

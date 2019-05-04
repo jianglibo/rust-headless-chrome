@@ -1,4 +1,4 @@
-use crate::protocol::{dom, page, target};
+use crate::protocol::{dom, page, target, runtime};
 use crate::browser::tab::element::{BoxModel};
 use super::id_type as ids;
 use super::dev_tools_method_util::{SessionId};
@@ -26,7 +26,7 @@ pub enum PageEventName {
     WindowOpen,
 }
 
-pub type PageResponsePlusTabId = (Option<target::TargetId>, Option<ids::Task>, PageResponse);
+pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<ids::Task>, PageResponse);
 
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
@@ -37,6 +37,7 @@ pub enum PageResponse {
     QuerySelector(&'static str, Option<dom::NodeId>),
     PageAttached(target::TargetInfo, SessionId),
     PageEnable,
+    RuntimeEnable,
     FrameNavigated(ChangingFrame),
     LoadEventFired(f32),
     DescribeNode(Option<&'static str>, Option<dom::NodeId>),
@@ -44,13 +45,8 @@ pub enum PageResponse {
     SetChildNodes(dom::NodeId, Vec<dom::Node>),
     GetDocument,
     Screenshot(response_object::CaptureScreenshot),
+    RuntimeEvaluate(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
     Fail,
-    // MessageAvailable(protocol::Message),
-    // GetFrameTree(protocol::page::methods::FrameTree),
-    // TargetInfoChanged(target::TargetInfo),
-    // PageEvent(PageEventName),
-    // EnablePageDone(String),
-    // Interval,
 }
 
 pub mod response_object {

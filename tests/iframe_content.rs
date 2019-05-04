@@ -13,7 +13,6 @@ use headless_chrome::browser_async::debug_session::{DebugSession};
 use headless_chrome::browser_async::page_message::{ChangingFrame};
 use tokio;
 use std::default::Default;
-use serde_json;
 
 struct IframeContent {
     debug_session: DebugSession,

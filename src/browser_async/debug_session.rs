@@ -202,30 +202,34 @@ impl DebugSession {
                     self.convert_to_page_response(Some(&page_enable), PageResponse::PageEnable);
                 Ok(resp.into())
             }
+            // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             TaskDescribe::FrameNavigated(frame, common_fields) => {
+                // error!("-----------------frame_navigated-----------------{:?}", frame.id);
                 if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
                     let frame_id = frame.id.clone();
-                    tab._frame_navigated(frame);
+                    tab._frame_navigated(*frame);
                     let resp = self
                         .convert_to_page_response(Some(&common_fields), PageResponse::FrameNavigated(frame_id));
                     Ok(resp.into()) 
                 } else {
-                    error!("got frame navigated event, but cannot find target.");
+                    error!("got frame navigated event, but cannot find target. {:?}, {:?}, {:?}", frame, common_fields, self.tabs);
                     self.send_fail_1(Some(&common_fields))
                 }
             }
-            TaskDescribe::FrameStartedLoading(frame_id, common_fields) => {
+            TaskDescribe::FrameStartedLoading(frame_id, common_fields) => { // started loading is first, then attached.
+                // error!("-----------------frame_started-----------------{:?}", frame_id);
                 if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
                     tab._frame_started_loading(frame_id.clone());
                     let resp = self
                         .convert_to_page_response(Some(&common_fields), PageResponse::FrameStartedLoading(frame_id));
                     Ok(resp.into()) 
                 } else {
-                    error!("got frame navigated event, but cannot find target.");
+                    error!("got frame_started_loading event, but cannot find target. {:?}, {:?}, {:?}", frame_id, common_fields, self.tabs);
                     self.send_fail_1(Some(&common_fields))
                 }
             }
             TaskDescribe::FrameStoppedLoading(frame_id, common_fields) => {
+                // error!("-----------------frame_stopped-----------------{:?}", frame_id);
                 if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
                     tab._frame_stopped_loading(frame_id.clone());
                     let pr = (
@@ -235,11 +239,12 @@ impl DebugSession {
                     );
                     Ok(Some(pr).into())
                 } else {
-                    error!("got frame_stopped_loading_event event, but cannot find target.");
+                    error!("got frame_stopped_loading_event, but cannot find target. frame_id: {:?}, common_fields: {:?}, {:?}", frame_id, common_fields, self.tabs);
                     self.send_fail_1(Some(&common_fields))
                 }
             }
             TaskDescribe::FrameAttached(frame_attached_params, common_fields) => {
+                // error!("-----------------frame_attached-----------------{:?}", frame_attached_params.frame_id);
                 if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
                     let frame_id = frame_attached_params.frame_id.clone();
                     tab._frame_attached(frame_attached_params);
@@ -247,7 +252,7 @@ impl DebugSession {
                         .convert_to_page_response(Some(&common_fields), PageResponse::FrameAttached(frame_id));
                     Ok(resp.into()) 
                 } else {
-                    error!("got frame_stopped_loading_event event, but cannot find target.");
+                    error!("got frame_attached_event, but cannot find target. {:?}, {:?}, {:?}", frame_attached_params, common_fields, self.tabs);
                     self.send_fail_1(Some(&common_fields))
                 }
             }

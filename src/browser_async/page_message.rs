@@ -12,19 +12,6 @@ pub enum ChangingFrame {
     StoppedLoading(page::Frame),
 }
 
-impl ChangingFrame {
-    pub fn to_stopped_loading(&mut self) {
-        if let ChangingFrame::Navigated(fm) = self {
-            *self = ChangingFrame::StoppedLoading(fm.clone());
-        } else {
-            error!("Cannot change to stoppedLoading state: {:?}", self);
-        }
-    }
-    pub fn to_navigated(&mut self, frame: page::Frame) {
-        *self = ChangingFrame::Navigated(frame);
-    }
-}
-
 #[derive(Debug)]
 pub enum PageEventName {
     DomContentEventFired,

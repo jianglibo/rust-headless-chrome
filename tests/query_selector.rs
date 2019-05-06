@@ -55,7 +55,7 @@ impl Future for QuerySelector {
                         info!("page enabled.");
                         assert!(tab.is_some());
                         let tab = tab.unwrap();
-                        tab.navigate_to(self.url);
+                        tab.navigate_to(self.url, None);
                     }
                     PageResponse::FrameNavigated(frame_id) => {
                         let tab = tab.unwrap();

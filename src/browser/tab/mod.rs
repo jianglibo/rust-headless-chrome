@@ -230,7 +230,7 @@ impl<'a> Tab {
     }
 
     pub fn navigate_to(&self, url: &str) -> Result<&Self, Error> {
-        let return_object = self.call_method(Navigate { url })?;
+        let return_object = self.call_method(Navigate { url, referrer: None, transition_type: None, frame_id: None, })?;
         if let Some(error_text) = return_object.error_text {
             return Err(NavigationFailed { error_text }.into());
         }

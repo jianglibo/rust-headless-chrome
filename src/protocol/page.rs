@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 use crate::protocol::{network};
 
+pub mod types {
+    use serde::{Deserialize, Serialize};
+    pub type FrameId = String;
+
+    #[derive(Debug, Serialize, Clone)]
+    #[serde(rename_all = "snake_case")]
+    pub enum TransitionType {
+        Link, Typed, AddressBar, AutoBookmark, AutoSubframe, ManualSubframe, Generated, AutoToplevel, FormSubmit, Reload, Keyword, KeywordGenerated, Other
+    }
+
+}
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Frame {
@@ -142,6 +154,7 @@ pub mod methods {
     use super::PrintToPdfOptions;
     use crate::protocol::Method;
     use serde::{Deserialize, Serialize};
+    use super::*;
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
@@ -232,12 +245,18 @@ pub mod methods {
     #[serde(rename_all = "camelCase")]
     pub struct Navigate<'a> {
         pub url: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub referrer: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub transition_type: Option<types::TransitionType>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub frame_id: Option<types::FrameId>,
     }
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct NavigateReturnObject {
-        pub frame_id: String,
-        pub loader_id: Option<String>,
+        pub frame_id: types::FrameId,
+        pub loader_id: Option<network::types::LoaderId>,
         pub error_text: Option<String>,
     }
     impl<'a> Method for Navigate<'a> {

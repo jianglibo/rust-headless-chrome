@@ -1,6 +1,6 @@
 use super::dev_tools_method_util::SessionId;
 use super::id_type as ids;
-use super::page_message::{ChangingFrame, PageEventName};
+use super::page_message::{PageEventName};
 use super::unique_number;
 use crate::browser::tab::element::BoxModel;
 use crate::browser_async::dev_tools_method_util::{
@@ -12,6 +12,7 @@ use log::*;
 
 #[derive(Debug)]
 pub enum TaskDescribe {
+    NavigateTo(NavigateTo),
     QuerySelector(QuerySelector),
     DescribeNode(Box<DescribeNode>),
     ResolveNode(ResolveNode),
@@ -24,7 +25,7 @@ pub enum TaskDescribe {
     PageEvent(PageEventName),
     FrameAttached(page::events::FrameAttachedParams, CommonDescribeFields),
     FrameStartedLoading(String, CommonDescribeFields),
-    FrameNavigated(page::Frame, CommonDescribeFields),
+    FrameNavigated(Box<page::Frame>, CommonDescribeFields),
     FrameStoppedLoading(String, CommonDescribeFields),
     LoadEventFired(target::TargetId, f32),
     TargetInfoChanged(target::TargetInfo),
@@ -42,12 +43,11 @@ impl TaskDescribe {
     pub fn get_common_fields(&self) -> Option<&CommonDescribeFields> {
         match &self {
             TaskDescribe::QuerySelector(query_selector) => Some(&query_selector.common_fields),
-
             TaskDescribe::DescribeNode(describe_node) => Some(&describe_node.common_fields),
-
             TaskDescribe::GetDocument(get_document) => Some(&get_document.common_fields),
             TaskDescribe::GetBoxModel(get_box_model) => Some(&get_box_model.common_fields),
             TaskDescribe::ScreenShot(screen_shot) => Some(&screen_shot.common_fields),
+            TaskDescribe::NavigateTo(navigate_to) => Some(&navigate_to.common_fields),
             TaskDescribe::PageEnable(common_fields)
             | TaskDescribe::TargetSetDiscoverTargets(_, common_fields)
             | TaskDescribe::RuntimeEnable(common_fields) => Some(&common_fields),
@@ -136,6 +136,18 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                     get_document.common_fields.call_id,
                 ))
             }
+            TaskDescribe::NavigateTo(navigate_to) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    page::methods::Navigate {
+                        url: navigate_to.url,
+                        referrer: navigate_to.referrer.clone(),
+                        transition_type: navigate_to.transition_type.clone(),
+                        frame_id: navigate_to.frame_id.clone(),
+                    },
+                    &navigate_to.common_fields.session_id,
+                    navigate_to.common_fields.call_id,
+                ))
+            }
             TaskDescribe::PageEnable(common_fields) => {
                 Ok(MethodUtil::create_msg_to_send_with_session_id(
                     page::methods::Enable {},
@@ -220,6 +232,28 @@ impl From<RuntimeEvaluate> for TaskDescribe {
         TaskDescribe::RuntimeEvaluate(Box::new(runtime_evaluate))
     }
 }
+
+#[derive(Debug, Builder, Clone)]
+#[builder(setter(into))]
+pub struct NavigateTo {
+    pub common_fields: CommonDescribeFields,
+    pub url: &'static str,
+    #[builder(default = "None")]
+    pub referrer: Option<String>,
+    #[builder(default = "None")]
+    pub transition_type: Option<page::types::TransitionType>,
+    #[builder(default = "None")]
+    pub frame_id: Option<page::types::FrameId>,
+    #[builder(default = "None")]
+    pub result: Option<page::methods::NavigateReturnObject>,
+}
+
+impl From<NavigateTo> for TaskDescribe {
+    fn from(screen_shot: NavigateTo) -> Self {
+        TaskDescribe::NavigateTo(screen_shot)
+    }
+}
+
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -345,6 +379,16 @@ pub struct CommonDescribeFields {
     pub task_id: ids::Task,
     #[builder(default = "next_call_id()")]
     pub call_id: usize,
+}
+
+impl From<(Option<String>, Option<String>)> for CommonDescribeFields {
+    fn from(session_id_target_id: (Option<String>, Option<String>)) -> Self {
+        CommonDescribeFieldsBuilder::default()
+                        .target_id(session_id_target_id.1)
+                        .session_id(session_id_target_id.0.map(Into::into))
+                        .build()
+                        .unwrap()
+    }
 }
 
 impl CommonDescribeFieldsBuilder {

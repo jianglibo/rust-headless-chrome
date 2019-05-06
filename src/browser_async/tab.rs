@@ -32,16 +32,16 @@ impl Tab {
             temporary_node_holder: HashMap::new(),
         }
     }
-    pub fn navigate_to(&mut self, url: &str) {
-        let method_str = MethodUtil::create_msg_to_send_with_session_id(
-            page::methods::Navigate { url },
-            &self.session_id,
-            next_call_id(),
-        );
+    pub fn navigate_to(&mut self, url: &'static str, manual_task_id: Option<ids::Task>) {
+        let task = tasks::NavigateToBuilder::default()
+            .common_fields(self.get_c_f(manual_task_id))
+            .url(url)
+            .build()
+            .unwrap();
         self.chrome_session
             .lock()
             .unwrap()
-            .send_message_direct(method_str);
+            .execute_task(vec![task.into()]);
     }
 
     pub fn main_frame(&self) -> Option<&page::Frame> {
@@ -112,7 +112,7 @@ impl Tab {
 
     pub fn _frame_navigated(&mut self, frame: page::Frame) {
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame.id) {
-            changing_frame.to_navigated(frame);
+            *changing_frame = ChangingFrame::Navigated(frame);
         } else {
             error!(
                 "Cannot found frame with id when got _frame_navigated: {:?}",
@@ -126,19 +126,22 @@ impl Tab {
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame_id) {
             *changing_frame = ChangingFrame::StartedLoading(frame_id);
         } else {
-            error!(
-                "Cannot found frame with id when got _frame_stopped_loading: {:?}",
+            info!(
+                "Cannot found frame with id when got _frame_attached: {:?}",
                 &frame_id
             );
-            error!("Current changing_frames: {:?}", self.changing_frames);
             self.changing_frames
                 .insert(frame_id.clone(), ChangingFrame::StartedLoading(frame_id));
         }
     }
 
     pub fn _frame_stopped_loading<T: AsRef<str>>(&mut self, frame_id: T) {
-        if let Some(frame) = self.changing_frames.get_mut(frame_id.as_ref()) {
-            frame.to_stopped_loading();
+        if let Some(changing_frame) = self.changing_frames.get_mut(frame_id.as_ref()) {
+            if let ChangingFrame::Navigated(fm) = changing_frame {
+                *changing_frame = ChangingFrame::StoppedLoading(fm.clone());
+            } else {
+                error!("-----------{:?}", changing_frame);
+            }
         } else {
             error!(
                 "Cannot found frame with id when got _frame_stopped_loading: {:?}",
@@ -151,7 +154,7 @@ impl Tab {
     pub fn _frame_attached(&mut self, frame_attached_params: page::events::FrameAttachedParams) {
         let frame_id = frame_attached_params.frame_id.clone();
         self.changing_frames
-            .insert(frame_id, ChangingFrame::Attached(frame_attached_params));
+            .insert(frame_id.clone(), ChangingFrame::Attached(frame_attached_params));
     }
 
     pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<ids::Task>) {

@@ -24,7 +24,7 @@ impl RuntimeEvaluate {
     fn assert_result(&self) {
         assert!(self.task_100_called);
         assert!(self.task_101_called);
-        assert_eq!(self.runtime_execution_context_created_count, 5);
+        assert_eq!(self.runtime_execution_context_created_count, 8);
     }
 }
 
@@ -44,13 +44,12 @@ impl Future for RuntimeEvaluate {
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
-                        // self.debug_session.runtime_enable();
                     }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
                         let tab = tab.unwrap();
-                        tab.navigate_to(self.url);
+                        tab.navigate_to(self.url, None);
                     }
                     PageResponse::FrameNavigated(frame_id) => {
                         let tab = tab.unwrap();
@@ -60,7 +59,6 @@ impl Future for RuntimeEvaluate {
                             if let Some(tab) = self.debug_session.main_tab_mut() {
                                 tab.runtime_evaluate("3+3".into(), Some(100));
                                 tab.runtime_evaluate("3::0".into(), Some(101));
-                                // tab.runtime_evaluate(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument.body.innerHTML;"#.into(), Some(102));
                                 tab.runtime_enable(Some(102));
                                 tab.runtime_evaluate(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#.into(), Some(103));
                             }

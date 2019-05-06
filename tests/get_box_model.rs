@@ -40,7 +40,7 @@ impl Future for GetBoxModelTest {
                     }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
-                        tab.unwrap().navigate_to(self.url);
+                        tab.unwrap().navigate_to(self.url, None);
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);

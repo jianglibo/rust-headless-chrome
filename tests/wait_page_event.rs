@@ -38,7 +38,7 @@ impl Future for LoadEventFired {
                     },
                     PageResponse::PageEnable => {
                         info!("page enabled.");
-                        tab.unwrap().navigate_to(self.url);
+                        tab.unwrap().navigate_to(self.url, None);
                     },
                     PageResponse::FrameNavigated(frame_id) => {
                         let tab = tab.unwrap();

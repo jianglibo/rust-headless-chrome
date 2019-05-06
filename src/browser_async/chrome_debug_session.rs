@@ -3,7 +3,6 @@ use super::task_describe::{self as tasks, TaskDescribe};
 
 use super::dev_tools_method_util::{ChromePageError, SessionId};
 use super::inner_event::{self, InnerEvent};
-use super::page_message::ChangingFrame;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
@@ -296,8 +295,8 @@ impl ChromeDebugSession {
             protocol::Event::FrameNavigated(frame_navigated_event) => {
                 // let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
                 return Some(TaskDescribe::FrameNavigated(
-                    frame_navigated_event.params.frame,
-                    tasks::CommonDescribeFieldsBuilder::default().target_id(target_id).session_id(session_id.map(Into::into)).build().unwrap(),
+                    Box::new(frame_navigated_event.params.frame),
+                    (session_id, target_id).into(),
                     // Box::new(changing_frame),
                 ));
             }
@@ -345,25 +344,22 @@ impl ChromeDebugSession {
             protocol::Event::FrameAttached(frame_attached_event) => {
                 return Some(TaskDescribe::FrameAttached(
                     frame_attached_event.params,
-                    tasks::CommonDescribeFieldsBuilder::default()
-                        .target_id(target_id)
-                        .session_id(session_id.map(Into::into))
-                        .build()
-                        .unwrap(),
-                ))
-                .into();                
+                    (session_id, target_id).into(),
+                ));
             }
             protocol::Event::FrameStoppedLoading(frame_stopped_loading_event) => {
                 let frame_id = frame_stopped_loading_event.params.frame_id;
                 return Some(TaskDescribe::FrameStoppedLoading(
                     frame_id,
-                    tasks::CommonDescribeFieldsBuilder::default()
-                        .target_id(target_id)
-                        .session_id(session_id.map(Into::into))
-                        .build()
-                        .unwrap(),
-                ))
-                .into();
+                    (session_id, target_id).into(),
+                ));
+            }
+            protocol::Event::FrameStartedLoading(frame_started_loading) => {
+                let frame_id = frame_started_loading.params.frame_id;
+                return Some(TaskDescribe::FrameStartedLoading(
+                    frame_id,
+                    (session_id, target_id).into(),
+                ));
             }
             _ => {
                 warn!("unprocessed inner event: {:?}", protocol_event);

@@ -236,7 +236,7 @@ impl DebugSession {
                     Ok(Some(pr).into())
                 } else {
                     error!("got frame_stopped_loading_event event, but cannot find target.");
-                    self.send_fail(Some(common_fields.target_id.map_or("".into(), |v|v)), None)
+                    self.send_fail_1(Some(&common_fields))
                 }
             }
             TaskDescribe::FrameAttached(frame_attached_params, common_fields) => {
@@ -248,7 +248,7 @@ impl DebugSession {
                     Ok(resp.into()) 
                 } else {
                     error!("got frame_stopped_loading_event event, but cannot find target.");
-                    self.send_fail(Some(common_fields.target_id.map_or("".into(), |v|v)), None)
+                    self.send_fail_1(Some(&common_fields))
                 }
             }
             TaskDescribe::GetDocument(get_document) => {
@@ -261,7 +261,7 @@ impl DebugSession {
                     Ok(resp.into())
                 } else {
                     error!("got get document event, but cannot find target.");
-                    self.send_fail(common_fields.target_id.clone(), Some(common_fields.task_id))
+                    self.send_fail_1(Some(&common_fields))
                 }
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {

@@ -1,13 +1,13 @@
 use super::id_type as ids;
-use super::task_describe::TaskDescribe;
+use super::task_describe::{self as tasks, TaskDescribe};
 
-use super::dev_tools_method_util::ChromePageError;
+use super::dev_tools_method_util::{ChromePageError, SessionId};
 use super::inner_event::{self, InnerEvent};
 use super::page_message::ChangingFrame;
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
-use crate::protocol::{self, dom, page, target, runtime};
+use crate::protocol::{self, dom, page, runtime, target};
 use failure::Error;
 use log::*;
 use std::convert::TryFrom;
@@ -65,7 +65,7 @@ impl ChromeDebugSession {
     pub fn handle_inner_target_events(
         &mut self,
         inner_event: InnerEvent,
-        _raw_session_id: String,
+        session_id: String,
         target_id: target::TargetId,
     ) -> Option<TaskDescribe> {
         match inner_event {
@@ -77,6 +77,18 @@ impl ChromeDebugSession {
             InnerEvent::LoadEventFired(load_event_fired_event) => {
                 let params = load_event_fired_event.params;
                 return TaskDescribe::LoadEventFired(target_id, params.timestamp).into();
+            }
+            InnerEvent::ExecutionContextCreated(execution_context_created) => {
+                let s_id: SessionId = session_id.into();
+                return TaskDescribe::RuntimeExecutionContextCreated(
+                    execution_context_created.params.context,
+                    tasks::CommonDescribeFieldsBuilder::default()
+                        .target_id(target_id)
+                        .session_id(s_id)
+                        .build()
+                        .unwrap(),
+                )
+                .into();
             }
             _ => {
                 info!("discard inner event: {:?}", inner_event);
@@ -263,8 +275,8 @@ impl ChromeDebugSession {
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
                 let evaluate_return_object =
                     protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
-                    runtime_evaluate.result = Some(evaluate_return_object.result);
-                    runtime_evaluate.exception_details = evaluate_return_object.exception_details;
+                runtime_evaluate.result = Some(evaluate_return_object.result);
+                runtime_evaluate.exception_details = evaluate_return_object.exception_details;
             }
             task_describe => {
                 info!("got unprocessed task_describe: {:?}", task_describe);
@@ -277,15 +289,16 @@ impl ChromeDebugSession {
     fn handle_protocol_event(
         &mut self,
         protocol_event: protocol::Event,
-        _session_id: Option<String>,
+        session_id: Option<String>,
         target_id: Option<String>,
     ) -> Option<TaskDescribe> {
         match protocol_event {
             protocol::Event::FrameNavigated(frame_navigated_event) => {
-                let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
+                // let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
                 return Some(TaskDescribe::FrameNavigated(
-                    target_id.unwrap(),
-                    Box::new(changing_frame),
+                    frame_navigated_event.params.frame,
+                    tasks::CommonDescribeFieldsBuilder::default().target_id(target_id).session_id(session_id.map(Into::into)).build().unwrap(),
+                    // Box::new(changing_frame),
                 ));
             }
             protocol::Event::TargetInfoChanged(target_info_changed) => {
@@ -328,6 +341,29 @@ impl ChromeDebugSession {
                     }
                     _ => (),
                 }
+            }
+            protocol::Event::FrameAttached(frame_attached_event) => {
+                return Some(TaskDescribe::FrameAttached(
+                    frame_attached_event.params,
+                    tasks::CommonDescribeFieldsBuilder::default()
+                        .target_id(target_id)
+                        .session_id(session_id.map(Into::into))
+                        .build()
+                        .unwrap(),
+                ))
+                .into();                
+            }
+            protocol::Event::FrameStoppedLoading(frame_stopped_loading_event) => {
+                let frame_id = frame_stopped_loading_event.params.frame_id;
+                return Some(TaskDescribe::FrameStoppedLoading(
+                    frame_id,
+                    tasks::CommonDescribeFieldsBuilder::default()
+                        .target_id(target_id)
+                        .session_id(session_id.map(Into::into))
+                        .build()
+                        .unwrap(),
+                ))
+                .into();
             }
             _ => {
                 warn!("unprocessed inner event: {:?}", protocol_event);

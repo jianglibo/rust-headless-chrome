@@ -22,7 +22,10 @@ pub enum TaskDescribe {
     RuntimeEnable(CommonDescribeFields),
     Interval,
     PageEvent(PageEventName),
-    FrameNavigated(target::TargetId, Box<ChangingFrame>),
+    FrameAttached(page::events::FrameAttachedParams, CommonDescribeFields),
+    FrameStartedLoading(String, CommonDescribeFields),
+    FrameNavigated(page::Frame, CommonDescribeFields),
+    FrameStoppedLoading(String, CommonDescribeFields),
     LoadEventFired(target::TargetId, f32),
     TargetInfoChanged(target::TargetInfo),
     PageCreated(target::TargetInfo, Option<&'static str>),
@@ -32,6 +35,7 @@ pub enum TaskDescribe {
     ChromeConnected,
     Fail,
     RuntimeEvaluate(Box<RuntimeEvaluate>),
+    RuntimeExecutionContextCreated(runtime::types::ExecutionContextDescription, CommonDescribeFields),
 }
 
 impl TaskDescribe {

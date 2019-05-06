@@ -28,7 +28,7 @@ impl Future for LoadEventFired {
         loop {
             if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
-                    self.debug_session.get_tab_by_id_mut(tid)
+                    self.debug_session.get_tab_by_id_mut(Some(tid))
                 } else {
                     None
                 };
@@ -40,16 +40,15 @@ impl Future for LoadEventFired {
                         info!("page enabled.");
                         tab.unwrap().navigate_to(self.url);
                     },
-                    PageResponse::FrameNavigated(changing_frame) => {
-                        info!("got frame: {:?}", changing_frame);
-                        if let ChangingFrame::Navigated(frame) = changing_frame {
-                            if frame.name == Some("ddlogin-iframe".into()) {
-                                info!("send get document command.");
-                                let tab = tab.unwrap();
-                                tab.get_document(Some(1), Some(100));
-                                tab.get_document(Some(1), Some(101));
-                                tab.get_document(Some(1), Some(102));
-                            }
+                    PageResponse::FrameNavigated(frame_id) => {
+                        let tab = tab.unwrap();
+                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        info!("got frame: {:?}", frame_id);
+                        if frame.name == Some("ddlogin-iframe".into()) {
+                            info!("send get document command.");
+                            tab.get_document(Some(1), Some(100));
+                            tab.get_document(Some(1), Some(101));
+                            tab.get_document(Some(1), Some(102));
                         }
                     }
                     PageResponse::GetDocument => {

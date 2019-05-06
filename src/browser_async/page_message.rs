@@ -2,13 +2,27 @@ use crate::protocol::{dom, page, target, runtime};
 use crate::browser::tab::element::{BoxModel};
 use super::id_type as ids;
 use super::dev_tools_method_util::{SessionId};
+use log::*;
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
-    Attached(String, String),
-    StartLoading(String),
+    Attached(page::events::FrameAttachedParams),
+    StartedLoading(String),
     Navigated(page::Frame),
     StoppedLoading(page::Frame),
+}
+
+impl ChangingFrame {
+    pub fn to_stopped_loading(&mut self) {
+        if let ChangingFrame::Navigated(fm) = self {
+            *self = ChangingFrame::StoppedLoading(fm.clone());
+        } else {
+            error!("Cannot change to stoppedLoading state: {:?}", self);
+        }
+    }
+    pub fn to_navigated(&mut self, frame: page::Frame) {
+        *self = ChangingFrame::Navigated(frame);
+    }
 }
 
 #[derive(Debug)]
@@ -38,7 +52,10 @@ pub enum PageResponse {
     PageAttached(target::TargetInfo, SessionId),
     PageEnable,
     RuntimeEnable,
-    FrameNavigated(ChangingFrame),
+    FrameAttached(String),
+    FrameStartedLoading(String),
+    FrameNavigated(String),
+    FrameStoppedLoading(String),
     LoadEventFired(f32),
     DescribeNode(Option<&'static str>, Option<dom::NodeId>),
     GetBoxModel(Option<&'static str>, Option<Box<BoxModel>>),
@@ -46,6 +63,7 @@ pub enum PageResponse {
     GetDocument,
     Screenshot(response_object::CaptureScreenshot),
     RuntimeEvaluate(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
+    RuntimeExecutionContextCreated(runtime::types::ExecutionContextDescription),
     Fail,
 }
 

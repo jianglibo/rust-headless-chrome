@@ -6,13 +6,13 @@ extern crate tokio_timer;
 
 use headless_chrome::protocol::{dom, page};
 
-use websocket::futures::{Future, Poll, Stream, IntoFuture};
+use headless_chrome::browser_async::debug_session::DebugSession;
+use headless_chrome::browser_async::page_message::ChangingFrame;
+use headless_chrome::browser_async::page_message::PageResponse;
 use log::*;
-use headless_chrome::browser_async::page_message::{PageResponse};
-use headless_chrome::browser_async::debug_session::{DebugSession};
-use headless_chrome::browser_async::page_message::{ChangingFrame};
-use tokio;
 use std::default::Default;
+use tokio;
+use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 struct IframeContent {
     debug_session: DebugSession,
@@ -43,42 +43,48 @@ impl Future for IframeContent {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
-                    self.debug_session.get_tab_by_id_mut(tid)
+                    self.debug_session.get_tab_by_id_mut(Some(tid))
                 } else {
                     None
                 };
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
-                    },
+                    }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
                         let tab = tab.unwrap();
                         tab.navigate_to(self.url);
-                    },
-                    PageResponse::FrameNavigated(changing_frame) => {
-                        info!("got frame: {:?}", changing_frame);
-                        if let ChangingFrame::Navigated(frame) = changing_frame {
-                            if frame.name == Some("ddlogin-iframe".into()) {
-                                if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.describe_node_by_selector(self.selector, Some(10), Some(100));
-                                }
+                    }
+                    PageResponse::FrameNavigated(frame_id) => {
+                        let tab = tab.unwrap();
+                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        info!("got frame: {:?}", frame_id);
+                        self.ddlogin_frame = Some(frame.clone());
+                        if frame.name == Some("ddlogin-iframe".into()) {
+                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                                tab.describe_node_by_selector(self.selector, Some(10), Some(100));
                             }
-                            self.ddlogin_frame = Some(frame);
                         }
                     }
                     PageResponse::DescribeNode(_selector, node_id) => {
                         self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
-                        assert_eq!(Some(&self.ddlogin_frame.as_ref().unwrap().id), self.node.as_ref().unwrap().frame_id.as_ref());
+                        assert_eq!(
+                            Some(&self.ddlogin_frame.as_ref().unwrap().id),
+                            self.node.as_ref().unwrap().frame_id.as_ref()
+                        );
                         info!("node content: {:?}", self.node);
-                        info!("content document: {:?}", self.node.as_ref().unwrap().content_document);
+                        info!(
+                            "content document: {:?}",
+                            self.node.as_ref().unwrap().content_document
+                        );
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
                             self.assert_result();
-                            break Ok(().into())
+                            break Ok(().into());
                         }
                     }
                     _ => {

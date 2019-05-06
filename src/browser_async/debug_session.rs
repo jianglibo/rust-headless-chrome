@@ -70,9 +70,9 @@ impl DebugSession {
     }
     pub fn get_tab_by_id_mut<T: AsRef<str>>(
         &mut self,
-        tab_id: impl Into<Option<T>>,
+        tab_id: Option<T>,
     ) -> Option<&mut Tab> {
-        if let Some(v) = tab_id.into() {
+        if let Some(v) = tab_id {
             let tid = v.as_ref();
             return self
                 .tabs
@@ -183,7 +183,7 @@ impl DebugSession {
                     target_info,
                     session_id.clone()
                 );
-                if let Some(tab) = self.get_tab_by_id_mut(&target_info.target_id) {
+                if let Some(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
                     tab.session_id.replace(session_id.clone());
                     tab.page_enable();
                     let pr = (
@@ -202,23 +202,58 @@ impl DebugSession {
                     self.convert_to_page_response(Some(&page_enable), PageResponse::PageEnable);
                 Ok(resp.into())
             }
-            TaskDescribe::FrameNavigated(target_id, changing_frame) => {
-                if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
-                    tab._frame_navigated(*changing_frame.clone());
+            TaskDescribe::FrameNavigated(frame, common_fields) => {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
+                    let frame_id = frame.id.clone();
+                    tab._frame_navigated(frame);
+                    let resp = self
+                        .convert_to_page_response(Some(&common_fields), PageResponse::FrameNavigated(frame_id));
+                    Ok(resp.into()) 
+                } else {
+                    error!("got frame navigated event, but cannot find target.");
+                    self.send_fail_1(Some(&common_fields))
+                }
+            }
+            TaskDescribe::FrameStartedLoading(frame_id, common_fields) => {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
+                    tab._frame_started_loading(frame_id.clone());
+                    let resp = self
+                        .convert_to_page_response(Some(&common_fields), PageResponse::FrameStartedLoading(frame_id));
+                    Ok(resp.into()) 
+                } else {
+                    error!("got frame navigated event, but cannot find target.");
+                    self.send_fail_1(Some(&common_fields))
+                }
+            }
+            TaskDescribe::FrameStoppedLoading(frame_id, common_fields) => {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
+                    tab._frame_stopped_loading(frame_id.clone());
                     let pr = (
-                        Some(target_id),
+                        common_fields.target_id,
                         None,
-                        PageResponse::FrameNavigated(*changing_frame),
+                        PageResponse::FrameStoppedLoading(frame_id),
                     );
                     Ok(Some(pr).into())
                 } else {
-                    error!("got frame navigated event, but cannot find target.");
-                    self.send_fail(Some(target_id), None)
+                    error!("got frame_stopped_loading_event event, but cannot find target.");
+                    self.send_fail(Some(common_fields.target_id.map_or("".into(), |v|v)), None)
+                }
+            }
+            TaskDescribe::FrameAttached(frame_attached_params, common_fields) => {
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
+                    let frame_id = frame_attached_params.frame_id.clone();
+                    tab._frame_attached(frame_attached_params);
+                    let resp = self
+                        .convert_to_page_response(Some(&common_fields), PageResponse::FrameAttached(frame_id));
+                    Ok(resp.into()) 
+                } else {
+                    error!("got frame_stopped_loading_event event, but cannot find target.");
+                    self.send_fail(Some(common_fields.target_id.map_or("".into(), |v|v)), None)
                 }
             }
             TaskDescribe::GetDocument(get_document) => {
                 let common_fields = &get_document.common_fields;
-                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap())
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref())
                 {
                     tab.root_node = get_document.root_node;
                     let resp = self
@@ -231,7 +266,7 @@ impl DebugSession {
             }
             TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
                 // let t_id = target_id.clone();
-                if let Some(tab) = self.get_tab_by_id_mut(&target_id) {
+                if let Some(tab) = self.get_tab_by_id_mut(Some(&target_id)) {
                     tab.node_arrived(parent_node_id, nodes);
                     let pr = (
                         Some(target_id),
@@ -258,7 +293,7 @@ impl DebugSession {
                     .found_node
                     .as_ref()
                     .and_then(|n| Some(n.node_id));
-                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref().unwrap())
+                if let Some(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref())
                 {
                     tab.node_returned(describe_node.found_node);
                     let resp = self.convert_to_page_response(
@@ -319,6 +354,13 @@ impl DebugSession {
                 let resp = self.convert_to_page_response(
                     Some(&common_fields),
                     PageResponse::RuntimeEnable
+                );
+                Ok(resp.into())
+            }
+            TaskDescribe::RuntimeExecutionContextCreated(runtime_execution_context_created, common_fields) => {
+                let resp = self.convert_to_page_response(
+                    Some(&common_fields),
+                    PageResponse::RuntimeExecutionContextCreated(runtime_execution_context_created),
                 );
                 Ok(resp.into())
             }

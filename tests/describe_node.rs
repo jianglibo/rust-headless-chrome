@@ -4,16 +4,15 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
-use headless_chrome::protocol::{dom};
+use headless_chrome::protocol::dom;
 
-use websocket::futures::{Future, Poll, Stream, IntoFuture};
+use headless_chrome::browser_async::debug_session::DebugSession;
+use headless_chrome::browser_async::page_message::ChangingFrame;
+use headless_chrome::browser_async::page_message::PageResponse;
 use log::*;
-use headless_chrome::browser_async::page_message::{PageResponse};
-use headless_chrome::browser_async::debug_session::{DebugSession};
-use headless_chrome::browser_async::page_message::{ChangingFrame};
 use std::default::Default;
 use tokio;
-
+use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 struct DescribeNode {
     debug_session: DebugSession,
@@ -39,32 +38,32 @@ impl Future for DescribeNode {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
-                    self.debug_session.get_tab_by_id_mut(tid)
+                    self.debug_session.get_tab_by_id_mut(Some(tid))
                 } else {
                     None
                 };
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
-                    },
+                    }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         tab.unwrap().navigate_to(self.url);
-                    },
+                    }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
                             self.assert_result();
-                            break Ok(().into())                        
+                            break Ok(().into());
                         }
                     }
-                    PageResponse::FrameNavigated(changing_frame) => {
-                        info!("got frame: {:?}", changing_frame);
-                        if let ChangingFrame::Navigated(frame) = changing_frame {
-                            if frame.name == Some("ddlogin-iframe".into()) {
-                                if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.describe_node_by_selector(self.selector, Some(2), Some(100));
-                                }
+                    PageResponse::FrameNavigated(frame_id) => {
+                        let tab = tab.unwrap();
+                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        info!("got frame: {:?}", frame_id);
+                        if frame.name == Some("ddlogin-iframe".into()) {
+                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                                tab.describe_node_by_selector(self.selector, Some(2), Some(100));
                             }
                         }
                     }
@@ -76,9 +75,12 @@ impl Future for DescribeNode {
                             assert!(task_id == Some(100));
                             assert!(node_id.is_some());
                             assert_eq!(selector, Some(self.selector));
-                            self.node_id  = node_id;
+                            self.node_id = node_id;
                             self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
-                            info!("content document: {:?}", self.node.as_ref().unwrap().content_document);
+                            info!(
+                                "content document: {:?}",
+                                self.node.as_ref().unwrap().content_document
+                            );
                         }
                     }
                     _ => {
@@ -107,5 +109,7 @@ fn t_dom_describe_node() {
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    if let Err(error) = runtime.block_on(my_page.into_future()) { error!("{:?}", error) }
+    if let Err(error) = runtime.block_on(my_page.into_future()) {
+        error!("{:?}", error)
+    }
 }

@@ -4,17 +4,16 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
-use websocket::futures::{Future, Poll, Stream, IntoFuture};
+use headless_chrome::browser_async::debug_session::DebugSession;
+use headless_chrome::browser_async::page_message::ChangingFrame;
+use headless_chrome::browser_async::page_message::{response_object, PageResponse};
+use headless_chrome::protocol::page;
 use log::*;
-use headless_chrome::browser_async::page_message::{PageResponse, response_object};
-use headless_chrome::browser_async::debug_session::{DebugSession};
-use headless_chrome::browser_async::page_message::{ChangingFrame};
-use headless_chrome::protocol::{page};
 use std::default::Default;
 use std::fs;
 use std::path::Path;
 use tokio;
-
+use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 struct CaptureScreenShotTest {
     debug_session: DebugSession,
@@ -31,28 +30,33 @@ impl Future for CaptureScreenShotTest {
         loop {
             if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
-                    self.debug_session.get_tab_by_id_mut(tid)
+                    self.debug_session.get_tab_by_id_mut(Some(tid))
                 } else {
                     None
                 };
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
-                    },
+                    }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         tab.unwrap().navigate_to(self.url);
-                    },
+                    }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds == 19 {
-                                if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
-                                }
+                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                                tab.capture_screenshot_by_selector(
+                                    self.selector,
+                                    page::ScreenshotFormat::PNG,
+                                    true,
+                                    Some(100),
+                                );
+                            }
                         }
                         if seconds > 25 {
                             assert!(self.ro.is_some());
-                            
+
                             let file_name = "target/abc.png";
                             let path = Path::new(file_name);
                             if path.exists() && path.is_file() {
@@ -63,13 +67,18 @@ impl Future for CaptureScreenShotTest {
                             break Ok(().into());
                         }
                     }
-                    PageResponse::FrameNavigated(changing_frame) => {
-                        trace!("got frame: {:?}", changing_frame);
-                        if let ChangingFrame::Navigated(frame) = changing_frame {
-                            if frame.name == Some("ddlogin-iframe".into()) {
-                                if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.capture_screenshot_by_selector(self.selector, page::ScreenshotFormat::PNG, true, Some(100));
-                                }
+                    PageResponse::FrameNavigated(frame_id) => {
+                        let tab = tab.unwrap();
+                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        info!("got frame: {:?}", frame_id);
+                        if frame.name == Some("ddlogin-iframe".into()) {
+                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                                tab.capture_screenshot_by_selector(
+                                    self.selector,
+                                    page::ScreenshotFormat::PNG,
+                                    true,
+                                    Some(100),
+                                );
                             }
                         }
                     }
@@ -77,7 +86,7 @@ impl Future for CaptureScreenShotTest {
                         info!("got screen shot: {:?}", capture_screen_shot.base64);
                         assert!(capture_screen_shot.base64.is_some());
                         assert_eq!(capture_screen_shot.selector, Some(self.selector));
-                        self.ro  = Some(capture_screen_shot);
+                        self.ro = Some(capture_screen_shot);
                     }
                     _ => {
                         info!("got unused page message {:?}", value);

@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
+use crate::protocol::{network};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Frame {
     pub id: String,
     pub parent_id: Option<String>,
-    pub loader_id: String,
+    pub loader_id: network::types::LoaderId,
     pub name: Option<String>,
     pub url: String,
     pub security_origin: String,
@@ -80,6 +81,7 @@ pub struct PrintToPdfOptions {
 
 pub mod events {
     use serde::Deserialize;
+    use crate::protocol::{runtime};
     #[derive(Deserialize, Debug, Clone)]
     pub struct LifecycleEvent {
         pub params: LifecycleParams,
@@ -122,6 +124,7 @@ pub mod events {
     pub struct FrameAttachedParams {
         pub frame_id: String,
         pub parent_frame_id: String,
+        pub stack: Option<runtime::types::StackTrace>,
     }
 
     #[derive(Deserialize, Debug, Clone)]

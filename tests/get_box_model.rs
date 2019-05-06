@@ -5,16 +5,15 @@ extern crate futures;
 extern crate tokio_timer;
 
 // use headless_chrome::protocol::{dom};
-use headless_chrome::browser::tab::element::{BoxModel};
+use headless_chrome::browser::tab::element::BoxModel;
 
-use websocket::futures::{Future, Poll, Stream, IntoFuture};
+use headless_chrome::browser_async::debug_session::DebugSession;
+use headless_chrome::browser_async::page_message::ChangingFrame;
+use headless_chrome::browser_async::page_message::PageResponse;
 use log::*;
-use headless_chrome::browser_async::page_message::{PageResponse};
-use headless_chrome::browser_async::debug_session::{DebugSession};
-use headless_chrome::browser_async::page_message::{ChangingFrame};
 use std::default::Default;
 use tokio;
-
+use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 struct GetBoxModelTest {
     debug_session: DebugSession,
@@ -31,31 +30,31 @@ impl Future for GetBoxModelTest {
         loop {
             if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = if let Some(tid) = &tab_id {
-                    self.debug_session.get_tab_by_id_mut(tid)
+                    self.debug_session.get_tab_by_id_mut(Some(tid))
                 } else {
                     None
                 };
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
-                    },
+                    }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         tab.unwrap().navigate_to(self.url);
-                    },
+                    }
                     PageResponse::SecondsElapsed(seconds) => {
                         info!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
                             assert!(self.box_model.is_some());
                         }
                     }
-                    PageResponse::FrameNavigated(changing_frame) => {
-                        info!("got frame: {:?}", changing_frame);
-                        if let ChangingFrame::Navigated(frame) = changing_frame {
-                            if frame.name == Some("ddlogin-iframe".into()) {
-                                if let Some(tab) = self.debug_session.main_tab_mut() {
-                                    tab.get_box_model_by_selector(self.selector, Some(100));
-                                }
+                    PageResponse::FrameNavigated(frame_id) => {
+                        let tab = tab.unwrap();
+                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        info!("got frame: {:?}", frame_id);
+                        if frame.name == Some("ddlogin-iframe".into()) {
+                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                                tab.get_box_model_by_selector(self.selector, Some(100));
                             }
                         }
                     }
@@ -63,7 +62,7 @@ impl Future for GetBoxModelTest {
                         info!("got box model: {:?}", box_model);
                         assert!(box_model.is_some());
                         assert_eq!(selector, Some(self.selector));
-                        self.box_model  = box_model;
+                        self.box_model = box_model;
                         break Ok(().into());
                     }
                     _ => {

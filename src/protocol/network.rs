@@ -2,6 +2,10 @@ type Headers = HashMap<String, String>;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod types {
+    pub type LoaderId = String;
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Request {

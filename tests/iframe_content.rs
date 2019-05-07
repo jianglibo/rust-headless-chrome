@@ -42,11 +42,7 @@ impl Future for IframeContent {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = if let Some(tid) = &tab_id {
-                    self.debug_session.get_tab_by_id_mut(Some(tid))
-                } else {
-                    None
-                };
+                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
@@ -81,14 +77,14 @@ impl Future for IframeContent {
                         );
                     }
                     PageResponse::SecondsElapsed(seconds) => {
-                        info!("seconds elapsed: {} ", seconds);
+                        trace!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
                             self.assert_result();
                             break Ok(().into());
                         }
                     }
                     _ => {
-                        info!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", value);
                     }
                 }
             } else {

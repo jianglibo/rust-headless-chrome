@@ -1,9 +1,10 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::dev_tools_method_util::{next_call_id, MethodDestination, MethodUtil, SessionId};
 use super::id_type as ids;
+use super::inner_event::{inner_events};
 use super::page_message::ChangingFrame;
 use super::task_describe::{self as tasks, TaskDescribe};
-use crate::protocol::{self, dom, page, target};
+use crate::protocol::{self, dom, page, runtime, target};
 use log::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -16,6 +17,8 @@ pub struct Tab {
     pub root_node: Option<dom::Node>,
     pub changing_frames: HashMap<String, ChangingFrame>,
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
+    pub execution_context_descriptions:
+        HashMap<page::types::FrameId, runtime::types::ExecutionContextDescription>,
 }
 
 impl Tab {
@@ -30,6 +33,7 @@ impl Tab {
             root_node: None,
             changing_frames: HashMap::new(),
             temporary_node_holder: HashMap::new(),
+            execution_context_descriptions: HashMap::new(),
         }
     }
     pub fn navigate_to(&mut self, url: &'static str, manual_task_id: Option<ids::Task>) {
@@ -110,6 +114,39 @@ impl Tab {
         }
     }
 
+    pub fn verify_execution_context_id(&self, console_api_called: &inner_events::ConsoleAPICalledParams) {
+        let ex = self.execution_context_descriptions.values().find(|v|v.id == console_api_called.execution_context_id);
+        if ex.is_none() {
+            error!("no execution_context_description found on tab. {:?}", console_api_called);
+        }
+    }
+
+    pub fn runtime_execution_context_created(
+        &mut self,
+        execution_context: runtime::types::ExecutionContextDescription,
+    ) -> Option<page::types::FrameId> {
+        if let Some(frame_id_str) = *&execution_context.aux_data["frameId"].as_str() {
+            let frame_id = frame_id_str.clone().to_string();
+            let old_value = self
+                .execution_context_descriptions
+                .insert(frame_id_str.to_string(), execution_context);
+            if old_value.is_some() {
+                warn!(
+                    "execution context already saved, old: {:?}, new: {:?}",
+                    old_value,
+                    self.execution_context_descriptions.get(&frame_id)
+                );
+            }
+            Some(frame_id)
+        } else {
+            warn!(
+                "execution context has no frameId property. {:?}",
+                execution_context
+            );
+            None
+        }
+    }
+
     pub fn _frame_navigated(&mut self, frame: page::Frame) {
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame.id) {
             *changing_frame = ChangingFrame::Navigated(frame);
@@ -153,8 +190,10 @@ impl Tab {
 
     pub fn _frame_attached(&mut self, frame_attached_params: page::events::FrameAttachedParams) {
         let frame_id = frame_attached_params.frame_id.clone();
-        self.changing_frames
-            .insert(frame_id.clone(), ChangingFrame::Attached(frame_attached_params));
+        self.changing_frames.insert(
+            frame_id.clone(),
+            ChangingFrame::Attached(frame_attached_params),
+        );
     }
 
     pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<ids::Task>) {

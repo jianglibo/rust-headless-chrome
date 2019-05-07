@@ -1,7 +1,7 @@
 use super::id_type as ids;
-use super::task_describe::{self as tasks, TaskDescribe};
+use super::task_describe::TaskDescribe;
 
-use super::dev_tools_method_util::{ChromePageError, SessionId};
+use super::dev_tools_method_util::ChromePageError;
 use super::inner_event::{self, InnerEvent};
 use crate::browser_async::chrome_browser::ChromeBrowser;
 
@@ -64,30 +64,39 @@ impl ChromeDebugSession {
     pub fn handle_inner_target_events(
         &mut self,
         inner_event: InnerEvent,
-        session_id: String,
-        target_id: target::TargetId,
+        session_id: Option<String>,
+        target_id: Option<target::TargetId>,
     ) -> Option<TaskDescribe> {
         match inner_event {
             InnerEvent::SetChildNodes(set_child_nodes_event) => {
                 let params = set_child_nodes_event.params;
-                return TaskDescribe::SetChildNodes(target_id, params.parent_id, params.nodes)
-                    .into();
+                return TaskDescribe::SetChildNodes(
+                    target_id.unwrap(),
+                    params.parent_id,
+                    params.nodes,
+                )
+                .into();
             }
             InnerEvent::LoadEventFired(load_event_fired_event) => {
                 let params = load_event_fired_event.params;
-                return TaskDescribe::LoadEventFired(target_id, params.timestamp).into();
+                return TaskDescribe::LoadEventFired(target_id.unwrap(), params.timestamp).into();
             }
             InnerEvent::ExecutionContextCreated(execution_context_created) => {
-                let s_id: SessionId = session_id.into();
                 return TaskDescribe::RuntimeExecutionContextCreated(
                     execution_context_created.params.context,
-                    tasks::CommonDescribeFieldsBuilder::default()
-                        .target_id(target_id)
-                        .session_id(s_id)
-                        .build()
-                        .unwrap(),
+                    (session_id, target_id).into(),
                 )
                 .into();
+            }
+            InnerEvent::ConsoleAPICalled(console_api_called) => {
+                return TaskDescribe::RuntimeConsoleAPICalled(
+                    console_api_called.params,
+                    (session_id, target_id).into(),
+                )
+                .into();
+            }
+            InnerEvent::DomContentEventFired(dom_content_event_fired) => {
+                trace!("{:?}", dom_content_event_fired.params);
             }
             _ => {
                 info!("discard inner event: {:?}", inner_event);
@@ -277,8 +286,12 @@ impl ChromeDebugSession {
                 runtime_evaluate.result = Some(evaluate_return_object.result);
                 runtime_evaluate.exception_details = evaluate_return_object.exception_details;
             }
+            TaskDescribe::NavigateTo(navigate_to) => {
+                let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
+                navigate_to.result = Some(navigate_to_return_object);
+            }
             task_describe => {
-                info!("got unprocessed task_describe: {:?}", task_describe);
+                warn!("got unprocessed task_describe: {:?}", task_describe);
             }
         }
         Ok(())
@@ -303,6 +316,7 @@ impl ChromeDebugSession {
             protocol::Event::TargetInfoChanged(target_info_changed) => {
                 return Some(TaskDescribe::TargetInfoChanged(
                     target_info_changed.params.target_info,
+                    (session_id, target_id).into(),
                 ));
             }
             protocol::Event::TargetCreated(target_created_event) => {
@@ -413,22 +427,24 @@ impl Stream for ChromeDebugSession {
                                     break Ok(Some(page_message).into());
                                 }
                             }
-                            _ => {
-                                if let Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) =
-                                    parse_raw_message(&message_field)
-                                {
+                            _ => match parse_raw_message(&message_field) {
+                                Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) => {
                                     trace!("got inner event: {:?}", inner_event);
                                     if let Some(page_message) = self.handle_inner_target_events(
                                         inner_event,
-                                        session_id,
-                                        target_id,
+                                        Some(session_id),
+                                        Some(target_id),
                                     ) {
                                         break Ok(Some(page_message).into());
                                     }
-                                } else {
-                                    warn!("unprocessed ** {:?}", message_field);
                                 }
-                            }
+                                Err(error) => {
+                                    error!(
+                                        "parse_raw_message failed ** {:?}, {:?}",
+                                        error, message_field
+                                    );
+                                }
+                            },
                         }
                     }
                     protocol::Message::Event(protocol_event) => {

@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 pub mod inner_events {
     use serde::Deserialize;
-    use crate::protocol::{dom as protocol_dom, runtime};
+    use crate::protocol::{dom as protocol_dom, runtime, network};
 
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
@@ -26,7 +26,19 @@ pub mod inner_events {
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct LoadEventFiredParams {
-        pub timestamp: f32,
+        pub timestamp: network::types::MonotonicTime,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct DomContentEventFired {
+        pub params: LoadEventFiredParams,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct DomContentEventFiredParams {
+        pub timestamp: network::types::MonotonicTime,
     }
 
     #[derive(Deserialize, Debug, Clone)]
@@ -39,6 +51,23 @@ pub mod inner_events {
     #[serde(rename_all = "camelCase")]
     pub struct ExecutionContextCreatedParams {
         pub context: runtime::types::ExecutionContextDescription,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ConsoleAPICalled {
+        pub params: ConsoleAPICalledParams,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ConsoleAPICalledParams {
+        #[serde(rename = "type")]
+        pub object_type: String,
+        pub args: Vec<runtime::types::RemoteObject>,
+        pub execution_context_id: runtime::types::ExecutionContextId,
+        pub stack_trace: Option<runtime::types::StackTrace>,
+        pub context: Option<String>,
     }
 }
 
@@ -54,6 +83,10 @@ pub enum InnerEvent {
     LoadEventFired(inner_events::LoadEventFired),
     #[serde(rename = "Runtime.executionContextCreated")]
     ExecutionContextCreated(inner_events::ExecutionContextCreated),
+    #[serde(rename = "Runtime.consoleAPICalled")]
+    ConsoleAPICalled(inner_events::ConsoleAPICalled),
+    #[serde(rename = "Page.domContentEventFired")]
+    DomContentEventFired(inner_events::DomContentEventFired),
 }
 
 #[derive(Deserialize, Debug, Clone)]

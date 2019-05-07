@@ -13,8 +13,8 @@ pub mod types {
         pub function_name: String,
         pub script_id: ScriptId,
         pub url: String,
-        pub line_number: u16,
-        pub column_number: u16,
+        pub line_number: u32,
+        pub column_number: u32,
     }
 
     #[derive(Deserialize, Debug, Clone)]

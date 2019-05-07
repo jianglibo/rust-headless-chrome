@@ -1,5 +1,5 @@
+use crate::protocol::network;
 use serde::{Deserialize, Serialize};
-use crate::protocol::{network};
 
 pub mod types {
     use serde::{Deserialize, Serialize};
@@ -8,7 +8,19 @@ pub mod types {
     #[derive(Debug, Serialize, Clone)]
     #[serde(rename_all = "snake_case")]
     pub enum TransitionType {
-        Link, Typed, AddressBar, AutoBookmark, AutoSubframe, ManualSubframe, Generated, AutoToplevel, FormSubmit, Reload, Keyword, KeywordGenerated, Other
+        Link,
+        Typed,
+        AddressBar,
+        AutoBookmark,
+        AutoSubframe,
+        ManualSubframe,
+        Generated,
+        AutoToplevel,
+        FormSubmit,
+        Reload,
+        Keyword,
+        KeywordGenerated,
+        Other,
     }
 
 }
@@ -92,8 +104,8 @@ pub struct PrintToPdfOptions {
 }
 
 pub mod events {
+    use crate::protocol::runtime;
     use serde::Deserialize;
-    use crate::protocol::{runtime};
     #[derive(Deserialize, Debug, Clone)]
     pub struct LifecycleEvent {
         pub params: LifecycleParams,
@@ -152,9 +164,9 @@ pub mod events {
 
 pub mod methods {
     use super::PrintToPdfOptions;
+    use super::*;
     use crate::protocol::Method;
     use serde::{Deserialize, Serialize};
-    use super::*;
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
@@ -274,5 +286,18 @@ pub mod methods {
         const NAME: &'static str = "Page.enable";
         type ReturnObject = EnableReturnObject;
     }
+}
 
+#[cfg(test)]
+mod tests {
+    use log::*;
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_frame_attached_event() {
+        let message = "{\"method\":\"Page.frameAttached\",\"params\":{\"frameId\":\"100FD572BD64BB38EB2CAEE354C93F52\",\"parentFrameId\":\"2D0E2292FC393BB4953C7629AF041862\",\"stack\":{\"callFrames\":[{\"functionName\":\"Ho\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":445965},{\"functionName\":\"_i\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":466041},{\"functionName\":\"Oi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":463515},{\"functionName\":\"Ei\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":462867},{\"functionName\":\"Ci\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":461888},{\"functionName\":\"$o\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":460808},{\"functionName\":\"Ii\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":469592},{\"functionName\":\"Fi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":469646},{\"functionName\":\"Bi.render\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":473435},{\"functionName\":\"\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":471293},{\"functionName\":\"Ni\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":468914},{\"functionName\":\"qi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":471226},{\"functionName\":\"render\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":474407},{\"functionName\":\"SurW\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":13244},{\"functionName\":\"a\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":517},{\"functionName\":\"u\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":386},{\"functionName\":\"\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":1469},{\"functionName\":\"\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":1473}]}}}";
+        serde_json::from_str::<events::FrameAttachedEvent>(message.as_ref()).unwrap();
+    }
 }

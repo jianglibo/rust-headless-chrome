@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 pub mod types {
     pub type LoaderId = String;
+    pub type MonotonicTime = f32;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

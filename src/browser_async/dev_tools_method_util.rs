@@ -78,6 +78,8 @@ pub enum ChromePageError {
         tasks: Vec<TaskDescribe>,
         error: failure::Error,
     },
+    #[fail(display = "cannot find tab.")]
+    TabNotFound,
 }
 
 #[derive(Debug)]

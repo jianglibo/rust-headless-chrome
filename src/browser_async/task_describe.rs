@@ -1,5 +1,6 @@
 use super::dev_tools_method_util::SessionId;
 use super::id_type as ids;
+use super::inner_event::{inner_events};
 use super::page_message::{PageEventName};
 use super::unique_number;
 use crate::browser::tab::element::BoxModel;
@@ -28,7 +29,7 @@ pub enum TaskDescribe {
     FrameNavigated(Box<page::Frame>, CommonDescribeFields),
     FrameStoppedLoading(String, CommonDescribeFields),
     LoadEventFired(target::TargetId, f32),
-    TargetInfoChanged(target::TargetInfo),
+    TargetInfoChanged(target::TargetInfo, CommonDescribeFields),
     PageCreated(target::TargetInfo, Option<&'static str>),
     PageAttached(target::TargetInfo, SessionId),
     ScreenShot(ScreenShot),
@@ -37,6 +38,7 @@ pub enum TaskDescribe {
     Fail,
     RuntimeEvaluate(Box<RuntimeEvaluate>),
     RuntimeExecutionContextCreated(runtime::types::ExecutionContextDescription, CommonDescribeFields),
+    RuntimeConsoleAPICalled(inner_events::ConsoleAPICalledParams, CommonDescribeFields),
 }
 
 impl TaskDescribe {

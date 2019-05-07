@@ -357,6 +357,14 @@ impl DebugSession {
                 );
                 Ok(resp.into())
             }
+            TaskDescribe::RuntimeExecutionContextDestroyed(
+                runtime_execution_context_destroyed,
+                common_fields,
+            ) => {
+                let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
+                tab.runtime_execution_context_destroyed(runtime_execution_context_destroyed);
+                self.send_fail_1(Some(&common_fields))
+            }
             TaskDescribe::RuntimeConsoleAPICalled(console_api_called, common_fields) => {
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 // let execution_context_id = console_api_called.execution_context_id.clone();

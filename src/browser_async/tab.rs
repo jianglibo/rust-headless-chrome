@@ -121,12 +121,17 @@ impl Tab {
         }
     }
 
+    pub fn runtime_execution_context_destroyed(&mut self, execution_context_id: runtime::types::ExecutionContextId) {
+        self.execution_context_descriptions.retain(|_, v| v.id != execution_context_id);
+    }
+
     pub fn runtime_execution_context_created(
         &mut self,
         execution_context: runtime::types::ExecutionContextDescription,
     ) -> Option<page::types::FrameId> {
-        if let Some(frame_id_str) = *&execution_context.aux_data["frameId"].as_str() {
-            let frame_id = frame_id_str.clone().to_string();
+        let aux_data = execution_context.aux_data.clone();
+        if let Some(frame_id_str) = aux_data["frameId"].as_str() {
+            let frame_id = frame_id_str.to_string();
             let old_value = self
                 .execution_context_descriptions
                 .insert(frame_id_str.to_string(), execution_context);

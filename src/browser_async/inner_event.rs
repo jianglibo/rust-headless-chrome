@@ -55,6 +55,18 @@ pub mod inner_events {
 
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
+    pub struct ExecutionContextDestroyed {
+        pub params: ExecutionContextDestroyedParams,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ExecutionContextDestroyedParams {
+        pub execution_context_id: runtime::types::ExecutionContextId,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
     pub struct ConsoleAPICalled {
         pub params: ConsoleAPICalledParams,
     }
@@ -83,6 +95,8 @@ pub enum InnerEvent {
     LoadEventFired(inner_events::LoadEventFired),
     #[serde(rename = "Runtime.executionContextCreated")]
     ExecutionContextCreated(inner_events::ExecutionContextCreated),
+    #[serde(rename = "Runtime.executionContextDestroyed")]
+    ExecutionContextDestroyed(inner_events::ExecutionContextDestroyed),
     #[serde(rename = "Runtime.consoleAPICalled")]
     ConsoleAPICalled(inner_events::ConsoleAPICalled),
     #[serde(rename = "Page.domContentEventFired")]

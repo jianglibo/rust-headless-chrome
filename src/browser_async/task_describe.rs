@@ -13,7 +13,7 @@ use log::*;
 
 #[derive(Debug)]
 pub enum TaskDescribe {
-    NavigateTo(NavigateTo),
+    NavigateTo(Box<NavigateTo>),
     QuerySelector(QuerySelector),
     DescribeNode(Box<DescribeNode>),
     ResolveNode(ResolveNode),
@@ -38,6 +38,7 @@ pub enum TaskDescribe {
     Fail,
     RuntimeEvaluate(Box<RuntimeEvaluate>),
     RuntimeExecutionContextCreated(runtime::types::ExecutionContextDescription, CommonDescribeFields),
+    RuntimeExecutionContextDestroyed(runtime::types::ExecutionContextId, CommonDescribeFields),
     RuntimeConsoleAPICalled(inner_events::ConsoleAPICalledParams, CommonDescribeFields),
 }
 
@@ -251,8 +252,8 @@ pub struct NavigateTo {
 }
 
 impl From<NavigateTo> for TaskDescribe {
-    fn from(screen_shot: NavigateTo) -> Self {
-        TaskDescribe::NavigateTo(screen_shot)
+    fn from(navigate_to: NavigateTo) -> Self {
+        TaskDescribe::NavigateTo(Box::new(navigate_to))
     }
 }
 

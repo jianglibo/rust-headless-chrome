@@ -189,6 +189,7 @@ impl Browser {
     /// # Ok(())
     /// # }
     /// ```
+    #[allow(clippy::pedantic)]
     pub fn new_tab_with_options(
         &self,
         create_target_params: CreateTarget,

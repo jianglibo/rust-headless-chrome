@@ -2,7 +2,6 @@ use crate::protocol::{dom, page, target, runtime};
 use crate::browser::tab::element::{BoxModel};
 use super::id_type as ids;
 use super::dev_tools_method_util::{SessionId};
-use log::*;
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {

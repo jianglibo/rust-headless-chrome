@@ -88,6 +88,13 @@ impl ChromeDebugSession {
                 )
                 .into();
             }
+            InnerEvent::ExecutionContextDestroyed(execution_context_destroyed) => {
+                return TaskDescribe::RuntimeExecutionContextDestroyed(
+                    execution_context_destroyed.params.execution_context_id,
+                    (session_id, target_id).into(),
+                )
+                .into();
+            }
             InnerEvent::ConsoleAPICalled(console_api_called) => {
                 return TaskDescribe::RuntimeConsoleAPICalled(
                     console_api_called.params,
@@ -289,6 +296,9 @@ impl ChromeDebugSession {
             TaskDescribe::NavigateTo(navigate_to) => {
                 let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
                 navigate_to.result = Some(navigate_to_return_object);
+            }
+            TaskDescribe::RuntimeEnable(common_fields) => {
+                trace!("runtime enabled: {:?}", common_fields);
             }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);

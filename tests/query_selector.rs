@@ -7,13 +7,14 @@ extern crate tokio_timer;
 use headless_chrome::protocol::dom;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::ChangingFrame;
 use headless_chrome::browser_async::page_message::PageResponse;
+use headless_chrome::browser_async::task_describe::{self as tasks};
 use log::*;
 use std::default::Default;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
+#[derive(Default)]
 struct QuerySelector {
     debug_session: DebugSession,
     url: &'static str,
@@ -26,10 +27,10 @@ struct QuerySelector {
 impl QuerySelector {
     fn assert_result(&self) {
         let tab = self.debug_session.main_tab().unwrap();
-        assert_eq!(self.call_count, 3);
+        assert_eq!(self.call_count, 4);
         assert!(self.task_id_100_called);
         assert!(tab.temporary_node_holder.len() >= 7);
-        info!("all nodes: {:?}", tab.temporary_node_holder);
+        // info!("all nodes: {:?}", tab.temporary_node_holder);
         // tab.temporary_node_holder.values().for_each(|v| v.iter().for_each(|nd| assert_eq!(nd.node_name, "IFRAME")));
         assert!(self.found_node_id.is_some());
     }
@@ -72,12 +73,32 @@ impl Future for QuerySelector {
                             assert_eq!(node_id, None);
                         } else if task_id == Some(100) {
                             self.task_id_100_called = true;
-                        } else {
+                        } else if task_id == Some(101) {
                             assert_eq!(task_id, Some(101));
                             let tab = tab.unwrap();
                             self.found_node_id = node_id;
-                            let node = tab.find_node_by_id(node_id.unwrap());
+                            let node = tab.find_node_by_id(node_id);
+                            let content_document = node.as_ref().unwrap().content_document.clone().unwrap();
                             assert!(node.is_some());
+                            let backend_node_id = content_document.backend_node_id;
+                            let mut task_builder = tasks::DescribeNodeBuilder::default();
+                            task_builder.backend_node_id(backend_node_id).depth(10);
+                            tab.describe_node(task_builder, Some(105));
+
+                            let this_node_id = content_document.node_id;
+                            let mut task_builder = tasks::QuerySelectorBuilder::default();
+                            task_builder.node_id(this_node_id).selector("#qrcode img"); // got nothing.
+                            tab.query_selector(task_builder, Some(106));
+                        } else {
+                            assert_eq!(Some(0), node_id);
+                            info!("got node_id in frame: {:?}", node_id);
+                        }
+                    }
+                    PageResponse::DescribeNode(_selector, node_id) => {
+                        if task_id == Some(105) {
+                            let tab = tab.unwrap();
+                            let node = tab.find_node_by_id(node_id);
+                            info!("got node by backend_node_id: {:?}", node);
                         }
                     }
                     PageResponse::SecondsElapsed(seconds) => {
@@ -98,22 +119,17 @@ impl Future for QuerySelector {
     }
 }
 
-// [2019-04-15T08:12:35Z ERROR headless_chrome::browser_async::chrome_debug_session] unprocessed ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "B1B0F5851D30241BC39BE00415D4F43A", target_id: "C9CB934D0B4C63978622ED5F01D6B829", message: "{\"method\":\"DOM.setChildNodes\",\"params\":{\"parentId\":1,\"nodes\":[{\"nodeId\":2,\"parentId\":1,\"backendNodeId\":5,\"nodeType\":10,\"nodeName\":\"html\",\"localName\":\"\",\"nodeValue\":\"\",\"publicId\":\"\",\"systemId\":\"\"},{\"nodeId\":3,\"parentId\":1,\"backendNodeId\":6,\"nodeType\":1,\"nodeName\":\"HTML\",\"localName\":\"html\",\"nodeValue\":\"\",\"childNodeCount\":2,\"attributes\":[],\"frameId\":\"C9CB934D0B4C63978622ED5F01D6B829\"}]}}" } }
-
 #[test]
 fn t_dom_query_selector() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
     let selector = "#ddlogin-iframe";
     let my_page = QuerySelector {
-        debug_session: Default::default(),
         url,
         selector,
-        found_node_id: None,
-        call_count: 0,
-        task_id_100_called: false,
+        ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
     if let Err(err) = runtime.block_on(my_page.into_future()) {

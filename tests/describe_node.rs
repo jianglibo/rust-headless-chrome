@@ -7,13 +7,13 @@ extern crate tokio_timer;
 use headless_chrome::protocol::dom;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::ChangingFrame;
 use headless_chrome::browser_async::page_message::PageResponse;
 use log::*;
 use std::default::Default;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
+#[derive(Default)]
 struct DescribeNode {
     debug_session: DebugSession,
     url: &'static str,
@@ -72,7 +72,7 @@ impl Future for DescribeNode {
                             assert!(node_id.is_some());
                             assert_eq!(selector, Some(self.selector));
                             self.node_id = node_id;
-                            self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
+                            self.node = tab.unwrap().find_node_by_id(node_id).cloned();
                             info!(
                                 "content document: {:?}",
                                 self.node.as_ref().unwrap().content_document
@@ -97,11 +97,9 @@ fn t_dom_describe_node() {
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let selector = "#ddlogin-iframe";
     let my_page = DescribeNode {
-        debug_session: Default::default(),
         url,
         selector,
-        node_id: None,
-        node: None,
+        ..Default::default()
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");

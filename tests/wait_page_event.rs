@@ -8,11 +8,11 @@ use websocket::futures::{Future, Poll, Stream, IntoFuture};
 use log::*;
 use headless_chrome::browser_async::page_message::{PageResponse};
 use headless_chrome::browser_async::debug_session::{DebugSession};
-use headless_chrome::browser_async::page_message::{ChangingFrame};
 use std::default::Default;
 use tokio;
 
 
+#[derive(Default)]
 struct LoadEventFired {
     debug_session: DebugSession,
     url: &'static str,
@@ -88,10 +88,8 @@ fn t_load_event_fired() {
 
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let my_page = LoadEventFired {
-        debug_session: Default::default(),
         url,
-        root_node: None,
-        call_count: 0,
+        ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
     runtime.block_on(my_page.into_future()).unwrap();

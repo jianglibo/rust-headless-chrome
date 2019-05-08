@@ -85,11 +85,11 @@ impl Tab {
         }
     }
 
-    pub fn find_node_by_id(&self, node_id: dom::NodeId) -> Option<&dom::Node> {
+    pub fn find_node_by_id(&self, node_id: Option<dom::NodeId>) -> Option<&dom::Node> {
         self.temporary_node_holder
             .values()
             .flatten()
-            .find(|nd| nd.node_id == node_id)
+            .find(|nd| Some(nd.node_id) == node_id)
     }
 
     pub fn find_navigated_frame<F>(&self, mut filter: F) -> Option<&page::Frame>
@@ -241,6 +241,28 @@ impl Tab {
         self.chrome_session.lock().unwrap().execute_task(pre_tasks);
     }
 
+    pub fn describe_node(
+        &mut self,
+        mut describe_node_task_builder: tasks::DescribeNodeBuilder,
+        manual_task_id: Option<ids::Task>,
+    ) {
+        match describe_node_task_builder.common_fields(self.get_c_f(manual_task_id)).build() {
+            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+            Err(err) => error!("build describe_node task error: {:?}", err),
+        }
+    }
+
+    pub fn query_selector(
+        &mut self,
+        mut query_selector_task_builder: tasks::QuerySelectorBuilder,
+        manual_task_id: Option<ids::Task>,
+    ) {
+        match query_selector_task_builder.common_fields(self.get_c_f(manual_task_id)).build() {
+            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+            Err(err) => error!("build query_selector task error: {:?}", err),
+        }
+    }
+
     fn get_query_selector(
         &self,
         selector: &'static str,
@@ -327,7 +349,7 @@ impl Tab {
             )]);
     }
 
-    pub fn runtime_evaluate(&mut self, expression: String, manual_task_id: Option<ids::Task>) {
+    pub fn runtime_evaluate_expression(&mut self, expression: String, manual_task_id: Option<ids::Task>) {
         let rt = tasks::RuntimeEvaluateBuilder::default()
             .expression(expression)
             .common_fields(self.get_c_f(manual_task_id))

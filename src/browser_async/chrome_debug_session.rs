@@ -149,11 +149,13 @@ impl ChromeDebugSession {
             // if has remote error.
             if resp.error.is_some() {
                 error!("got remote error: {:?}", resp);
-                if let Some(tk) = tasks.pop() {
-                    return Some(tk);
+                let t = if let Some(tk) = tasks.pop() {
+                    tk
                 } else {
-                    return Some(current_task);
-                }
+                    current_task
+                };
+                error!("the task: {:?}", t);
+                return Some(t);
             }
 
             if let Err(err) = self.full_fill_task(resp, &mut current_task) {

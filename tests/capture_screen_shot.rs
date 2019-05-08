@@ -5,7 +5,6 @@ extern crate futures;
 extern crate tokio_timer;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::ChangingFrame;
 use headless_chrome::browser_async::page_message::{response_object, PageResponse};
 use headless_chrome::protocol::page;
 use log::*;
@@ -15,6 +14,7 @@ use std::path::Path;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
+#[derive(Default)]
 struct CaptureScreenShotTest {
     debug_session: DebugSession,
     url: &'static str,
@@ -102,10 +102,9 @@ fn t_take_screen_shot() {
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let selector = "#ddlogin-iframe";
     let my_page = CaptureScreenShotTest {
-        debug_session: Default::default(),
         url,
         selector,
-        ro: None,
+        ..Default::default()
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");

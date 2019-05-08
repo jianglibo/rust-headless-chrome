@@ -5,19 +5,21 @@ extern crate futures;
 extern crate tokio_timer;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::ChangingFrame;
 use headless_chrome::browser_async::page_message::PageResponse;
+use headless_chrome::protocol::{page};
 use log::*;
 use std::default::Default;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
+#[derive(Default)]
 struct RuntimeEvaluate {
     debug_session: DebugSession,
     url: &'static str,
     task_100_called: bool,
     task_101_called: bool,
     runtime_execution_context_created_count: u8,
+    ddlogin_frame_stopped_loading: bool,
 }
 
 impl RuntimeEvaluate {
@@ -25,6 +27,7 @@ impl RuntimeEvaluate {
         assert!(self.task_100_called);
         assert!(self.task_101_called);
         assert_eq!(self.runtime_execution_context_created_count, 8);
+        assert!(self.ddlogin_frame_stopped_loading);
     }
 }
 
@@ -53,10 +56,10 @@ impl Future for RuntimeEvaluate {
                         info!("got frame: {:?}", frame_id);
                         if frame.name == Some("ddlogin-iframe".into()) {
                             if let Some(tab) = self.debug_session.main_tab_mut() {
-                                tab.runtime_evaluate("3+3".into(), Some(100));
-                                tab.runtime_evaluate("3::0".into(), Some(101));
+                                tab.runtime_evaluate_expression("3+3".into(), Some(100));
+                                tab.runtime_evaluate_expression("3::0".into(), Some(101));
                                 tab.runtime_enable(Some(102));
-                                tab.runtime_evaluate(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#.into(), Some(103));
+                                tab.runtime_evaluate_expression(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#.into(), Some(103));
                             }
                         }
                     }
@@ -90,10 +93,21 @@ impl Future for RuntimeEvaluate {
                         _ => unreachable!(),
                     },
                     PageResponse::RuntimeExecutionContextCreated(
-                        runtime_execution_context_created,
+                        frame_id,
                     ) => {
-                        info!("<<<<<<<<{:?}", runtime_execution_context_created);
+                        info!("execution context created, frame_id: <<<<<<<<{:?}", frame_id);
                         self.runtime_execution_context_created_count += 1;
+                    }
+                    PageResponse::FrameStoppedLoading(frame_id) => {
+                        let tab = tab.unwrap();
+                        if let Some(frame) = tab.find_frame_by_id(&frame_id) {
+                            if frame.name == Some("ddlogin-iframe".into()) {
+                                let context = tab.execution_context_descriptions.get(&frame_id);
+                                assert!(context.is_some());
+                                info!("execution_context_description: {:?}", context.unwrap());
+                                self.ddlogin_frame_stopped_loading = true;
+                            }
+                        }
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
@@ -113,8 +127,6 @@ impl Future for RuntimeEvaluate {
     }
 }
 
-// [2019-04-15T08:12:35Z ERROR headless_chrome::browser_async::chrome_debug_session] unprocessed ReceivedMessageFromTargetEvent { params: ReceivedMessageFromTargetParams { session_id: "B1B0F5851D30241BC39BE00415D4F43A", target_id: "C9CB934D0B4C63978622ED5F01D6B829", message: "{\"method\":\"DOM.setChildNodes\",\"params\":{\"parentId\":1,\"nodes\":[{\"nodeId\":2,\"parentId\":1,\"backendNodeId\":5,\"nodeType\":10,\"nodeName\":\"html\",\"localName\":\"\",\"nodeValue\":\"\",\"publicId\":\"\",\"systemId\":\"\"},{\"nodeId\":3,\"parentId\":1,\"backendNodeId\":6,\"nodeType\":1,\"nodeName\":\"HTML\",\"localName\":\"html\",\"nodeValue\":\"\",\"childNodeCount\":2,\"attributes\":[],\"frameId\":\"C9CB934D0B4C63978622ED5F01D6B829\"}]}}" } }
-
 #[test]
 fn t_runtime_evaluate() {
     ::std::env::set_var("RUST_LOG", "headless_chrome=info,runtime_evaluate=trace");
@@ -122,11 +134,8 @@ fn t_runtime_evaluate() {
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
     let my_page = RuntimeEvaluate {
-        debug_session: Default::default(),
         url,
-        task_100_called: false,
-        task_101_called: false,
-        runtime_execution_context_created_count: 0,
+        ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
     runtime.block_on(my_page.into_future()).unwrap();

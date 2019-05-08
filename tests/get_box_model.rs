@@ -8,13 +8,13 @@ extern crate tokio_timer;
 use headless_chrome::browser::tab::element::BoxModel;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::ChangingFrame;
 use headless_chrome::browser_async::page_message::PageResponse;
 use log::*;
 use std::default::Default;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
+#[derive(Default)]
 struct GetBoxModelTest {
     debug_session: DebugSession,
     url: &'static str,
@@ -79,10 +79,9 @@ fn t_get_model_box() {
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
     let selector = "#ddlogin-iframe";
     let my_page = GetBoxModelTest {
-        debug_session: Default::default(),
         url,
         selector,
-        box_model: None,
+        ..Default::default()
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");

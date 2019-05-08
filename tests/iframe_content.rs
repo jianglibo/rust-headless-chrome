@@ -7,7 +7,6 @@ extern crate tokio_timer;
 use headless_chrome::protocol::{dom, page};
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::ChangingFrame;
 use headless_chrome::browser_async::page_message::PageResponse;
 use log::*;
 use std::default::Default;
@@ -65,7 +64,7 @@ impl Future for IframeContent {
                         }
                     }
                     PageResponse::DescribeNode(_selector, node_id) => {
-                        self.node = tab.unwrap().find_node_by_id(node_id.unwrap()).cloned();
+                        self.node = tab.unwrap().find_node_by_id(node_id).cloned();
                         assert_eq!(
                             Some(&self.ddlogin_frame.as_ref().unwrap().id),
                             self.node.as_ref().unwrap().frame_id.as_ref()

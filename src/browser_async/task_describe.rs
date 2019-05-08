@@ -1,7 +1,7 @@
 use super::dev_tools_method_util::SessionId;
 use super::id_type as ids;
-use super::inner_event::{inner_events};
-use super::page_message::{PageEventName};
+use super::inner_event::inner_events;
+use super::page_message::PageEventName;
 use super::unique_number;
 use crate::browser::tab::element::BoxModel;
 use crate::browser_async::dev_tools_method_util::{
@@ -37,7 +37,10 @@ pub enum TaskDescribe {
     ChromeConnected,
     Fail,
     RuntimeEvaluate(Box<RuntimeEvaluate>),
-    RuntimeExecutionContextCreated(runtime::types::ExecutionContextDescription, CommonDescribeFields),
+    RuntimeExecutionContextCreated(
+        runtime::types::ExecutionContextDescription,
+        CommonDescribeFields,
+    ),
     RuntimeExecutionContextDestroyed(runtime::types::ExecutionContextId, CommonDescribeFields),
     RuntimeConsoleAPICalled(inner_events::ConsoleAPICalledParams, CommonDescribeFields),
 }
@@ -70,19 +73,20 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
 
     fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
         match task_describe {
-            TaskDescribe::QuerySelector(QuerySelector {
-                node_id: Some(node_id_value),
-                common_fields,
-                selector,
-                ..
-            }) => Ok(MethodUtil::create_msg_to_send_with_session_id(
-                dom::methods::QuerySelector {
-                    node_id: *node_id_value,
-                    selector,
-                },
-                &common_fields.session_id,
-                common_fields.call_id,
-            )),
+            TaskDescribe::QuerySelector(query_selector) => {
+                failure::ensure!(
+                    query_selector.node_id.is_some(),
+                    "query_selector missing node_id parameter."
+                );
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    dom::methods::QuerySelector {
+                        node_id: query_selector.node_id.unwrap(),
+                        selector: query_selector.selector,
+                    },
+                    &query_selector.common_fields.session_id,
+                    query_selector.common_fields.call_id,
+                ))
+            }
             TaskDescribe::DescribeNode(describe_node) => {
                 Ok(MethodUtil::create_msg_to_send_with_session_id(
                     dom::methods::DescribeNode {
@@ -257,7 +261,6 @@ impl From<NavigateTo> for TaskDescribe {
     }
 }
 
-
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
 pub struct ScreenShot {
@@ -355,6 +358,7 @@ pub struct DescribeNode {
     pub backend_node_id: Option<dom::NodeId>,
     #[builder(default = "None")]
     pub found_node: Option<dom::Node>,
+    #[builder(default = "None")]
     pub selector: Option<&'static str>,
     #[builder(default = "Some(0)")]
     pub depth: Option<i8>,
@@ -387,10 +391,10 @@ pub struct CommonDescribeFields {
 impl From<(Option<String>, Option<String>)> for CommonDescribeFields {
     fn from(session_id_target_id: (Option<String>, Option<String>)) -> Self {
         CommonDescribeFieldsBuilder::default()
-                        .target_id(session_id_target_id.1)
-                        .session_id(session_id_target_id.0.map(Into::into))
-                        .build()
-                        .unwrap()
+            .target_id(session_id_target_id.1)
+            .session_id(session_id_target_id.0.map(Into::into))
+            .build()
+            .unwrap()
     }
 }
 

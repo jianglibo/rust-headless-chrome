@@ -50,6 +50,7 @@ pub enum PageResponse {
     Screenshot(response_object::CaptureScreenshot),
     RuntimeEvaluate(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
     RuntimeExecutionContextCreated(Option<page::types::FrameId>),
+    RuntimeGetProperties(Option<runtime::methods::GetPropertiesReturnObject>),
     Fail,
 }
 

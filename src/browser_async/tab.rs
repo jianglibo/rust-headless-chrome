@@ -105,8 +105,8 @@ impl Tab {
             .find(|frame| filter(frame))
     }
 
-    pub fn find_frame_by_id<T: AsRef<str>>(&self, frame_id: T) -> Option<&page::Frame> {
-        match self.changing_frames.get(frame_id.as_ref()) {
+    pub fn find_frame_by_id(&self, frame_id: &page::types::FrameId) -> Option<&page::Frame> {
+        match self.changing_frames.get(frame_id) {
             Some(ChangingFrame::Navigated(fm)) | Some(ChangingFrame::StoppedLoading(fm)) => {
                 Some(fm)
             }
@@ -360,7 +360,7 @@ impl Tab {
     }
 
     pub fn runtime_evaluate_expression(&mut self, expression: String, manual_task_id: Option<ids::Task>) {
-        let rt = tasks::RuntimeEvaluateBuilder::default()
+        let task = tasks::RuntimeEvaluateBuilder::default()
             .expression(expression)
             .common_fields(self.get_c_f(manual_task_id))
             .build()
@@ -368,7 +368,7 @@ impl Tab {
         self.chrome_session
             .lock()
             .unwrap()
-            .execute_task(vec![rt.into()]);
+            .execute_task(vec![task.into()]);
     }
 
     pub fn runtime_evaluate(
@@ -381,6 +381,18 @@ impl Tab {
             Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
             Err(err) => error!("build evaluate task error: {:?}", err),
         }
+    }
+
+    pub fn runtime_get_properties(&mut self, object_id: runtime::types::RemoteObjectId, manual_task_id: Option<ids::Task>) {
+        let task = tasks::RuntimeGetPropertiesBuilder::default()
+            .object_id(object_id)
+            .common_fields(self.get_c_f(manual_task_id))
+            .build()
+            .unwrap();
+        self.chrome_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![task.into()]);
     }
 
     pub fn attach_to_page(&mut self) {

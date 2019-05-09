@@ -141,16 +141,20 @@ pub mod methods {
     #[serde(rename_all = "camelCase")]
     pub struct GetProperties<'a> {
         pub object_id: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub own_properties: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub accessor_properties_only: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub generate_preview: Option<bool>,
     }
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct GetPropertiesReturnObject {
         pub result: Vec<types::PropertyDescriptor>,
-        pub internal_properties: Vec<types::InternalPropertyDescriptor>,
-        pub exception_details: types::ExceptionDetails,
+        pub internal_properties: Option<Vec<types::InternalPropertyDescriptor>>,
+        // pub private_properties: Option<types::PrivatePropertyDescriptor>,
+        pub exception_details: Option<types::ExceptionDetails>,
 
     }
     impl<'a> Method for GetProperties<'a> {

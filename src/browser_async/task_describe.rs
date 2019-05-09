@@ -37,6 +37,7 @@ pub enum TaskDescribe {
     ChromeConnected,
     Fail,
     RuntimeEvaluate(Box<RuntimeEvaluate>),
+    RuntimeGetProperties(Box<RuntimeGetProperties>),
     RuntimeExecutionContextCreated(
         runtime::types::ExecutionContextDescription,
         CommonDescribeFields,
@@ -57,9 +58,8 @@ impl TaskDescribe {
             TaskDescribe::PageEnable(common_fields)
             | TaskDescribe::TargetSetDiscoverTargets(_, common_fields)
             | TaskDescribe::RuntimeEnable(common_fields) => Some(&common_fields),
-            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
-                Some(&runtime_evaluate.common_fields)
-            }
+            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => Some(&runtime_evaluate.common_fields),
+            TaskDescribe::RuntimeGetProperties(get_properties) => Some(&get_properties.common_fields),
             _ => {
                 error!("get_common_fields got queried. but it doesn't implement that.");
                 None
@@ -195,6 +195,18 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                     runtime_evaluate.common_fields.call_id,
                 ))
             }
+            TaskDescribe::RuntimeGetProperties(get_properties) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    runtime::methods::GetProperties {
+                        object_id: get_properties.object_id.as_str(),
+                        own_properties: get_properties.own_properties,
+                        accessor_properties_only: get_properties.accessor_properties_only,
+                        generate_preview: get_properties.generate_preview,
+                    },
+                    &get_properties.common_fields.session_id,
+                    get_properties.common_fields.call_id,
+                ))
+            }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);
                 Err(ChromePageError::TaskDescribeConvert.into())
@@ -237,6 +249,27 @@ pub struct RuntimeEvaluate {
 impl From<RuntimeEvaluate> for TaskDescribe {
     fn from(runtime_evaluate: RuntimeEvaluate) -> Self {
         TaskDescribe::RuntimeEvaluate(Box::new(runtime_evaluate))
+    }
+}
+
+#[derive(Debug, Builder, Clone)]
+#[builder(setter(into))]
+pub struct RuntimeGetProperties {
+    pub common_fields: CommonDescribeFields,
+    pub object_id: runtime::types::RemoteObjectId,
+    #[builder(default = "None")]
+    pub own_properties: Option<bool>,
+    #[builder(default = "None")]
+    pub accessor_properties_only: Option<bool>,
+    #[builder(default = "None")]
+    pub generate_preview: Option<bool>,
+    #[builder(default = "None")]
+    pub result: Option<runtime::methods::GetPropertiesReturnObject>,
+}
+
+impl From<RuntimeGetProperties> for TaskDescribe {
+    fn from(get_properties: RuntimeGetProperties) -> Self {
+        TaskDescribe::RuntimeGetProperties(Box::new(get_properties))
     }
 }
 

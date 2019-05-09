@@ -391,6 +391,13 @@ impl DebugSession {
                 trace!("navigate_to: {:?}", navigate_to);
                 self.send_fail(None, None)
             }
+            TaskDescribe::RuntimeGetProperties(get_properties) => {
+                let resp = self.convert_to_page_response(
+                    Some(&get_properties.common_fields),
+                    PageResponse::RuntimeGetProperties(get_properties.result),
+                );
+                Ok(resp.into())
+            }
             _ => {
                 warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)

@@ -27,7 +27,7 @@ impl RuntimeEvaluate {
     fn assert_result(&self) {
         assert!(self.task_100_called);
         assert!(self.task_101_called);
-        assert_eq!(self.runtime_execution_context_created_count, 8);
+        assert!(self.runtime_execution_context_created_count > 7);
         assert!(self.ddlogin_frame_stopped_loading);
     }
 }
@@ -37,7 +37,6 @@ impl Future for RuntimeEvaluate {
     type Error = failure::Error;
 
     #[allow(clippy::cognitive_complexity)]
-    #[allow(clippy::cyclomatic_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
@@ -92,27 +91,45 @@ impl Future for RuntimeEvaluate {
                             info!("task id: {:?}, {:?}", task_id, result);
                             info!("task id: {:?}, {:?}", task_id, exception_details);
                         }
+                        Some(110) => {
+                            info!("task id: {:?}, {:?}", task_id, result);
+                            assert!(result.is_some());
+                            let result = result.unwrap();
+                            let tab = tab.unwrap();
+                            tab.runtime_get_properties(result.object_id.expect("object_id should exists."), Some(111));
+                        }
                         _ => unreachable!(),
                     },
+                    PageResponse::RuntimeGetProperties(get_properties_return_object) => {
+                        let get_properties_return_object = get_properties_return_object.expect("should return get_properties_return_object");
+                        info!("property count: {:?}", get_properties_return_object.result.len());
+                        let src: std::collections::HashSet<String> = ["src", "currentSrc", "outerHTML"].iter().map(|&v|v.to_string()).collect();
+                        get_properties_return_object.result.iter().filter(|pd|src.contains(&pd.name)).for_each(|pd| info!("property name: {:?}, value: {:?}", pd.name, pd.value));
+                    }
                     PageResponse::RuntimeExecutionContextCreated(
                         frame_id,
                     ) => {
                         info!("execution context created, frame_id: <<<<<<<<{:?}", frame_id);
                         self.runtime_execution_context_created_count += 1;
                     }
-                    PageResponse::FrameStoppedLoading(_frame_id) => {
+                    PageResponse::FrameStoppedLoading(frame_id) => {
                         let tab = tab.unwrap();
-                        let context = tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
-                        if context.is_some() {
-                            info!("execution_context_description: {:?}", context.unwrap());
-                            self.ddlogin_frame_stopped_loading = true;
-                            let tb = tasks::RuntimeEvaluateBuilder::default();
-                            tab.runtime_evaluate(tb, Some(110));
+                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        
+                        if frame.name == Some("ddlogin-iframe".into()) {
+                            let context = tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
+                            if context.is_some() {
+                                info!("execution_context_description: {:?}", context);
+                                self.ddlogin_frame_stopped_loading = true;
+                                let mut tb = tasks::RuntimeEvaluateBuilder::default();
+                                tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.unwrap().id);
+                                tab.runtime_evaluate(tb, Some(110));
+                            }
                         }
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 19 {
+                        if seconds > 35 {
                             self.assert_result();
                             break Ok(().into());
                         }

@@ -6,6 +6,7 @@ extern crate tokio_timer;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
 use headless_chrome::browser_async::page_message::PageResponse;
+use headless_chrome::browser_async::task_describe::{self as tasks};
 use headless_chrome::protocol::{page};
 use log::*;
 use std::default::Default;
@@ -36,6 +37,7 @@ impl Future for RuntimeEvaluate {
     type Error = failure::Error;
 
     #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cyclomatic_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
@@ -98,15 +100,14 @@ impl Future for RuntimeEvaluate {
                         info!("execution context created, frame_id: <<<<<<<<{:?}", frame_id);
                         self.runtime_execution_context_created_count += 1;
                     }
-                    PageResponse::FrameStoppedLoading(frame_id) => {
+                    PageResponse::FrameStoppedLoading(_frame_id) => {
                         let tab = tab.unwrap();
-                        if let Some(frame) = tab.find_frame_by_id(&frame_id) {
-                            if frame.name == Some("ddlogin-iframe".into()) {
-                                let context = tab.execution_context_descriptions.get(&frame_id);
-                                assert!(context.is_some());
-                                info!("execution_context_description: {:?}", context.unwrap());
-                                self.ddlogin_frame_stopped_loading = true;
-                            }
+                        let context = tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
+                        if context.is_some() {
+                            info!("execution_context_description: {:?}", context.unwrap());
+                            self.ddlogin_frame_stopped_loading = true;
+                            let tb = tasks::RuntimeEvaluateBuilder::default();
+                            tab.runtime_evaluate(tb, Some(110));
                         }
                     }
                     PageResponse::SecondsElapsed(seconds) => {

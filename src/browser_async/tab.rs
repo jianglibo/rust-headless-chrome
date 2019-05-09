@@ -15,7 +15,7 @@ pub struct Tab {
     pub target_info: protocol::target::TargetInfo,
     pub session_id: Option<SessionId>,
     pub root_node: Option<dom::Node>,
-    pub changing_frames: HashMap<String, ChangingFrame>,
+    pub changing_frames: HashMap<page::types::FrameId, ChangingFrame>,
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
     pub execution_context_descriptions:
         HashMap<page::types::FrameId, runtime::types::ExecutionContextDescription>,
@@ -112,6 +112,16 @@ impl Tab {
             }
             _ => None,
         }
+    }
+
+    pub fn find_execution_context_id_by_frame_name(&self, frame_name: &'static str) -> Option<&runtime::types::ExecutionContextDescription> {
+        let frame = self.changing_frames.values().find_map(|cf| match cf {
+            ChangingFrame::Navigated(fr) | ChangingFrame::StoppedLoading(fr) if fr.name == Some(frame_name.into()) => {
+                Some(fr)
+            }
+            _ => None
+        });
+        frame.and_then(|fr| self.execution_context_descriptions.get(&fr.id))
     }
 
     pub fn verify_execution_context_id(&self, console_api_called: &inner_events::ConsoleAPICalledParams) {
@@ -359,6 +369,18 @@ impl Tab {
             .lock()
             .unwrap()
             .execute_task(vec![rt.into()]);
+    }
+
+    pub fn runtime_evaluate(
+        &mut self,
+        mut evaluate_task_builder: tasks::RuntimeEvaluateBuilder,
+        manual_task_id: Option<ids::Task>,
+    ) {
+        let task = evaluate_task_builder.common_fields(self.get_c_f(manual_task_id)).build();
+        match task {
+            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+            Err(err) => error!("build evaluate task error: {:?}", err),
+        }
     }
 
     pub fn attach_to_page(&mut self) {

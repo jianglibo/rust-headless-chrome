@@ -116,21 +116,29 @@ pub mod methods {
     #[serde(rename_all = "camelCase")]
     pub struct CallFunctionOn<'a> {
         pub function_declaration: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub object_id: Option<types::RemoteObjectId>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub silent: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub return_by_value: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub generate_preview: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub user_gesture: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub await_promise: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub execution_context_id: Option<types::ExecutionContextId>,
-        pub object_group: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub object_group: Option<&'a String>,
     }
     
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct CallFunctionOnReturnObject {
         pub result: types::RemoteObject,
-        pub exception_details: types::ExceptionDetails,
+        pub exception_details: Option<types::ExceptionDetails>,
     }
     impl<'a> Method for CallFunctionOn<'a> {
         const NAME: &'static str = "Runtime.callFunctionOn";

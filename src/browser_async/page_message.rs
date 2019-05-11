@@ -1,7 +1,7 @@
 use crate::protocol::{dom, page, target, runtime};
 use crate::browser::tab::element::{BoxModel};
+use crate::browser::transport::{SessionId};
 use super::id_type as ids;
-use super::dev_tools_method_util::{SessionId};
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
@@ -51,6 +51,7 @@ pub enum PageResponse {
     RuntimeEvaluate(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
     RuntimeExecutionContextCreated(Option<page::types::FrameId>),
     RuntimeGetProperties(Option<runtime::methods::GetPropertiesReturnObject>),
+    RuntimeCallFunctionOn(Option<runtime::methods::CallFunctionOnReturnObject>),
     Fail,
 }
 

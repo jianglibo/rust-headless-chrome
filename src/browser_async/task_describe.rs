@@ -1,15 +1,16 @@
-use super::dev_tools_method_util::SessionId;
 use super::id_type as ids;
 use super::inner_event::inner_events;
 use super::page_message::PageEventName;
 use super::unique_number;
 use crate::browser::tab::element::BoxModel;
+use crate::browser::transport::{MethodDestination, SessionId};
 use crate::browser_async::dev_tools_method_util::{
-    next_call_id, ChromePageError, MethodDestination, MethodUtil,
+    next_call_id, ChromePageError, MethodUtil,
 };
 use crate::protocol::{dom, page, runtime, target};
 use failure;
 use log::*;
+use std::ops::Deref;
 
 #[derive(Debug)]
 pub enum TaskDescribe {
@@ -44,6 +45,7 @@ pub enum TaskDescribe {
     ),
     RuntimeExecutionContextDestroyed(runtime::types::ExecutionContextId, CommonDescribeFields),
     RuntimeConsoleAPICalled(inner_events::ConsoleAPICalledParams, CommonDescribeFields),
+    RuntimeCallFunctionOn(Box<RuntimeCallFunctionOn>),
 }
 
 impl TaskDescribe {
@@ -60,6 +62,7 @@ impl TaskDescribe {
             | TaskDescribe::RuntimeEnable(common_fields) => Some(&common_fields),
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => Some(&runtime_evaluate.common_fields),
             TaskDescribe::RuntimeGetProperties(get_properties) => Some(&get_properties.common_fields),
+            TaskDescribe::RuntimeCallFunctionOn(call_function_on) => Some(&call_function_on.common_fields),
             _ => {
                 error!("get_common_fields got queried. but it doesn't implement that.");
                 None
@@ -178,19 +181,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
             }
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
                 Ok(MethodUtil::create_msg_to_send_with_session_id(
-                    runtime::methods::Evaluate {
-                        expression: runtime_evaluate.expression.as_str(),
-                        object_group: runtime_evaluate.object_group.as_ref().map(Self::as_str),
-                        include_command_line_a_p_i: runtime_evaluate.include_command_line_a_p_i,
-                        silent: runtime_evaluate.silent,
-                        context_id: runtime_evaluate.context_id,
-                        return_by_value: runtime_evaluate.return_by_value,
-                        generate_preview: runtime_evaluate.generate_preview,
-                        user_gesture: runtime_evaluate.user_gesture,
-                        await_promise: runtime_evaluate.await_promise,
-                        throw_on_side_effect: runtime_evaluate.throw_on_side_effect,
-                        time_out: runtime_evaluate.time_out,
-                    },
+                    runtime::methods::Evaluate::from(runtime_evaluate),
                     &runtime_evaluate.common_fields.session_id,
                     runtime_evaluate.common_fields.call_id,
                 ))
@@ -205,6 +196,13 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                     },
                     &get_properties.common_fields.session_id,
                     get_properties.common_fields.call_id,
+                ))
+            }
+            TaskDescribe::RuntimeCallFunctionOn(call_function_on) => {
+                Ok(MethodUtil::create_msg_to_send_with_session_id(
+                    runtime::methods::CallFunctionOn::from(call_function_on),
+                    &call_function_on.common_fields.session_id,
+                    call_function_on.common_fields.call_id,
                 ))
             }
             _ => {
@@ -251,6 +249,23 @@ impl From<RuntimeEvaluate> for TaskDescribe {
         TaskDescribe::RuntimeEvaluate(Box::new(runtime_evaluate))
     }
 }
+impl<'a, T: Deref<Target=RuntimeEvaluate>> From<&'a T> for runtime::methods::Evaluate<'a> {
+    fn from(runtime_evaluate: &'a T) -> Self {
+        runtime::methods::Evaluate {
+            expression: runtime_evaluate.expression.as_str(),
+            object_group: runtime_evaluate.object_group.as_ref().map(String::as_str),
+            include_command_line_a_p_i: runtime_evaluate.include_command_line_a_p_i,
+            silent: runtime_evaluate.silent,
+            context_id: runtime_evaluate.context_id,
+            return_by_value: runtime_evaluate.return_by_value,
+            generate_preview: runtime_evaluate.generate_preview,
+            user_gesture: runtime_evaluate.user_gesture,
+            await_promise: runtime_evaluate.await_promise,
+            throw_on_side_effect: runtime_evaluate.throw_on_side_effect,
+            time_out: runtime_evaluate.time_out,
+        }
+    }
+}
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -272,6 +287,54 @@ impl From<RuntimeGetProperties> for TaskDescribe {
         TaskDescribe::RuntimeGetProperties(Box::new(get_properties))
     }
 }
+
+#[derive(Debug, Builder, Clone)]
+#[builder(setter(into))]
+pub struct RuntimeCallFunctionOn {
+    pub common_fields: CommonDescribeFields,
+    pub function_declaration: String,
+    #[builder(default = "None")]
+    pub object_id: Option<runtime::types::RemoteObjectId>,
+    #[builder(default = "None")]
+    pub silent: Option<bool>,
+    #[builder(default = "None")]
+    pub return_by_value: Option<bool>,
+    #[builder(default = "None")]
+    pub generate_preview: Option<bool>,
+    #[builder(default = "None")]
+    pub user_gesture: Option<bool>,
+    #[builder(default = "None")]
+    pub await_promise: Option<bool>,
+    #[builder(default = "None")]
+    pub execution_context_id: Option<runtime::types::ExecutionContextId>,
+    #[builder(default = "None")]
+    pub object_group: Option<String>,
+    #[builder(default = "None")]
+    pub result: Option<runtime::methods::CallFunctionOnReturnObject>,
+}
+
+impl<'a, T: Deref<Target=RuntimeCallFunctionOn>> From<&'a T> for runtime::methods::CallFunctionOn<'a> {
+    fn from(call_function_on: &'a T) -> Self {
+        runtime::methods::CallFunctionOn {
+                function_declaration: call_function_on.function_declaration.as_ref(),
+                object_id: call_function_on.object_id.clone(),
+                silent: call_function_on.silent,
+                return_by_value: call_function_on.return_by_value,
+                generate_preview: call_function_on.generate_preview,
+                user_gesture: call_function_on.user_gesture,
+                await_promise: call_function_on.await_promise,
+                execution_context_id: call_function_on.execution_context_id,
+                object_group: call_function_on.object_group.as_ref(),
+            }
+    }
+}
+
+impl From<RuntimeCallFunctionOn> for TaskDescribe {
+    fn from(call_function_on: RuntimeCallFunctionOn) -> Self {
+        TaskDescribe::RuntimeCallFunctionOn(Box::new(call_function_on))
+    }
+}
+
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]

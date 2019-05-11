@@ -306,6 +306,10 @@ impl ChromeDebugSession {
                 let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
                 get_properties.result = Some(get_properties_return_object);
             }
+            TaskDescribe::RuntimeCallFunctionOn(call_function_on) => {
+                let call_function_on_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
+                call_function_on.result = Some(call_function_on_return_object);
+            }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);
             }

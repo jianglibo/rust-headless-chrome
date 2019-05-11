@@ -27,7 +27,7 @@ pub mod context;
 mod fetcher;
 pub mod process;
 pub mod tab;
-mod transport;
+pub mod transport;
 
 /// A handle to an instance of Chrome / Chromium, which wraps a WebSocket connection to its debugging port.
 ///

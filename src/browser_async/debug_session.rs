@@ -398,6 +398,13 @@ impl DebugSession {
                 );
                 Ok(resp.into())
             }
+            TaskDescribe::RuntimeCallFunctionOn(call_function_on) => {
+                let resp = self.convert_to_page_response(
+                    Some(&call_function_on.common_fields),
+                    PageResponse::RuntimeCallFunctionOn(call_function_on.result),
+                );
+                Ok(resp.into())
+            }
             _ => {
                 warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)

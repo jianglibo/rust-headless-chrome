@@ -1,10 +1,11 @@
 use super::chrome_debug_session::ChromeDebugSession;
-use super::dev_tools_method_util::{next_call_id, MethodDestination, MethodUtil, SessionId};
+use super::dev_tools_method_util::{next_call_id, MethodUtil};
 use super::id_type as ids;
 use super::inner_event::{inner_events};
 use super::page_message::ChangingFrame;
 use super::task_describe::{self as tasks, TaskDescribe};
 use crate::protocol::{self, dom, page, runtime, target};
+use crate::browser::transport::{MethodDestination, SessionId};
 use log::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -380,6 +381,18 @@ impl Tab {
         match task {
             Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
             Err(err) => error!("build evaluate task error: {:?}", err),
+        }
+    }
+
+    pub fn runtime_call_function_on(
+        &mut self,
+        mut call_function_on_task_builder: tasks::RuntimeCallFunctionOnBuilder,
+        manual_task_id: Option<ids::Task>,
+    ) {
+        let task = call_function_on_task_builder.common_fields(self.get_c_f(manual_task_id)).build();
+        match task {
+            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+            Err(err) => error!("build call_function_on task error: {:?}", err),
         }
     }
 

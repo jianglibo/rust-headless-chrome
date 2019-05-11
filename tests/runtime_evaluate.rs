@@ -64,6 +64,9 @@ impl Future for RuntimeEvaluate {
                             }
                         }
                     }
+                    PageResponse::RuntimeCallFunctionOn(result) => {
+                        info!("got call result: {:?}", result);
+                    }
                     PageResponse::RuntimeEvaluate(result, exception_details) => match task_id {
                         Some(100) => {
                             self.task_100_called = true;
@@ -96,15 +99,21 @@ impl Future for RuntimeEvaluate {
                             assert!(result.is_some());
                             let result = result.unwrap();
                             let tab = tab.unwrap();
-                            tab.runtime_get_properties(result.object_id.expect("object_id should exists."), Some(111));
+                            let object_id = result.object_id.expect("object_id should exists.");
+                            tab.runtime_get_properties(object_id.clone(), Some(111));
+                            
+                            let mut task = tasks::RuntimeCallFunctionOnBuilder::default();
+                            let fnd = "function() {return this.getAttribute('src');}";
+                            task.object_id(object_id.clone()).function_declaration(fnd);
+                            tab.runtime_call_function_on(task, Some(112));
                         }
                         _ => unreachable!(),
                     },
                     PageResponse::RuntimeGetProperties(get_properties_return_object) => {
                         let get_properties_return_object = get_properties_return_object.expect("should return get_properties_return_object");
                         info!("property count: {:?}", get_properties_return_object.result.len());
-                        let src: std::collections::HashSet<String> = ["src", "currentSrc", "outerHTML"].iter().map(|&v|v.to_string()).collect();
-                        get_properties_return_object.result.iter().filter(|pd|src.contains(&pd.name)).for_each(|pd| info!("property name: {:?}, value: {:?}", pd.name, pd.value));
+                        // let src: std::collections::HashSet<String> = ["src", "currentSrc", "outerHTML"].iter().map(|&v|v.to_string()).collect();
+                        // get_properties_return_object.result.iter().filter(|pd|src.contains(&pd.name)).for_each(|pd| info!("property name: {:?}, value: {:?}", pd.name, pd.value));
                     }
                     PageResponse::RuntimeExecutionContextCreated(
                         frame_id,

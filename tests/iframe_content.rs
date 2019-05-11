@@ -13,11 +13,12 @@ use std::default::Default;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
+#[derive(Default)]
 struct IframeContent {
     debug_session: DebugSession,
     url: &'static str,
     selector: &'static str,
-    node_id: Option<dom::NodeId>,
+    // node_id: Option<dom::NodeId>,
     node: Option<dom::Node>,
     ddlogin_frame: Option<page::Frame>,
 }
@@ -103,12 +104,9 @@ fn t_iframe_content() {
 
     let selector = "#ddlogin-iframe";
     let my_page = IframeContent {
-        debug_session: Default::default(),
         url,
         selector,
-        node_id: None,
-        node: None,
-        ddlogin_frame: None,
+        ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
     if let Err(err) = runtime.block_on(my_page.into_future()) {

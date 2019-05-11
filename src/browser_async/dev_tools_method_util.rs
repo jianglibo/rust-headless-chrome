@@ -1,5 +1,6 @@
 use crate::protocol;
 use crate::protocol::target;
+use crate::browser::transport::{SessionId, MethodDestination};
 use failure;
 use log::*;
 
@@ -8,26 +9,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use super::task_describe::{TaskDescribe};
 
 pub static GLOBAL_METHOD_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SessionId(String);
-
-impl SessionId {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<String> for SessionId {
-    fn from(session_id: String) -> Self {
-        Self(session_id)
-    }
-}
-
-pub enum MethodDestination {
-    Target(SessionId),
-    Browser,
-}
 
 pub fn next_call_id() -> usize {
     GLOBAL_METHOD_CALL_COUNT.fetch_add(1, Ordering::SeqCst)
@@ -61,7 +42,7 @@ impl std::convert::From<websocket::result::WebSocketError> for ChannelBridgeErro
 pub enum ChromePageError {
     #[fail(display = "page has no target_info.")]
     TargetInfoMissing,
-    #[fail(display = "is'nt a target oriented method.")]
+    #[fail(display = "isn't a target oriented method.")]
     NotTargetOrient,
     #[fail(display = "there is no session.")]
     NoSession,

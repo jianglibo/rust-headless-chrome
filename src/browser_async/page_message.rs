@@ -1,7 +1,11 @@
-use crate::protocol::{dom, page, target, runtime};
+use crate::protocol::{dom, page, target, runtime, network};
 use crate::browser::tab::element::{BoxModel};
 use crate::browser::transport::{SessionId};
 use super::id_type as ids;
+use std::path::Path;
+use std::fs::OpenOptions;
+use log::*;
+use std::io::{Write};
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
@@ -11,20 +15,6 @@ pub enum ChangingFrame {
     StoppedLoading(page::Frame),
 }
 
-#[derive(Debug)]
-pub enum PageEventName {
-    DomContentEventFired,
-    FrameAttached,
-    FrameDetached,
-    FrameNavigated,
-    InterstitialHidden,
-    InterstitialShown,
-    JavascriptDialogClosed,
-    JavascriptDialogOpening,
-    LifecycleEvent,
-    LoadEventFired,
-    WindowOpen,
-}
 
 pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<ids::Task>, PageResponse);
 
@@ -42,12 +32,13 @@ pub enum PageResponse {
     FrameStartedLoading(page::types::FrameId),
     FrameNavigated(page::types::FrameId),
     FrameStoppedLoading(page::types::FrameId),
-    LoadEventFired(f32),
+    LoadEventFired(network::types::MonotonicTime),
+    PrintToPDF(Option<String>),
     DescribeNode(Option<&'static str>, Option<dom::NodeId>),
     GetBoxModel(Option<&'static str>, Option<Box<BoxModel>>),
     SetChildNodes(dom::NodeId, Vec<dom::Node>),
     GetDocument,
-    Screenshot(response_object::CaptureScreenshot),
+    CaptureScreenshot(response_object::CaptureScreenshot),
     RuntimeEvaluate(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
     RuntimeExecutionContextCreated(Option<page::types::FrameId>),
     RuntimeGetProperties(Option<runtime::methods::GetPropertiesReturnObject>),
@@ -55,11 +46,30 @@ pub enum PageResponse {
     Fail,
 }
 
+pub fn write_base64_str_to<P: AsRef<Path>, C: AsRef<str>>(path: P, base64_str: Option<C>) -> std::io::Result<()> {
+    if let Some(c) = base64_str {
+        let slice = c.as_ref();   
+        match base64::decode(slice) {
+            Ok(vu8) => {
+                let mut file = OpenOptions::new().write(true)
+                            .create_new(true)
+                            .open(path)?;
+                file.write_all(&vu8)?;
+            }
+            Err(error) => {
+                error!("decode failed: {:?}", error);
+            }
+        }
+    } else {
+        error!("base64_str is None!");
+    }
+    Ok(())
+}
+
+
 pub mod response_object {
     use std::path::Path;
-    use std::fs::OpenOptions;
-    use log::*;
-    use std::io::{Write};
+    use super::*;
 
     #[derive(Debug)]
     pub struct CaptureScreenshot {
@@ -69,17 +79,22 @@ pub mod response_object {
 
     impl CaptureScreenshot {
         pub fn write_to<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-            if let Some(base64_str) = &self.base64 {
-                if let Ok(vu8) = base64::decode(base64_str) {
-                   let mut file = OpenOptions::new().write(true)
-                             .create_new(true)
-                             .open(path)?;
-                   file.write_all(&vu8)?;
-                }
-            } else {
-                error!("decode base64 failed.");
-            }
-            Ok(())
+            write_base64_str_to(path, self.base64.as_ref())
         }
     }
 }
+
+// #[derive(Debug)]
+// pub enum PageEventName {
+//     DomContentEventFired,
+//     FrameAttached,
+//     FrameDetached,
+//     FrameNavigated,
+//     InterstitialHidden,
+//     InterstitialShown,
+//     JavascriptDialogClosed,
+//     JavascriptDialogOpening,
+//     LifecycleEvent,
+//     LoadEventFired,
+//     WindowOpen,
+// }

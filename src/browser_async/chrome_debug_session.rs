@@ -232,7 +232,7 @@ impl ChromeDebugSession {
                 get_box_model.node_id = query_selector.found_node_id;
                 return self.execute_next_and_return_remains(tasks);
             }
-            (TaskDescribe::GetBoxModel(get_box_model), TaskDescribe::ScreenShot(screen_shot)) => {
+            (TaskDescribe::GetBoxModel(get_box_model), TaskDescribe::CaptureScreenshot(screen_shot)) => {
                 if let Some(mb) = &get_box_model.found_box {
                     let viewport = mb.content_viewport();
                     screen_shot.clip = Some(viewport);
@@ -284,7 +284,7 @@ impl ChromeDebugSession {
                 };
                 get_box_model.found_box = Some(model_box);
             }
-            TaskDescribe::ScreenShot(screen_shot) => {
+            TaskDescribe::CaptureScreenshot(screen_shot) => {
                 let capture_screenshot_return_object =
                     protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
                 screen_shot.base64 = Some(capture_screenshot_return_object.data);
@@ -306,9 +306,13 @@ impl ChromeDebugSession {
                 let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
                 get_properties.result = Some(get_properties_return_object);
             }
-            TaskDescribe::RuntimeCallFunctionOn(call_function_on) => {
-                let call_function_on_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
-                call_function_on.result = Some(call_function_on_return_object);
+            TaskDescribe::RuntimeCallFunctionOn(task) => {
+                let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
+                task.result = Some(task_return_object);
+            }
+            TaskDescribe::PrintToPDF(task) => {
+                let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
+                task.result = Some(task_return_object.data);
             }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);
@@ -458,10 +462,10 @@ impl Stream for ChromeDebugSession {
                                         break Ok(Some(page_message).into());
                                     }
                                 }
-                                Err(error) => {
+                                Err(_error) => {
                                     error!(
-                                        "parse_raw_message failed ** {:?}, {:?}",
-                                        error, message_field
+                                        "parse_raw_message failed ** {:?}",
+                                        message_field
                                     );
                                 }
                             },

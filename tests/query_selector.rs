@@ -81,12 +81,12 @@ impl Future for QuerySelector {
                             let content_document = node.as_ref().unwrap().content_document.clone().unwrap();
                             assert!(node.is_some());
                             let backend_node_id = content_document.backend_node_id;
-                            let mut task_builder = tasks::DescribeNodeBuilder::default();
+                            let mut task_builder = tasks::DescribeNodeTaskBuilder::default();
                             task_builder.backend_node_id(backend_node_id).depth(10);
                             tab.describe_node(task_builder, Some(105));
 
                             let this_node_id = content_document.node_id;
-                            let mut task_builder = tasks::QuerySelectorBuilder::default();
+                            let mut task_builder = tasks::QuerySelectorTaskBuilder::default();
                             task_builder.node_id(this_node_id).selector("#qrcode img"); // got nothing.
                             tab.query_selector(task_builder, Some(106));
                         } else {
@@ -132,7 +132,5 @@ fn t_dom_query_selector() {
         ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    if let Err(err) = runtime.block_on(my_page.into_future()) {
-        error!("err: {:?}", err);
-    }
+    runtime.block_on(my_page.into_future()).unwrap();
 }

@@ -78,7 +78,7 @@ impl Future for CaptureScreenShotTest {
                             }
                         }
                     }
-                    PageResponse::Screenshot(capture_screen_shot) => {
+                    PageResponse::CaptureScreenshot(capture_screen_shot) => {
                         info!("got screen shot: {:?}", capture_screen_shot.base64);
                         assert!(capture_screen_shot.base64.is_some());
                         assert_eq!(capture_screen_shot.selector, Some(self.selector));

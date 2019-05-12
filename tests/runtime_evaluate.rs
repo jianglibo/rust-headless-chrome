@@ -5,11 +5,14 @@ extern crate futures;
 extern crate tokio_timer;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::PageResponse;
-use headless_chrome::browser_async::task_describe::{self as tasks};
-use headless_chrome::protocol::{page};
+use headless_chrome::browser_async::page_message::{write_base64_str_to, PageResponse};
+use headless_chrome::browser_async::task_describe as tasks;
+use headless_chrome::protocol::page;
 use log::*;
-use std::default::Default;
+use serde_json;
+
+use std::fs;
+use std::path::Path;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
@@ -66,6 +69,25 @@ impl Future for RuntimeEvaluate {
                     }
                     PageResponse::RuntimeCallFunctionOn(result) => {
                         info!("got call result: {:?}", result);
+                        let file_name = "target/qrcode.png";
+                        let path = Path::new(file_name);
+                        if path.exists() && path.is_file() {
+                            fs::remove_file(file_name).unwrap();
+                        }
+                        let base64_data = result
+                            .as_ref()
+                            .map(|rn| &rn.result)
+                            .map(|ro| &ro.value)
+                            .and_then(Option::as_ref)
+                            .and_then(serde_json::value::Value::as_str)
+                            .and_then(|v| {
+                                let mut ss = v.splitn(2, ',').fuse();
+                                ss.next();
+                                ss.next()
+                            });
+
+                        write_base64_str_to(file_name, base64_data).unwrap();
+                        assert!(path.exists());
                     }
                     PageResponse::RuntimeEvaluate(result, exception_details) => match task_id {
                         Some(100) => {
@@ -101,8 +123,8 @@ impl Future for RuntimeEvaluate {
                             let tab = tab.unwrap();
                             let object_id = result.object_id.expect("object_id should exists.");
                             tab.runtime_get_properties(object_id.clone(), Some(111));
-                            
-                            let mut task = tasks::RuntimeCallFunctionOnBuilder::default();
+
+                            let mut task = tasks::RuntimeCallFunctionOnTaskBuilder::default();
                             let fnd = "function() {return this.getAttribute('src');}";
                             task.object_id(object_id.clone()).function_declaration(fnd);
                             tab.runtime_call_function_on(task, Some(112));
@@ -110,27 +132,33 @@ impl Future for RuntimeEvaluate {
                         _ => unreachable!(),
                     },
                     PageResponse::RuntimeGetProperties(get_properties_return_object) => {
-                        let get_properties_return_object = get_properties_return_object.expect("should return get_properties_return_object");
-                        info!("property count: {:?}", get_properties_return_object.result.len());
+                        let get_properties_return_object = get_properties_return_object
+                            .expect("should return get_properties_return_object");
+                        info!(
+                            "property count: {:?}",
+                            get_properties_return_object.result.len()
+                        );
                         // let src: std::collections::HashSet<String> = ["src", "currentSrc", "outerHTML"].iter().map(|&v|v.to_string()).collect();
                         // get_properties_return_object.result.iter().filter(|pd|src.contains(&pd.name)).for_each(|pd| info!("property name: {:?}, value: {:?}", pd.name, pd.value));
                     }
-                    PageResponse::RuntimeExecutionContextCreated(
-                        frame_id,
-                    ) => {
-                        info!("execution context created, frame_id: <<<<<<<<{:?}", frame_id);
+                    PageResponse::RuntimeExecutionContextCreated(frame_id) => {
+                        info!(
+                            "execution context created, frame_id: <<<<<<<<{:?}",
+                            frame_id
+                        );
                         self.runtime_execution_context_created_count += 1;
                     }
                     PageResponse::FrameStoppedLoading(frame_id) => {
                         let tab = tab.unwrap();
                         let frame = tab.find_frame_by_id(&frame_id).unwrap();
-                        
+
                         if frame.name == Some("ddlogin-iframe".into()) {
-                            let context = tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
+                            let context =
+                                tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
                             if context.is_some() {
                                 info!("execution_context_description: {:?}", context);
                                 self.ddlogin_frame_stopped_loading = true;
-                                let mut tb = tasks::RuntimeEvaluateBuilder::default();
+                                let mut tb = tasks::RuntimeEvaluateTaskBuilder::default();
                                 tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.unwrap().id);
                                 tab.runtime_evaluate(tb, Some(110));
                             }

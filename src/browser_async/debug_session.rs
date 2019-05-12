@@ -206,7 +206,7 @@ impl DebugSession {
             }
             TaskDescribe::PageEnable(page_enable) => {
                 let resp =
-                    self.convert_to_page_response(Some(&page_enable), PageResponse::PageEnable);
+                    self.convert_to_page_response(Some(&page_enable.common_fields), PageResponse::PageEnable);
                 Ok(resp.into())
             }
             // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
@@ -315,14 +315,14 @@ impl DebugSession {
                 );
                 Ok(Some(pr).into())
             }
-            TaskDescribe::ScreenShot(screen_shot) => {
+            TaskDescribe::CaptureScreenshot(screen_shot) => {
                 let common_fields = &screen_shot.common_fields;
                 let ro = response_object::CaptureScreenshot {
                     selector: screen_shot.selector,
                     base64: screen_shot.base64,
                 };
                 let resp = self
-                    .convert_to_page_response(Some(&common_fields), PageResponse::Screenshot(ro));
+                    .convert_to_page_response(Some(&common_fields), PageResponse::CaptureScreenshot(ro));
                 Ok(resp.into())
             }
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
@@ -398,10 +398,17 @@ impl DebugSession {
                 );
                 Ok(resp.into())
             }
-            TaskDescribe::RuntimeCallFunctionOn(call_function_on) => {
+            TaskDescribe::RuntimeCallFunctionOn(task) => {
                 let resp = self.convert_to_page_response(
-                    Some(&call_function_on.common_fields),
-                    PageResponse::RuntimeCallFunctionOn(call_function_on.result),
+                    Some(&task.common_fields),
+                    PageResponse::RuntimeCallFunctionOn(task.result),
+                );
+                Ok(resp.into())
+            }
+            TaskDescribe::PrintToPDF(task) => {
+                let resp = self.convert_to_page_response(
+                    Some(&task.common_fields),
+                    PageResponse::PrintToPDF(task.result),
                 );
                 Ok(resp.into())
             }

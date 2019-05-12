@@ -94,7 +94,7 @@ pub struct PrintToPdfOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page_ranges: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ignore_invalid_page_ranges: Option<String>,
+    pub ignore_invalid_page_ranges: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header_template: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

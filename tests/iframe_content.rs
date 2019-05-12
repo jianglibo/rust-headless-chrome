@@ -109,7 +109,5 @@ fn t_iframe_content() {
         ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    if let Err(err) = runtime.block_on(my_page.into_future()) {
-        error!("err: {:?}", err);
-    }
+    runtime.block_on(my_page.into_future()).unwrap();
 }

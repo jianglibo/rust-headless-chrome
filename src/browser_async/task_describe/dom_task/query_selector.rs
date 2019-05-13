@@ -10,7 +10,7 @@ pub struct QuerySelectorTask {
     pub node_id: Option<dom::NodeId>,
     #[builder(default = "None")]
     pub found_node_id: Option<dom::NodeId>,
-    pub selector: &'static str,
+    pub selector: String,
 }
 
 impl From<QuerySelectorTask> for TaskDescribe {
@@ -23,7 +23,7 @@ impl CreateMethodCallString for QuerySelectorTask {
     fn create_method_call_string(&self, session_id: Option<&SessionId>, call_id: usize) -> String {
         let method = dom::methods::QuerySelector {
             node_id: self.node_id.unwrap(),
-            selector: self.selector,
+            selector: self.selector.as_str(),
         };
                 create_msg_to_send_with_session_id(
                     method,

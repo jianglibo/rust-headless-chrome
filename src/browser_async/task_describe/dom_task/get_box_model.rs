@@ -11,7 +11,7 @@ pub struct GetBoxModelTask {
     #[builder(default = "None")]
     pub node_id: Option<dom::NodeId>,
     #[builder(default = "None")]
-    pub selector: Option<&'static str>,
+    pub selector: Option<String>,
     #[builder(default = "None")]
     pub backend_node_id: Option<dom::NodeId>,
     #[builder(default = "None")]

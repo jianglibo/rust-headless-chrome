@@ -70,7 +70,7 @@ impl Future for DescribeNode {
                         } else {
                             assert!(task_id == Some(100));
                             assert!(node_id.is_some());
-                            assert_eq!(selector, Some(self.selector));
+                            assert_eq!(selector, Some(self.selector.into()));
                             self.node_id = node_id;
                             self.node = tab.unwrap().find_node_by_id(node_id).cloned();
                             info!(

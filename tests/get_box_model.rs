@@ -57,7 +57,7 @@ impl Future for GetBoxModelTest {
                     PageResponse::GetBoxModel(selector, box_model) => {
                         trace!("got box model: {:?}", box_model);
                         assert!(box_model.is_some());
-                        assert_eq!(selector, Some(self.selector));
+                        assert_eq!(selector, Some(self.selector.into()));
                         self.box_model = box_model;
                         break Ok(().into());
                     }

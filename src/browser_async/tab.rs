@@ -243,7 +243,7 @@ impl Tab {
         let mut pre_tasks = self.get_query_selector(selector, None);
         let describe_node = tasks::DescribeNodeTaskBuilder::default()
             .common_fields(self.get_c_f(manual_task_id))
-            .selector(selector)
+            .selector(selector.to_owned())
             .depth(depth)
             .build()
             .unwrap();
@@ -298,7 +298,7 @@ impl Tab {
         let mut pre_tasks = self.get_query_selector(selector, None);
         let get_box_model = tasks::GetBoxModelTaskBuilder::default()
             .common_fields(self.get_c_f(manual_task_id))
-            .selector(selector)
+            .selector(selector.to_owned())
             .build()
             .unwrap();
         pre_tasks.push(get_box_model.into());

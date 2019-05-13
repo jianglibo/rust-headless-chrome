@@ -8,7 +8,7 @@ use headless_chrome::protocol::dom;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
 use headless_chrome::browser_async::page_message::PageResponse;
-use headless_chrome::browser_async::task_describe::{self as tasks};
+use headless_chrome::browser_async::task_describe as tasks;
 use log::*;
 use std::default::Default;
 use tokio;
@@ -30,8 +30,6 @@ impl QuerySelector {
         assert_eq!(self.call_count, 4);
         assert!(self.task_id_100_called);
         assert!(tab.temporary_node_holder.len() >= 7);
-        // info!("all nodes: {:?}", tab.temporary_node_holder);
-        // tab.temporary_node_holder.values().for_each(|v| v.iter().for_each(|nd| assert_eq!(nd.node_name, "IFRAME")));
         assert!(self.found_node_id.is_some());
     }
 }
@@ -43,7 +41,7 @@ impl Future for QuerySelector {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
+                let mut tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
@@ -51,14 +49,15 @@ impl Future for QuerySelector {
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
-                        let tab = tab.unwrap();
-                        tab.navigate_to(self.url, None);
+                        if let Some(t) = tab {
+                            t.navigate_to(self.url, None);
+                        }
                     }
                     PageResponse::FrameNavigated(frame_id) => {
-                        let tab = tab.unwrap();
-                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
-                        info!("got frame: {:?}", frame_id);
-                        if frame.name == Some("ddlogin-iframe".into()) {
+                        let frame = tab
+                            .and_then(|t| t.find_frame_by_id(&frame_id))
+                            .filter(|f| f.name == Some("ddlogin-iframe".into()));
+                        if frame.is_some() {
                             if let Some(tab) = self.debug_session.main_tab_mut() {
                                 tab.dom_query_selector_by_selector(self.selector, Some(100));
                                 tab.dom_query_selector_by_selector("#not-existed", Some(102));
@@ -75,20 +74,23 @@ impl Future for QuerySelector {
                             self.task_id_100_called = true;
                         } else if task_id == Some(101) {
                             assert_eq!(task_id, Some(101));
-                            let tab = tab.unwrap();
-                            self.found_node_id = node_id;
-                            let node = tab.find_node_by_id(node_id);
-                            let content_document = node.as_ref().unwrap().content_document.clone().unwrap();
-                            assert!(node.is_some());
-                            let backend_node_id = content_document.backend_node_id;
+
+                            let content_document = tab
+                                .as_ref()
+                                .and_then(|t| t.find_node_by_id(node_id))
+                                .and_then(|n| n.content_document.as_ref());
+
+                            let backend_node_id = content_document.map(|cd| cd.backend_node_id);
+                            let content_document_id = content_document.map(|cd| cd.node_id);
                             let mut task_builder = tasks::DescribeNodeTaskBuilder::default();
                             task_builder.backend_node_id(backend_node_id).depth(10);
-                            tab.describe_node(task_builder, Some(105));
-
-                            let this_node_id = content_document.node_id;
+                            tab.as_mut()
+                                .map(|t| t.describe_node(task_builder, Some(105)));
                             let mut task_builder = tasks::QuerySelectorTaskBuilder::default();
-                            task_builder.node_id(this_node_id).selector("#qrcode img"); // got nothing.
-                            tab.query_selector(task_builder, Some(106));
+                            task_builder
+                                .node_id(content_document_id)
+                                .selector("#qrcode img"); // got nothing.
+                            tab.map(|t| t.query_selector(task_builder, Some(106)));
                         } else {
                             assert_eq!(Some(0), node_id);
                             info!("got node_id in frame: {:?}", node_id);
@@ -96,9 +98,12 @@ impl Future for QuerySelector {
                     }
                     PageResponse::DescribeNode(_selector, node_id) => {
                         if task_id == Some(105) {
-                            let tab = tab.unwrap();
-                            let node = tab.find_node_by_id(node_id);
-                            info!("got node by backend_node_id: {:?}", node);
+                            if let Some(t) = tab {
+                                info!(
+                                    "got node by backend_node_id: {:?}",
+                                    t.find_node_by_id(node_id)
+                                );
+                            }
                         }
                     }
                     PageResponse::SecondsElapsed(seconds) => {

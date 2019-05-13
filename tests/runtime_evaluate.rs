@@ -51,20 +51,28 @@ impl Future for RuntimeEvaluate {
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
-                        let tab = tab.unwrap();
-                        tab.navigate_to(self.url, None);
+                        let url = self.url;
+                        tab.map(|t| t.navigate_to(url, None));
                     }
                     PageResponse::FrameNavigated(frame_id) => {
-                        let tab = tab.unwrap();
-                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
-                        info!("got frame: {:?}", frame_id);
-                        if frame.name == Some("ddlogin-iframe".into()) {
-                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                        let frame =
+                            tab.and_then(|t| t.find_frame_by_id(&frame_id))
+                                .and_then(|frame| {
+                                    if frame.name == Some("ddlogin-iframe".into()) {
+                                        Some(frame)
+                                    } else {
+                                        None
+                                    }
+                                });
+
+                        if frame.is_some() {
+                            self.debug_session.main_tab_mut().map(|tab|{
                                 tab.runtime_evaluate_expression("3+3".into(), Some(100));
                                 tab.runtime_evaluate_expression("3::0".into(), Some(101));
                                 tab.runtime_enable(Some(102));
                                 tab.runtime_evaluate_expression(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#.into(), Some(103));
-                            }
+                                ()
+                            });
                         }
                     }
                     PageResponse::RuntimeCallFunctionOn(result) => {
@@ -131,9 +139,9 @@ impl Future for RuntimeEvaluate {
                         }
                         _ => unreachable!(),
                     },
-                    PageResponse::RuntimeGetProperties(get_properties_return_object) => {
-                        let get_properties_return_object = get_properties_return_object
-                            .expect("should return get_properties_return_object");
+                    PageResponse::RuntimeGetProperties(return_object) => {
+                        let get_properties_return_object =
+                            return_object.expect("should return get_properties_return_object");
                         info!(
                             "property count: {:?}",
                             get_properties_return_object.result.len()
@@ -149,18 +157,21 @@ impl Future for RuntimeEvaluate {
                         self.runtime_execution_context_created_count += 1;
                     }
                     PageResponse::FrameStoppedLoading(frame_id) => {
-                        let tab = tab.unwrap();
-                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        let frame = tab
+                            .as_ref()
+                            .and_then(|t| t.find_frame_by_id(&frame_id))
+                            .filter(|f| f.name == Some("ddlogin-iframe".into()));
 
-                        if frame.name == Some("ddlogin-iframe".into()) {
-                            let context =
-                                tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
+                        if frame.is_some() {
+                            let context = tab.as_ref().and_then(|t| {
+                                t.find_execution_context_id_by_frame_name("ddlogin-iframe")
+                            });
                             if context.is_some() {
                                 info!("execution_context_description: {:?}", context);
                                 self.ddlogin_frame_stopped_loading = true;
                                 let mut tb = tasks::RuntimeEvaluateTaskBuilder::default();
                                 tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.unwrap().id);
-                                tab.runtime_evaluate(tb, Some(110));
+                                tab.map(|t| t.runtime_evaluate(tb, Some(110)));
                             }
                         }
                     }

@@ -4,15 +4,12 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
-use headless_chrome::protocol::dom;
-
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::{PageResponse, write_base64_str_to};
-use headless_chrome::browser_async::task_describe::{self as tasks};
-use std::fs;
-use std::path::Path;
+use headless_chrome::browser_async::page_message::{write_base64_str_to, PageResponse};
 use log::*;
 use std::default::Default;
+use std::fs;
+use std::path::Path;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
@@ -25,7 +22,6 @@ struct PrintToPdf {
 
 impl PrintToPdf {
     fn assert_result(&self) {
-        let tab = self.debug_session.main_tab().unwrap();
         assert!(self.base64_data.is_some());
     }
 }
@@ -36,7 +32,7 @@ impl Future for PrintToPdf {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
                 match value {
                     PageResponse::ChromeConnected => {
@@ -45,12 +41,11 @@ impl Future for PrintToPdf {
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
-                        let tab = tab.unwrap();
-                        tab.navigate_to(self.url, None);
+                        let url = self.url;
+                        tab.map(|t| t.navigate_to(url, None));
                     }
                     PageResponse::LoadEventFired(_monotonic_time) => {
-                        let tab = tab.unwrap();
-                        tab.print_to_pdf(Some(101), None);
+                        tab.map(|t| t.print_to_pdf(Some(101), None));
                     }
                     PageResponse::PrintToPDF(base64_data) => {
                         let file_name = "target/print_to_pdf.pdf";
@@ -58,9 +53,13 @@ impl Future for PrintToPdf {
                         if path.exists() && path.is_file() {
                             fs::remove_file(file_name).unwrap();
                         }
-                        write_base64_str_to(file_name, base64_data.as_ref()).unwrap();
+                        write_base64_str_to(file_name, base64_data.as_ref())
+                            .map(|_| {
+                                self.base64_data = base64_data;
+                            })
+                            .expect("write_base64_str_to failed.");
+
                         assert!(path.exists());
-                        self.base64_data = base64_data;
                         break Ok(().into());
                     }
                     PageResponse::SecondsElapsed(seconds) => {

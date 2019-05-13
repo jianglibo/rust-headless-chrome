@@ -57,7 +57,7 @@ pub enum TaskDescribe {
     FrameStoppedLoading(String, CommonDescribeFields),
     LoadEventFired(target::TargetId, f32),
     TargetInfoChanged(target::TargetInfo, CommonDescribeFields),
-    PageCreated(target::TargetInfo, Option<&'static str>),
+    PageCreated(target::TargetInfo, Option<String>),
     PageAttached(target::TargetInfo, SessionId),
     CaptureScreenshot(Box<CaptureScreenshotTask>),
     TargetSetDiscoverTargets(bool, CommonDescribeFields),

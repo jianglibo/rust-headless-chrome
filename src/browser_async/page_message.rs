@@ -23,7 +23,7 @@ pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<ids:
 pub enum PageResponse {
     ChromeConnected,
     SecondsElapsed(usize),
-    PageCreated(Option<&'static str>),
+    PageCreated(Option<String>),
     QuerySelector(String, Option<dom::NodeId>),
     PageAttached(target::TargetInfo, SessionId),
     PageEnable,

@@ -42,7 +42,7 @@ pub struct DebugSession {
     pub chrome_debug_session: Arc<Mutex<ChromeDebugSession>>,
     seconds_from_start: usize,
     flag: bool,
-    tabs: HashMap<&'static str, Tab>,
+    tabs: HashMap<String, Tab>,
     wrapper: Wrapper,
 }
 
@@ -176,7 +176,7 @@ impl DebugSession {
                 Ok(Some(pr).into())
             }
             TaskDescribe::PageCreated(target_info, page_name) => {
-                trace!(
+                info!(
                     "receive page created event: {:?}, {:?}",
                     target_info,
                     page_name
@@ -184,8 +184,17 @@ impl DebugSession {
                 let target_id = target_info.target_id.clone();
                 let mut tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                 tab.attach_to_page();
-                self.tabs.insert(page_name.unwrap_or(DEFAULT_TAB_NAME), tab);
-                let pr = (Some(target_id), None, PageResponse::PageCreated(page_name));
+                
+                let page_name = page_name.unwrap_or_else(||{
+                    let l = self.tabs.len();
+                    if l == 0 {
+                        DEFAULT_TAB_NAME.to_string()
+                    } else {
+                        format!("tab-{:?}", l)
+                    }
+                });
+                self.tabs.insert(page_name.clone(), tab);
+                let pr = (Some(target_id), None, PageResponse::PageCreated(Some(page_name)));
                 Ok(Some(pr).into())
             }
             TaskDescribe::PageAttached(target_info, session_id) => {
@@ -194,24 +203,32 @@ impl DebugSession {
                     target_info,
                     session_id.clone()
                 );
-                let tab = self.get_tab_by_id_mut(Some(&target_info.target_id))?;
-                tab.session_id.replace(session_id.clone());
-                tab.page_enable();
-                let pr = (
-                    Some(target_info.target_id.clone()),
-                    None,
-                    PageResponse::PageAttached(target_info, session_id),
-                );
-                Ok(Some(pr).into())
+                match self.get_tab_by_id_mut(Some(&target_info.target_id)) {
+                    Ok(tab) => {
+                        tab.session_id.replace(session_id.clone());
+                        tab.page_enable();
+                        let pr = (
+                            Some(target_info.target_id.clone()),
+                            None,
+                            PageResponse::PageAttached(target_info, session_id),
+                        );
+                        Ok(Some(pr).into())
+                    }
+                    Err(error) => {
+                        error!("page attached event catched, but cannot find coresponding tab. {:?}", error);
+                        self.send_fail(None, None)
+                    }
+                }
             }
             TaskDescribe::PageEnable(page_enable) => {
+                info!("page_enabled: {:?}", page_enable);
                 let resp =
                     self.convert_to_page_response(Some(&page_enable.common_fields), PageResponse::PageEnable);
                 Ok(resp.into())
             }
             // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             TaskDescribe::FrameNavigated(frame, common_fields) => {
-                // error!("-----------------frame_navigated-----------------{:?}", frame.id);
+                info!("-----------------frame_navigated-----------------{:?}", frame.id);
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 let frame_id = frame.id.clone();
                 tab._frame_navigated(*frame);
@@ -223,7 +240,7 @@ impl DebugSession {
             }
             TaskDescribe::FrameStartedLoading(frame_id, common_fields) => {
                 // started loading is first, then attached.
-                // error!("-----------------frame_started-----------------{:?}", frame_id);
+                info!("-----------------frame_started_loading-----------------{:?}", frame_id);
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 tab._frame_started_loading(frame_id.clone());
                 let resp = self.convert_to_page_response(
@@ -233,7 +250,7 @@ impl DebugSession {
                 Ok(resp.into())
             }
             TaskDescribe::FrameStoppedLoading(frame_id, common_fields) => {
-                // error!("-----------------frame_stopped-----------------{:?}", frame_id);
+                info!("-----------------frame_stopped_loading-----------------{:?}", frame_id);
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 tab._frame_stopped_loading(frame_id.clone());
                 let pr = (
@@ -244,7 +261,7 @@ impl DebugSession {
                 Ok(Some(pr).into())
             }
             TaskDescribe::FrameAttached(frame_attached_params, common_fields) => {
-                // error!("-----------------frame_attached-----------------{:?}", frame_attached_params.frame_id);
+                info!("-----------------frame_attached-----------------{:?}", frame_attached_params.frame_id);
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 let frame_id = frame_attached_params.frame_id.clone();
                 tab._frame_attached(frame_attached_params);
@@ -258,7 +275,7 @@ impl DebugSession {
                 let common_fields = &get_document.common_fields;
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
 
-                tab.root_node = get_document.root_node;
+                tab.root_node = get_document.task_result;
                 let resp =
                     self.convert_to_page_response(Some(common_fields), PageResponse::GetDocument);
                 Ok(resp.into())
@@ -276,7 +293,7 @@ impl DebugSession {
             TaskDescribe::QuerySelector(query_selector) => {
                 let pr = PageResponse::QuerySelector(
                     query_selector.selector,
-                    query_selector.found_node_id,
+                    query_selector.task_result,
                 );
                 let resp = self.convert_to_page_response(Some(&query_selector.common_fields), pr);
                 Ok(resp.into())
@@ -284,12 +301,12 @@ impl DebugSession {
             TaskDescribe::DescribeNode(describe_node) => {
                 let common_fields = &describe_node.common_fields;
                 let node_id = describe_node
-                    .found_node
+                    .task_result
                     .as_ref()
                     .and_then(|n| Some(n.node_id));
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
 
-                tab.node_returned(describe_node.found_node);
+                tab.node_returned(describe_node.task_result);
                 let resp = self.convert_to_page_response(
                     Some(&common_fields),
                     PageResponse::DescribeNode(describe_node.selector, node_id),
@@ -302,7 +319,7 @@ impl DebugSession {
                     Some(&common_fields),
                     PageResponse::GetBoxModel(
                         get_box_model.selector,
-                        get_box_model.found_box.map(Box::new),
+                        get_box_model.task_result.map(Box::new),
                     ),
                 );
                 Ok(resp.into())
@@ -319,7 +336,7 @@ impl DebugSession {
                 let common_fields = &screen_shot.common_fields;
                 let ro = response_object::CaptureScreenshot {
                     selector: screen_shot.selector,
-                    base64: screen_shot.base64,
+                    base64: screen_shot.task_result,
                 };
                 let resp = self
                     .convert_to_page_response(Some(&common_fields), PageResponse::CaptureScreenshot(ro));
@@ -330,7 +347,7 @@ impl DebugSession {
                 let resp = self.convert_to_page_response(
                     Some(&common_fields),
                     PageResponse::RuntimeEvaluate(
-                        runtime_evaluate.result.map(Box::new),
+                        runtime_evaluate.task_result.map(Box::new),
                         runtime_evaluate.exception_details.map(Box::new),
                     ),
                 );
@@ -376,14 +393,11 @@ impl DebugSession {
                 self.send_fail(None, None)
             }
             TaskDescribe::TargetInfoChanged(target_info, common_fields) => {
-                if let Ok(tab) = self.get_tab_by_id_mut(common_fields.target_id.as_ref()) {
-                    if tab.target_info.target_id == target_info.target_id {
-                        trace!("got main target.");
-                    } else {
-                        warn!("got target_info, with different id {:?}", target_info);
-                    }
+                if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
+                    tab.target_info = target_info;
+                    trace!("target info changed: {:?}, {:?}", tab.target_info, common_fields);
                 } else {
-                    warn!("target changed, no correspond tab. {:?}", target_info);
+                    warn!("target changed, no correspond tab. {:?}, {:?}", target_info, common_fields);
                 }
                 self.send_fail(None, None)
             }
@@ -394,21 +408,21 @@ impl DebugSession {
             TaskDescribe::RuntimeGetProperties(get_properties) => {
                 let resp = self.convert_to_page_response(
                     Some(&get_properties.common_fields),
-                    PageResponse::RuntimeGetProperties(get_properties.result),
+                    PageResponse::RuntimeGetProperties(get_properties.task_result),
                 );
                 Ok(resp.into())
             }
             TaskDescribe::RuntimeCallFunctionOn(task) => {
                 let resp = self.convert_to_page_response(
                     Some(&task.common_fields),
-                    PageResponse::RuntimeCallFunctionOn(task.result),
+                    PageResponse::RuntimeCallFunctionOn(task.task_result),
                 );
                 Ok(resp.into())
             }
             TaskDescribe::PrintToPDF(task) => {
                 let resp = self.convert_to_page_response(
                     Some(&task.common_fields),
-                    PageResponse::PrintToPDF(task.result),
+                    PageResponse::PrintToPDF(task.task_result),
                 );
                 Ok(resp.into())
             }

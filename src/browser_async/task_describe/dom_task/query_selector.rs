@@ -8,9 +8,9 @@ pub struct QuerySelectorTask {
     pub common_fields: CommonDescribeFields,
     #[builder(default = "None")]
     pub node_id: Option<dom::NodeId>,
-    #[builder(default = "None")]
-    pub found_node_id: Option<dom::NodeId>,
     pub selector: String,
+    #[builder(default = "None")]
+    pub task_result: Option<dom::NodeId>,
 }
 
 impl From<QuerySelectorTask> for TaskDescribe {

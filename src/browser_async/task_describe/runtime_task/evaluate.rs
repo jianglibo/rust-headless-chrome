@@ -28,7 +28,7 @@ pub struct RuntimeEvaluateTask {
     #[builder(default = "None")]
     pub time_out: Option<runtime::types::TimeDelta>,
     #[builder(default = "None")]
-    pub result: Option<runtime::types::RemoteObject>,
+    pub task_result: Option<runtime::types::RemoteObject>,
     #[builder(default = "None")]
     pub exception_details: Option<runtime::types::ExceptionDetails>,
 }

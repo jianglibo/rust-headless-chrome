@@ -1,13 +1,13 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::id_type as ids;
-use super::inner_event::{inner_events};
+use super::inner_event::inner_events;
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, TaskDescribe, create_msg_to_send, next_call_id};
-use crate::protocol::{self, dom, page, runtime, target};
+use super::task_describe::{self as tasks, create_msg_to_send, next_call_id, TaskDescribe};
 use crate::browser::transport::{MethodDestination, SessionId};
-use log::*;
+use crate::protocol::{self, dom, page, runtime, target};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use log::*;
 
 #[derive(Debug)]
 pub struct Tab {
@@ -114,25 +114,43 @@ impl Tab {
         }
     }
 
-    pub fn find_execution_context_id_by_frame_name(&self, frame_name: &'static str) -> Option<&runtime::types::ExecutionContextDescription> {
+    pub fn find_execution_context_id_by_frame_name(
+        &self,
+        frame_name: &'static str,
+    ) -> Option<&runtime::types::ExecutionContextDescription> {
         let frame = self.changing_frames.values().find_map(|cf| match cf {
-            ChangingFrame::Navigated(fr) | ChangingFrame::StoppedLoading(fr) if fr.name == Some(frame_name.into()) => {
+            ChangingFrame::Navigated(fr) | ChangingFrame::StoppedLoading(fr)
+                if fr.name == Some(frame_name.into()) =>
+            {
                 Some(fr)
             }
-            _ => None
+            _ => None,
         });
         frame.and_then(|fr| self.execution_context_descriptions.get(&fr.id))
     }
 
-    pub fn verify_execution_context_id(&self, console_api_called: &inner_events::ConsoleAPICalledParams) {
-        let ex = self.execution_context_descriptions.values().find(|v|v.id == console_api_called.execution_context_id);
+    pub fn verify_execution_context_id(
+        &self,
+        console_api_called: &inner_events::ConsoleAPICalledParams,
+    ) {
+        let ex = self
+            .execution_context_descriptions
+            .values()
+            .find(|v| v.id == console_api_called.execution_context_id);
         if ex.is_none() {
-            error!("no execution_context_description found on tab. {:?}", console_api_called);
+            error!(
+                "no execution_context_description found on tab. {:?}",
+                console_api_called
+            );
         }
     }
 
-    pub fn runtime_execution_context_destroyed(&mut self, execution_context_id: runtime::types::ExecutionContextId) {
-        self.execution_context_descriptions.retain(|_, v| v.id != execution_context_id);
+    pub fn runtime_execution_context_destroyed(
+        &mut self,
+        execution_context_id: runtime::types::ExecutionContextId,
+    ) {
+        self.execution_context_descriptions
+            .retain(|_, v| v.id != execution_context_id);
     }
 
     pub fn runtime_execution_context_created(
@@ -166,11 +184,12 @@ impl Tab {
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame.id) {
             *changing_frame = ChangingFrame::Navigated(frame);
         } else {
-            error!(
-                "Cannot found frame with id when got _frame_navigated: {:?}",
-                frame
+            info!(
+                "Cannot found frame with id when got _frame_navigated, sometime chrome didn't emit other two events.: {:?}",
+                frame,
             );
-            error!("Current changing_frames: {:?}", self.changing_frames);
+            self.changing_frames
+                .insert(frame.id.clone(), ChangingFrame::Navigated(frame));
         }
     }
 
@@ -178,8 +197,8 @@ impl Tab {
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame_id) {
             *changing_frame = ChangingFrame::StartedLoading(frame_id);
         } else {
-            info!(
-                "Cannot found frame with id when got _frame_attached: {:?}",
+            trace!(
+                "Cannot found frame with id when got _frame_started_loading, no it shouldn't.: {:?}",
                 &frame_id
             );
             self.changing_frames
@@ -256,8 +275,15 @@ impl Tab {
         mut describe_node_task_builder: tasks::DescribeNodeTaskBuilder,
         manual_task_id: Option<ids::Task>,
     ) {
-        match describe_node_task_builder.common_fields(self.get_c_f(manual_task_id)).build() {
-            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+        match describe_node_task_builder
+            .common_fields(self.get_c_f(manual_task_id))
+            .build()
+        {
+            Ok(task) => self
+                .chrome_session
+                .lock()
+                .unwrap()
+                .execute_task(vec![task.into()]),
             Err(err) => error!("build describe_node task error: {:?}", err),
         }
     }
@@ -267,8 +293,15 @@ impl Tab {
         mut query_selector_task_builder: tasks::QuerySelectorTaskBuilder,
         manual_task_id: Option<ids::Task>,
     ) {
-        match query_selector_task_builder.common_fields(self.get_c_f(manual_task_id)).build() {
-            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+        match query_selector_task_builder
+            .common_fields(self.get_c_f(manual_task_id))
+            .build()
+        {
+            Ok(task) => self
+                .chrome_session
+                .lock()
+                .unwrap()
+                .execute_task(vec![task.into()]),
             Err(err) => error!("build query_selector task error: {:?}", err),
         }
     }
@@ -343,13 +376,20 @@ impl Tab {
             .unwrap()
     }
 
-    pub fn print_to_pdf(&mut self, manual_task_id: Option<ids::Task>, task_builder: Option<tasks::PrintToPdfTaskBuilder>) {
+    pub fn print_to_pdf(
+        &mut self,
+        manual_task_id: Option<ids::Task>,
+        task_builder: Option<tasks::PrintToPdfTaskBuilder>,
+    ) {
         let mut task_builder = if let Some(tb) = task_builder {
-            tb   
+            tb
         } else {
             tasks::PrintToPdfTaskBuilder::default()
         };
-        let task = task_builder.common_fields(self.get_c_f(manual_task_id)).build().unwrap();
+        let task = task_builder
+            .common_fields(self.get_c_f(manual_task_id))
+            .build()
+            .unwrap();
         self.chrome_session
             .lock()
             .unwrap()
@@ -357,11 +397,10 @@ impl Tab {
     }
 
     pub fn page_enable(&mut self) {
-        let pn = TaskDescribe::PageEnable(tasks::PageEnableTask{common_fields: self.get_c_f(None)});
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![pn]);
+        let pn = TaskDescribe::PageEnable(tasks::PageEnableTask {
+            common_fields: self.get_c_f(None),
+        });
+        self.chrome_session.lock().unwrap().execute_task(vec![pn]);
     }
 
     pub fn runtime_enable(&mut self, manual_task_id: Option<ids::Task>) {
@@ -373,9 +412,13 @@ impl Tab {
             )]);
     }
 
-    pub fn runtime_evaluate_expression(&mut self, expression: String, manual_task_id: Option<ids::Task>) {
+    pub fn runtime_evaluate_expression(
+        &mut self,
+        expression: &str,
+        manual_task_id: Option<ids::Task>,
+    ) {
         let task = tasks::RuntimeEvaluateTaskBuilder::default()
-            .expression(expression)
+            .expression(expression.to_string())
             .common_fields(self.get_c_f(manual_task_id))
             .build()
             .unwrap();
@@ -390,9 +433,15 @@ impl Tab {
         mut evaluate_task_builder: tasks::RuntimeEvaluateTaskBuilder,
         manual_task_id: Option<ids::Task>,
     ) {
-        let task = evaluate_task_builder.common_fields(self.get_c_f(manual_task_id)).build();
+        let task = evaluate_task_builder
+            .common_fields(self.get_c_f(manual_task_id))
+            .build();
         match task {
-            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+            Ok(task) => self
+                .chrome_session
+                .lock()
+                .unwrap()
+                .execute_task(vec![task.into()]),
             Err(err) => error!("build evaluate task error: {:?}", err),
         }
     }
@@ -402,14 +451,24 @@ impl Tab {
         mut call_function_on_task_builder: tasks::RuntimeCallFunctionOnTaskBuilder,
         manual_task_id: Option<ids::Task>,
     ) {
-        let task = call_function_on_task_builder.common_fields(self.get_c_f(manual_task_id)).build();
+        let task = call_function_on_task_builder
+            .common_fields(self.get_c_f(manual_task_id))
+            .build();
         match task {
-            Ok(task) => self.chrome_session.lock().unwrap().execute_task(vec![task.into()]),
+            Ok(task) => self
+                .chrome_session
+                .lock()
+                .unwrap()
+                .execute_task(vec![task.into()]),
             Err(err) => error!("build call_function_on task error: {:?}", err),
         }
     }
 
-    pub fn runtime_get_properties(&mut self, object_id: runtime::types::RemoteObjectId, manual_task_id: Option<ids::Task>) {
+    pub fn runtime_get_properties_by_object_id(
+        &mut self,
+        object_id: runtime::types::RemoteObjectId,
+        manual_task_id: Option<ids::Task>,
+    ) {
         let task = tasks::RuntimeGetPropertiesTaskBuilder::default()
             .object_id(object_id)
             .common_fields(self.get_c_f(manual_task_id))
@@ -419,6 +478,24 @@ impl Tab {
             .lock()
             .unwrap()
             .execute_task(vec![task.into()]);
+    }
+
+    pub fn runtime_get_properties(
+        &mut self,
+        mut get_properties_task_builder: tasks::RuntimeGetPropertiesTaskBuilder,
+        manual_task_id: Option<ids::Task>,
+    ) {
+        let task = get_properties_task_builder
+            .common_fields(self.get_c_f(manual_task_id))
+            .build();
+        match task {
+            Ok(task) => self
+                .chrome_session
+                .lock()
+                .unwrap()
+                .execute_task(vec![task.into()]),
+            Err(err) => error!("build get_properties_task_builder error: {:?}", err),
+        }
     }
 
     pub fn attach_to_page(&mut self) {

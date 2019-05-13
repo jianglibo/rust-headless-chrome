@@ -11,7 +11,7 @@ pub struct GetDocumentTask {
     #[builder(default = "false")]
     pub pierce: bool,
     #[builder(setter(skip))]
-    pub root_node: Option<dom::Node>,
+    pub task_result: Option<dom::Node>,
 }
 
 impl From<GetDocumentTask> for TaskDescribe {

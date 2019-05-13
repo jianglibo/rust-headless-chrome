@@ -16,9 +16,6 @@ pub struct DescribeNodeTask {
     #[builder(default = "None")]
     pub backend_node_id: Option<dom::NodeId>,
     #[builder(default = "None")]
-    #[serde(skip)]
-    pub found_node: Option<dom::Node>,
-    #[builder(default = "None")]
     pub selector: Option<String>,
     #[builder(default = "Some(0)")]
     pub depth: Option<i8>,
@@ -26,6 +23,9 @@ pub struct DescribeNodeTask {
     pub object_id: Option<runtime::types::RemoteObjectId>,
     #[builder(default = "false")]
     pub pierce: bool,
+    #[builder(default = "None")]
+    #[serde(skip)]
+    pub task_result: Option<dom::Node>,
 }
 
 impl From<DescribeNodeTask> for TaskDescribe {

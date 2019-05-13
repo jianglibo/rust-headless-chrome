@@ -37,7 +37,7 @@ pub struct PrintToPdfTask {
     #[builder(default = "None")]
     pub prefer_css_page_size: Option<bool>,
     #[builder(default = "None")]
-    pub result: Option<String>,
+    pub task_result: Option<String>,
 }
 
 impl From<PrintToPdfTask> for TaskDescribe {

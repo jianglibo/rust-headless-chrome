@@ -16,7 +16,6 @@ use websocket::futures::{Poll, Stream};
 #[derive(Debug)]
 pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
-    target_info: Option<protocol::target::TargetInfo>,
     session_id: Option<String>,
     unique_number: AtomicUsize,
     tasks_waiting_for_response: Vec<Vec<TaskDescribe>>,
@@ -26,7 +25,6 @@ impl ChromeDebugSession {
     pub fn new(chrome_browser: ChromeBrowser) -> Self {
         Self {
             chrome_browser,
-            target_info: None,
             session_id: None,
             unique_number: AtomicUsize::new(10000),
             tasks_waiting_for_response: Vec::new(),
@@ -213,7 +211,7 @@ impl ChromeDebugSession {
                 TaskDescribe::QuerySelector(query_selector),
             ) => {
                 query_selector.node_id = get_document
-                    .root_node
+                    .task_result
                     .as_ref()
                     .and_then(|nd| Some(nd.node_id));
                 return self.execute_next_and_return_remains(tasks);
@@ -222,18 +220,18 @@ impl ChromeDebugSession {
                 TaskDescribe::QuerySelector(query_selector),
                 TaskDescribe::DescribeNode(describe_node),
             ) => {
-                describe_node.node_id = query_selector.found_node_id;
+                describe_node.node_id = query_selector.task_result;
                 return self.execute_next_and_return_remains(tasks);
             }
             (
                 TaskDescribe::QuerySelector(query_selector),
                 TaskDescribe::GetBoxModel(get_box_model),
             ) => {
-                get_box_model.node_id = query_selector.found_node_id;
+                get_box_model.node_id = query_selector.task_result;
                 return self.execute_next_and_return_remains(tasks);
             }
             (TaskDescribe::GetBoxModel(get_box_model), TaskDescribe::CaptureScreenshot(screen_shot)) => {
-                if let Some(mb) = &get_box_model.found_box {
+                if let Some(mb) = &get_box_model.task_result {
                     let viewport = mb.content_viewport();
                     screen_shot.clip = Some(viewport);
                     return self.execute_next_and_return_remains(tasks);
@@ -257,18 +255,18 @@ impl ChromeDebugSession {
             TaskDescribe::GetDocument(get_document) => {
                 let get_document_return_object =
                     protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
-                get_document.root_node = Some(get_document_return_object.root);
+                get_document.task_result = Some(get_document_return_object.root);
             }
             TaskDescribe::PageEnable(_common_fields) => {}
             TaskDescribe::QuerySelector(query_selector) => {
                 let query_select_return_object =
                     protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
-                query_selector.found_node_id = Some(query_select_return_object.node_id);
+                query_selector.task_result= Some(query_select_return_object.node_id);
             }
             TaskDescribe::DescribeNode(describe_node) => {
                 let describe_node_return_object =
                     protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
-                describe_node.found_node = Some(describe_node_return_object.node);
+                describe_node.task_result= Some(describe_node_return_object.node);
             }
             TaskDescribe::GetBoxModel(get_box_model) => {
                 let get_box_model_return_object =
@@ -282,37 +280,37 @@ impl ChromeDebugSession {
                     width: raw_model.width,
                     height: raw_model.height,
                 };
-                get_box_model.found_box = Some(model_box);
+                get_box_model.task_result = Some(model_box);
             }
             TaskDescribe::CaptureScreenshot(screen_shot) => {
                 let capture_screenshot_return_object =
                     protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
-                screen_shot.base64 = Some(capture_screenshot_return_object.data);
+                screen_shot.task_result= Some(capture_screenshot_return_object.data);
             }
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
                 let evaluate_return_object =
                     protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
-                runtime_evaluate.result = Some(evaluate_return_object.result);
+                runtime_evaluate.task_result = Some(evaluate_return_object.result);
                 runtime_evaluate.exception_details = evaluate_return_object.exception_details;
             }
             TaskDescribe::NavigateTo(navigate_to) => {
                 let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
-                navigate_to.result = Some(navigate_to_return_object);
+                navigate_to.task_result = Some(navigate_to_return_object);
             }
             TaskDescribe::RuntimeEnable(common_fields) => {
                 trace!("runtime enabled: {:?}", common_fields);
             }
             TaskDescribe::RuntimeGetProperties(get_properties) => {
                 let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
-                get_properties.result = Some(get_properties_return_object);
+                get_properties.task_result = Some(get_properties_return_object);
             }
             TaskDescribe::RuntimeCallFunctionOn(task) => {
                 let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
-                task.result = Some(task_return_object);
+                task.task_result = Some(task_return_object);
             }
             TaskDescribe::PrintToPDF(task) => {
                 let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
-                task.result = Some(task_return_object.data);
+                task.task_result = Some(task_return_object.data);
             }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);
@@ -366,7 +364,7 @@ impl ChromeDebugSession {
 
                 match target_info.target_type {
                     protocol::target::TargetType::Page => {
-                        info!(
+                        trace!(
                             "got attach to page event and sessionId: {}",
                             attach_to_target_params.session_id
                         );

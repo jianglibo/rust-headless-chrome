@@ -14,7 +14,7 @@ pub struct RuntimeGetPropertiesTask {
     #[builder(default = "None")]
     pub generate_preview: Option<bool>,
     #[builder(default = "None")]
-    pub result: Option<runtime::methods::GetPropertiesReturnObject>,
+    pub task_result: Option<runtime::methods::GetPropertiesReturnObject>,
 }
 
 impl From<RuntimeGetPropertiesTask> for TaskDescribe {

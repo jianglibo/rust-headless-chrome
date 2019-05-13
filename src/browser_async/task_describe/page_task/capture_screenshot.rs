@@ -13,7 +13,7 @@ pub struct CaptureScreenshotTask {
     #[builder(default = "false")]
     pub from_surface: bool,
     #[builder(default = "None")]
-    pub base64: Option<String>,
+    pub task_result: Option<String>,
 }
 
 impl From<CaptureScreenshotTask> for TaskDescribe {

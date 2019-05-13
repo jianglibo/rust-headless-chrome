@@ -24,7 +24,7 @@ pub struct RuntimeCallFunctionOnTask {
     #[builder(default = "None")]
     pub object_group: Option<String>,
     #[builder(default = "None")]
-    pub result: Option<runtime::methods::CallFunctionOnReturnObject>,
+    pub task_result: Option<runtime::methods::CallFunctionOnReturnObject>,
 }
 
 impl From<RuntimeCallFunctionOnTask> for TaskDescribe {

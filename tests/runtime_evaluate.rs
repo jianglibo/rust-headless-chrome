@@ -130,7 +130,7 @@ impl Future for RuntimeEvaluate {
                             let result = result.unwrap();
                             let tab = tab.unwrap();
                             let object_id = result.object_id.expect("object_id should exists.");
-                            tab.runtime_get_properties(object_id.clone(), Some(111));
+                            tab.runtime_get_properties_by_object_id(object_id.clone(), Some(111));
 
                             let mut task = tasks::RuntimeCallFunctionOnTaskBuilder::default();
                             let fnd = "function() {return this.getAttribute('src');}";

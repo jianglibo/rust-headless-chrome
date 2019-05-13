@@ -17,7 +17,7 @@ pub struct GetBoxModelTask {
     #[builder(default = "None")]
     pub object_id: Option<runtime::types::RemoteObjectId>,
     #[builder(setter(skip))]
-    pub found_box: Option<BoxModel>,
+    pub task_result: Option<BoxModel>,
 }
 
 impl From<GetBoxModelTask> for TaskDescribe {

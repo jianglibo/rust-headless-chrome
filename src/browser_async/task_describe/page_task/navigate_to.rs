@@ -14,7 +14,7 @@ pub struct NavigateToTask {
     #[builder(default = "None")]
     pub frame_id: Option<page::types::FrameId>,
     #[builder(default = "None")]
-    pub result: Option<page::methods::NavigateReturnObject>,
+    pub task_result: Option<page::methods::NavigateReturnObject>,
 }
 
 impl From<NavigateToTask> for TaskDescribe {

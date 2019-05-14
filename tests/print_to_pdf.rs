@@ -60,11 +60,11 @@ impl Future for PrintToPdf {
                             .expect("write_base64_str_to failed.");
 
                         assert!(path.exists());
-                        break Ok(().into());
+                        // break Ok(().into());
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 19 {
+                        if seconds > 190 {
                             self.assert_result();
                             break Ok(().into());
                         }

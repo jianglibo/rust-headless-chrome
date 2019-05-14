@@ -101,6 +101,8 @@ pub enum Event {
     FrameStartedLoading(page::events::FrameStartedLoadingEvent),
     #[serde(rename = "Page.frameNavigated")]
     FrameNavigated(page::events::FrameNavigatedEvent),
+    #[serde(rename = "Page.frameDetached")]
+    FrameDetached(page::events::FrameDetachedEvent),
     #[serde(rename = "Page.frameAttached")]
     FrameAttached(page::events::FrameAttachedEvent),
     #[serde(rename = "Page.frameStoppedLoading")]

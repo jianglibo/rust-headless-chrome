@@ -179,7 +179,7 @@ impl Future for RuntimeEvaluate {
                         trace!("seconds elapsed: {} ", seconds);
                         if seconds > 35 {
                             self.assert_result();
-                            break Ok(().into());
+                            // break Ok(().into());
                         }
                     }
                     _ => {

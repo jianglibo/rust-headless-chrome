@@ -377,22 +377,29 @@ impl ChromeDebugSession {
                     _ => (),
                 }
             }
-            protocol::Event::FrameAttached(frame_attached_event) => {
+            protocol::Event::FrameAttached(evt) => {
                 return Some(TaskDescribe::FrameAttached(
-                    frame_attached_event.params,
+                    evt.params,
                     (session_id, target_id).into(),
                 ));
             }
-            protocol::Event::FrameStoppedLoading(frame_stopped_loading_event) => {
-                let frame_id = frame_stopped_loading_event.params.frame_id;
+            protocol::Event::FrameStoppedLoading(evt) => {
+                let frame_id = evt.params.frame_id;
                 return Some(TaskDescribe::FrameStoppedLoading(
                     frame_id,
                     (session_id, target_id).into(),
                 ));
             }
-            protocol::Event::FrameStartedLoading(frame_started_loading) => {
-                let frame_id = frame_started_loading.params.frame_id;
+            protocol::Event::FrameStartedLoading(evt) => {
+                let frame_id = evt.params.frame_id;
                 return Some(TaskDescribe::FrameStartedLoading(
+                    frame_id,
+                    (session_id, target_id).into(),
+                ));
+            }
+            protocol::Event::FrameDetached(evt) => {
+                let frame_id = evt.params.frame_id;
+                return Some(TaskDescribe::FrameDetached(
                     frame_id,
                     (session_id, target_id).into(),
                 ));

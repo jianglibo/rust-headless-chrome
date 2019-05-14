@@ -52,6 +52,10 @@ pub enum TaskDescribe {
         page::events::FrameAttachedParams,
         CommonDescribeFields,
     ),
+    FrameDetached(
+        page::types::FrameId,
+        CommonDescribeFields,
+    ),
     FrameStartedLoading(String, CommonDescribeFields),
     FrameNavigated(Box<page::Frame>, CommonDescribeFields),
     FrameStoppedLoading(String, CommonDescribeFields),

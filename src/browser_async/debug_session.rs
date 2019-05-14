@@ -228,7 +228,7 @@ impl DebugSession {
             }
             // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             TaskDescribe::FrameNavigated(frame, common_fields) => {
-                info!("-----------------frame_navigated-----------------{:?}", frame.id);
+                info!("-----------------frame_navigated-----------------{:?}", frame);
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 let frame_id = frame.id.clone();
                 tab._frame_navigated(*frame);
@@ -270,6 +270,12 @@ impl DebugSession {
                     PageResponse::FrameAttached(frame_id),
                 );
                 Ok(resp.into())
+            }
+            TaskDescribe::FrameDetached(frame_id, common_fields) => {
+                info!("-----------------frame_detached-----------------{:?}", frame_id.clone());
+                let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
+                tab._frame_detached(&frame_id);
+                self.send_fail(None, None)
             }
             TaskDescribe::GetDocument(get_document) => {
                 let common_fields = &get_document.common_fields;

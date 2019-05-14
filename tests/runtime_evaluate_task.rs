@@ -60,8 +60,8 @@ impl Future for RuntimeEvaluateTask {
                         if seconds == 8 {
                             if let Some(mt) = self.debug_session.main_tab_mut() {
                                 mt.runtime_evaluate_expression(
-                                    // r#"document.querySelectorAll("div.text-link-item-title .text-wrap .text")"#,
-                                    r#"document.querySelectorAll("div.text-link-item-title .text-wrap .text").item(0).click()"#,
+                                    r#"document.querySelectorAll("div.text-link-item-title .text-wrap .text")"#,
+                                    // r#"document.querySelectorAll("div.text-link-item-title .text-wrap .text").item(0).click()"#,
                                     Some(101),
                                 )
                             }
@@ -78,7 +78,7 @@ impl Future for RuntimeEvaluateTask {
                                 get_properties_return_object
                                     .result
                                     .iter()
-                                    .take(3)
+                                    .take(1)
                                     .map(|pd| pd.value.as_ref().and_then(|v| v.object_id.as_ref()))
                                     .for_each(|oid| {
                                         if let Some(oid) = oid {

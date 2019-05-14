@@ -229,6 +229,9 @@ impl Tab {
             ChangingFrame::Attached(frame_attached_params),
         );
     }
+    pub fn _frame_detached(&mut self, frame_id: &page::types::FrameId) {
+        self.changing_frames.remove(frame_id);
+    }
 
     pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<ids::Task>) {
         let task = tasks::GetDocumentTaskBuilder::default()

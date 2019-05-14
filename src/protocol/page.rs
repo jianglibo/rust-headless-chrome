@@ -140,6 +140,16 @@ pub mod events {
     }
 
     #[derive(Deserialize, Debug, Clone)]
+    pub struct FrameDetachedEvent {
+        pub params: FrameDetachedParams,
+    }
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FrameDetachedParams {
+        pub frame_id: String,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FrameAttachedEvent {
         pub params: FrameAttachedParams,
     }

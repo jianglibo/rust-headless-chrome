@@ -108,6 +108,7 @@ fn t_runtime_evaluate_task() {
     env_logger::init();
     let url = "https://www.xuexi.cn/";
     // div.text-link-item-title
+    // "span:not(.my-points-red).my-points-points"
     let my_page = RuntimeEvaluateTask {
         url,
         ..Default::default()

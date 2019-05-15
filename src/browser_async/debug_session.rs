@@ -198,6 +198,7 @@ impl DebugSession {
                 Ok(Some(pr).into())
             }
             TaskDescribe::PageAttached(target_info, session_id) => {
+                // when the chrome process started, it default creates a target and attach it. the url is: about:blank
                 trace!(
                     "receive page attached event: {:?}, {:?}",
                     target_info,

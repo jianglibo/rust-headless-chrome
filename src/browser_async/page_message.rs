@@ -1,7 +1,6 @@
 use crate::protocol::{dom, page, target, runtime, network};
 use crate::browser::tab::element::{BoxModel};
-use crate::browser::transport::{SessionId};
-use super::id_type as ids;
+use super::super::browser_async::{TaskId};
 use std::path::Path;
 use std::fs::OpenOptions;
 use log::*;
@@ -16,16 +15,16 @@ pub enum ChangingFrame {
 }
 
 
-pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<ids::Task>, PageResponse);
+pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<TaskId>, PageResponse);
 
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
 pub enum PageResponse {
     ChromeConnected,
     SecondsElapsed(usize),
-    PageCreated(Option<String>),
+    PageCreated(usize),
     QuerySelector(String, Option<dom::NodeId>),
-    PageAttached(target::TargetInfo, SessionId),
+    PageAttached(target::TargetInfo, target::SessionID),
     PageEnable,
     RuntimeEnable,
     FrameAttached(page::types::FrameId),

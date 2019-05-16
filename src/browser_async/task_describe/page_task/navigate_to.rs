@@ -1,6 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
-use crate::protocol::{page};
-use crate::browser::transport::{SessionId};
+use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -24,7 +23,7 @@ impl From<NavigateToTask> for TaskDescribe {
 }
 
 impl CreateMethodCallString for NavigateToTask {
-    fn create_method_call_string(&self, session_id: Option<&SessionId>, call_id: usize) -> String {
+    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
         let method = page::methods::Navigate {
             url: self.url,
             referrer: self.referrer.clone(),

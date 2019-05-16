@@ -1,16 +1,16 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
-use super::dev_tools_method_util::ChromePageError;
-use super::id_type as ids;
 use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{response_object, PageResponse, PageResponseWithTargetIdTaskId};
 use super::tab::Tab;
-use super::task_describe::{self as tasks, CommonDescribeFields, TaskDescribe};
+use super::task_describe::{self as tasks, TaskDescribe, CommonDescribeFields};
+
+use crate::browser_async::{ChromePageError, TaskId,};
+use std::convert::TryInto;
 use crate::protocol::target;
 use failure;
 use futures::{Async, Poll};
 use log::*;
-use std::collections::HashMap;
 use std::default::Default;
 use std::sync::{Arc, Mutex};
 use websocket::futures::Stream;
@@ -42,7 +42,7 @@ pub struct DebugSession {
     pub chrome_debug_session: Arc<Mutex<ChromeDebugSession>>,
     seconds_from_start: usize,
     flag: bool,
-    tabs: HashMap<String, Tab>,
+    tabs: Vec<Tab>, // early created at front.
     wrapper: Wrapper,
 }
 
@@ -63,7 +63,7 @@ impl DebugSession {
             chrome_debug_session: arc_cds.clone(),
             seconds_from_start: 0,
             flag: false,
-            tabs: HashMap::new(),
+            tabs: Vec::new(),
             wrapper: Wrapper {
                 chrome_debug_session: arc_cds,
             },
@@ -74,14 +74,33 @@ impl DebugSession {
         target_id: Option<&target::TargetId>,
     ) -> Result<&mut Tab, failure::Error> {
         if let Some(tab) = self
-            .tabs
-            .values_mut()
+            .tabs.iter_mut()
             .find(|t| Some(&t.target_info.target_id) == target_id)
         {
             Ok(tab)
         } else {
             Err(ChromePageError::TabNotFound.into())
         }
+    }
+
+    pub fn create_new_tab(&mut self, url: &str) {
+        let task = tasks::CreateTargetTaskBuilder::default().url(url.to_owned()).build().unwrap();
+        let method_str: String = (&tasks::TaskDescribe::from(task)).try_into().expect("should convert from CreateTargetTask");
+        self.chrome_debug_session
+            .lock()
+            .unwrap()
+            .send_message_direct(method_str);
+    }
+
+    pub fn get_browser_context_ids(&self) -> Vec<&target::BrowserContextID> {
+        let mut ids: Vec<&target::BrowserContextID> = self
+            .tabs
+            .iter()
+            .filter_map(|tab| tab.target_info.browser_context_id.as_ref())
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
     }
 
     pub fn get_tab_by_id(
@@ -90,7 +109,7 @@ impl DebugSession {
     ) -> Result<&Tab, failure::Error> {
         if let Some(tab) = self
             .tabs
-            .values()
+            .iter()
             .find(|t| Some(&t.target_info.target_id) == target_id)
         {
             Ok(tab)
@@ -99,17 +118,17 @@ impl DebugSession {
         }
     }
 
-    pub fn main_tab_mut(&mut self) -> Option<&mut Tab> {
-        self.tabs.get_mut(DEFAULT_TAB_NAME)
+    pub fn first_page_mut(&mut self) -> Option<&mut Tab> {
+        self.tabs.get_mut(0)
     }
     pub fn main_tab(&self) -> Option<&Tab> {
-        self.tabs.get(DEFAULT_TAB_NAME)
+        self.tabs.get(0)
     }
 
     fn send_fail(
         &mut self,
         target_id: Option<target::TargetId>,
-        task_id: Option<ids::Task>,
+        task_id: Option<TaskId>,
     ) -> Poll<Option<PageResponseWithTargetIdTaskId>, failure::Error> {
         let pr = (target_id, task_id, PageResponse::Fail);
         Ok(Some(pr).into())
@@ -177,37 +196,32 @@ impl DebugSession {
             }
             TaskDescribe::PageCreated(target_info, page_name) => {
                 info!(
-                    "receive page created event: {:?}, {:?}",
-                    target_info,
-                    page_name
+                    "receive page created event: {:?}, page_name: {:?}",
+                    target_info, page_name
                 );
                 let target_id = target_info.target_id.clone();
-                let mut tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
-                tab.attach_to_page();
-                
-                let page_name = page_name.unwrap_or_else(||{
-                    let l = self.tabs.len();
-                    if l == 0 {
-                        DEFAULT_TAB_NAME.to_string()
-                    } else {
-                        format!("tab-{:?}", l)
-                    }
-                });
-                self.tabs.insert(page_name.clone(), tab);
-                let pr = (Some(target_id), None, PageResponse::PageCreated(Some(page_name)));
+                let tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
+                self.tabs.push(tab);
+                let idx = self.tabs.len();
+                let pr = (
+                    Some(target_id),
+                    None,
+                    PageResponse::PageCreated(idx),
+                );
                 Ok(Some(pr).into())
             }
             TaskDescribe::PageAttached(target_info, session_id) => {
+                // each attach return different session_id.
                 // when the chrome process started, it default creates a target and attach it. the url is: about:blank
-                trace!(
-                    "receive page attached event: {:?}, {:?}",
+                info!(
+                    "receive page attached event: {:?}, session_id: {:?}",
                     target_info,
                     session_id.clone()
                 );
                 match self.get_tab_by_id_mut(Some(&target_info.target_id)) {
                     Ok(tab) => {
                         tab.session_id.replace(session_id.clone());
-                        tab.page_enable();
+                        // tab.page_enable();
                         let pr = (
                             Some(target_info.target_id.clone()),
                             None,
@@ -216,20 +230,25 @@ impl DebugSession {
                         Ok(Some(pr).into())
                     }
                     Err(error) => {
-                        error!("page attached event catched, but cannot find coresponding tab. {:?}", error);
+                        error!("page attached event has caught, but cannot find corresponding tab. {:?}", error);
                         self.send_fail(None, None)
                     }
                 }
             }
             TaskDescribe::PageEnable(page_enable) => {
                 info!("page_enabled: {:?}", page_enable);
-                let resp =
-                    self.convert_to_page_response(Some(&page_enable.common_fields), PageResponse::PageEnable);
+                let resp = self.convert_to_page_response(
+                    Some(&page_enable.common_fields),
+                    PageResponse::PageEnable,
+                );
                 Ok(resp.into())
             }
             // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             TaskDescribe::FrameNavigated(frame, common_fields) => {
-                info!("-----------------frame_navigated-----------------{:?}", frame);
+                info!(
+                    "-----------------frame_navigated-----------------{:?}",
+                    frame
+                );
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 let frame_id = frame.id.clone();
                 tab._frame_navigated(*frame);
@@ -241,7 +260,10 @@ impl DebugSession {
             }
             TaskDescribe::FrameStartedLoading(frame_id, common_fields) => {
                 // started loading is first, then attached.
-                info!("-----------------frame_started_loading-----------------{:?}", frame_id);
+                info!(
+                    "-----------------frame_started_loading-----------------{:?}",
+                    frame_id
+                );
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 tab._frame_started_loading(frame_id.clone());
                 let resp = self.convert_to_page_response(
@@ -251,7 +273,10 @@ impl DebugSession {
                 Ok(resp.into())
             }
             TaskDescribe::FrameStoppedLoading(frame_id, common_fields) => {
-                info!("-----------------frame_stopped_loading-----------------{:?}", frame_id);
+                info!(
+                    "-----------------frame_stopped_loading-----------------{:?}",
+                    frame_id
+                );
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 tab._frame_stopped_loading(frame_id.clone());
                 let pr = (
@@ -262,7 +287,10 @@ impl DebugSession {
                 Ok(Some(pr).into())
             }
             TaskDescribe::FrameAttached(frame_attached_params, common_fields) => {
-                info!("-----------------frame_attached-----------------{:?}", frame_attached_params.frame_id);
+                info!(
+                    "-----------------frame_attached-----------------{:?}",
+                    frame_attached_params.frame_id
+                );
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 let frame_id = frame_attached_params.frame_id.clone();
                 tab._frame_attached(frame_attached_params);
@@ -273,7 +301,10 @@ impl DebugSession {
                 Ok(resp.into())
             }
             TaskDescribe::FrameDetached(frame_id, common_fields) => {
-                info!("-----------------frame_detached-----------------{:?}", frame_id.clone());
+                info!(
+                    "-----------------frame_detached-----------------{:?}",
+                    frame_id.clone()
+                );
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
                 tab._frame_detached(&frame_id);
                 self.send_fail(None, None)
@@ -345,8 +376,10 @@ impl DebugSession {
                     selector: screen_shot.selector,
                     base64: screen_shot.task_result,
                 };
-                let resp = self
-                    .convert_to_page_response(Some(&common_fields), PageResponse::CaptureScreenshot(ro));
+                let resp = self.convert_to_page_response(
+                    Some(&common_fields),
+                    PageResponse::CaptureScreenshot(ro),
+                );
                 Ok(resp.into())
             }
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
@@ -374,7 +407,8 @@ impl DebugSession {
                 common_fields,
             ) => {
                 let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-                let frame_id = tab.runtime_execution_context_created(runtime_execution_context_created);
+                let frame_id =
+                    tab.runtime_execution_context_created(runtime_execution_context_created);
                 let resp = self.convert_to_page_response(
                     Some(&common_fields),
                     PageResponse::RuntimeExecutionContextCreated(frame_id),
@@ -402,9 +436,16 @@ impl DebugSession {
             TaskDescribe::TargetInfoChanged(target_info, common_fields) => {
                 if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
                     tab.target_info = target_info;
-                    trace!("target info changed: {:?}, {:?}", tab.target_info, common_fields);
+                    trace!(
+                        "target info changed: {:?}, {:?}",
+                        tab.target_info,
+                        common_fields
+                    );
                 } else {
-                    warn!("target changed, no correspond tab. {:?}, {:?}", target_info, common_fields);
+                    warn!(
+                        "target changed, no correspond tab. {:?}, {:?}",
+                        target_info, common_fields
+                    );
                 }
                 self.send_fail(None, None)
             }

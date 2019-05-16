@@ -58,7 +58,7 @@ impl Future for DescribeNode {
                         let frame = tab.find_frame_by_id(&frame_id).unwrap();
                         info!("got frame: {:?}", frame_id);
                         if frame.name == Some("ddlogin-iframe".into()) {
-                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                            if let Some(tab) = self.debug_session.first_page_mut() {
                                 tab.describe_node_by_selector(self.selector, Some(2), Some(100));
                             }
                         }

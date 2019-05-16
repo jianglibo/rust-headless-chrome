@@ -58,7 +58,7 @@ impl Future for QuerySelector {
                             .and_then(|t| t.find_frame_by_id(&frame_id))
                             .filter(|f| f.name == Some("ddlogin-iframe".into()));
                         if frame.is_some() {
-                            if let Some(tab) = self.debug_session.main_tab_mut() {
+                            if let Some(tab) = self.debug_session.first_page_mut() {
                                 tab.dom_query_selector_by_selector(self.selector, Some(100));
                                 tab.dom_query_selector_by_selector("#not-existed", Some(102));
                                 tab.dom_query_selector_by_selector(self.selector, Some(101));

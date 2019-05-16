@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
 pub type TargetId = String;
+pub type SessionID = String;
+pub type BrowserContextID = String;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -140,7 +142,7 @@ pub mod methods {
         type ReturnObject = CreateBrowserContextReturnObject;
     }
 
-    #[derive(Serialize, Debug)]
+    #[derive(Serialize, Debug, Default)]
     #[serde(rename_all = "camelCase")]
     pub struct CreateTarget<'a> {
         pub url: &'a str,

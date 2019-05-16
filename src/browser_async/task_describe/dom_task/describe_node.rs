@@ -1,8 +1,7 @@
 use super::super::{
     create_msg_to_send_with_session_id, CommonDescribeFields, CreateMethodCallString, TaskDescribe,
 };
-use crate::browser::transport::SessionId;
-use crate::protocol::{dom, runtime};
+use crate::protocol::{dom, runtime, target};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Builder, Default, Deserialize, Serialize)]
@@ -35,7 +34,7 @@ impl From<DescribeNodeTask> for TaskDescribe {
 }
 
 impl CreateMethodCallString for DescribeNodeTask {
-    fn create_method_call_string(&self, session_id: Option<&SessionId>, call_id: usize) -> String {
+    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
         let method = dom::methods::DescribeNode {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,

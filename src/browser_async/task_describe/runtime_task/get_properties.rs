@@ -1,6 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
-use crate::protocol::{runtime};
-use crate::browser::transport::{SessionId};
+use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -25,7 +24,7 @@ impl From<RuntimeGetPropertiesTask> for TaskDescribe {
 
 
 impl CreateMethodCallString for RuntimeGetPropertiesTask {
-    fn create_method_call_string(&self, session_id: Option<&SessionId>, call_id: usize) -> String {
+    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
         let method = runtime::methods::GetProperties {
                         object_id: self.object_id.as_str(),
                         own_properties: self.own_properties,

@@ -1,6 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
-use crate::protocol::{runtime};
-use crate::browser::transport::{SessionId};
+use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -41,7 +40,7 @@ impl From<RuntimeEvaluateTask> for TaskDescribe {
 
 
 impl CreateMethodCallString for RuntimeEvaluateTask {
-    fn create_method_call_string(&self, session_id: Option<&SessionId>, call_id: usize) -> String {
+    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
         let method = runtime::methods::Evaluate {
             expression: self.expression.as_str(),
             object_group: self.object_group.as_ref().map(String::as_str),

@@ -1,9 +1,7 @@
-use super::id_type as ids;
 use super::task_describe::TaskDescribe;
 
-use super::dev_tools_method_util::ChromePageError;
 use super::inner_event::{self, InnerEvent};
-use crate::browser_async::chrome_browser::ChromeBrowser;
+use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::protocol::{self, dom, page, runtime, target};
@@ -53,7 +51,7 @@ impl ChromeDebugSession {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn resolve_node(&mut self) -> (Option<ids::Task>, Option<ids::RemoteObject>) {
+    pub fn resolve_node(&mut self) -> (Option<TaskId>, Option<runtime::types::RemoteObjectId>) {
         (None, None)
     }
 

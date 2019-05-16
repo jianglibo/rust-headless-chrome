@@ -1,6 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
-use crate::protocol::{dom, runtime};
-use crate::browser::transport::{SessionId};
+use crate::protocol::{dom, runtime, target};
 use crate::browser::tab::element::BoxModel;
 
 
@@ -27,7 +26,7 @@ impl From<GetBoxModelTask> for TaskDescribe {
 }
 
 impl CreateMethodCallString for GetBoxModelTask {
-    fn create_method_call_string(&self, session_id: Option<&SessionId>, call_id: usize) -> String {
+    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
         let method = dom::methods::GetBoxModel {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,

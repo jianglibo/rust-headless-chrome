@@ -58,7 +58,7 @@ impl Future for RuntimeEvaluateTask {
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
                         if seconds == 8 {
-                            if let Some(mt) = self.debug_session.main_tab_mut() {
+                            if let Some(mt) = self.debug_session.first_page_mut() {
                                 mt.runtime_evaluate_expression(
                                     r#"document.querySelectorAll("div.text-link-item-title .text-wrap .text")"#,
                                     // r#"document.querySelectorAll("div.text-link-item-title .text-wrap .text").item(0).click()"#,

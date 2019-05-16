@@ -66,7 +66,7 @@ impl Future for RuntimeEvaluate {
                                 });
 
                         if frame.is_some() {
-                            self.debug_session.main_tab_mut().map(|tab|{
+                            self.debug_session.first_page_mut().map(|tab|{
                                 tab.runtime_evaluate_expression("3+3".into(), Some(100));
                                 tab.runtime_evaluate_expression("3::0".into(), Some(101));
                                 tab.runtime_enable(Some(102));

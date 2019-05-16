@@ -1,18 +1,16 @@
-use super::id_type as ids;
 use super::inner_event::inner_events;
-use super::unique_number;
-use crate::browser::transport::{MethodDestination, SessionId};
-use crate::browser_async::dev_tools_method_util::{ChromePageError};
+use crate::browser_async::{
+    create_msg_to_send, create_msg_to_send_with_session_id, next_call_id, ChromePageError,
+    CreateMethodCallString, MethodDestination, TaskId, create_unique_usize
+};
 use crate::protocol::{dom, page, runtime, target};
 use failure;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
 
 pub mod dom_task;
-pub mod runtime_task;
 pub mod page_task;
-pub mod create_method_call_string;
-
+pub mod runtime_task;
+pub mod target_task;
 
 pub use dom_task::{
     describe_node::DescribeNodeTask, describe_node::DescribeNodeTaskBuilder,
@@ -22,8 +20,8 @@ pub use dom_task::{
 };
 pub use page_task::{
     capture_screenshot::CaptureScreenshotTask, capture_screenshot::CaptureScreenshotTaskBuilder,
-    navigate_to::NavigateToTask, navigate_to::NavigateToTaskBuilder, print_to_pdf::PrintToPdfTask,
-    print_to_pdf::PrintToPdfTaskBuilder, page_enable::PageEnableTask,
+    navigate_to::NavigateToTask, navigate_to::NavigateToTaskBuilder, page_enable::PageEnableTask,
+    print_to_pdf::PrintToPdfTask, print_to_pdf::PrintToPdfTaskBuilder,
 };
 pub use runtime_task::{
     call_function_on::RuntimeCallFunctionOnTask,
@@ -32,7 +30,9 @@ pub use runtime_task::{
     get_properties::RuntimeGetPropertiesTaskBuilder,
 };
 
-pub use create_method_call_string::{CreateMethodCallString, next_call_id, create_msg_to_send_with_session_id, create_msg_to_send};
+pub use target_task::{
+    create_target::CreateTargetTask, create_target::CreateTargetTaskBuilder,
+};
 
 #[derive(Debug)]
 pub enum TaskDescribe {
@@ -47,22 +47,15 @@ pub enum TaskDescribe {
     PageEnable(PageEnableTask),
     RuntimeEnable(CommonDescribeFields),
     Interval,
-    // PageEvent(PageEventName),
-    FrameAttached(
-        page::events::FrameAttachedParams,
-        CommonDescribeFields,
-    ),
-    FrameDetached(
-        page::types::FrameId,
-        CommonDescribeFields,
-    ),
+    FrameAttached(page::events::FrameAttachedParams, CommonDescribeFields),
+    FrameDetached(page::types::FrameId, CommonDescribeFields),
     FrameStartedLoading(String, CommonDescribeFields),
     FrameNavigated(Box<page::Frame>, CommonDescribeFields),
     FrameStoppedLoading(String, CommonDescribeFields),
     LoadEventFired(target::TargetId, f32),
     TargetInfoChanged(target::TargetInfo, CommonDescribeFields),
     PageCreated(target::TargetInfo, Option<String>),
-    PageAttached(target::TargetInfo, SessionId),
+    PageAttached(target::TargetInfo, target::SessionID),
     CaptureScreenshot(Box<CaptureScreenshotTask>),
     TargetSetDiscoverTargets(bool, CommonDescribeFields),
     ChromeConnected,
@@ -76,11 +69,12 @@ pub enum TaskDescribe {
     RuntimeExecutionContextDestroyed(runtime::types::ExecutionContextId, CommonDescribeFields),
     RuntimeConsoleAPICalled(inner_events::ConsoleAPICalledParams, CommonDescribeFields),
     RuntimeCallFunctionOn(Box<RuntimeCallFunctionOnTask>),
+    CreateTarget(Box<CreateTargetTask>),
 }
-
 
 impl TaskDescribe {
     pub fn get_common_fields(&self) -> Option<&CommonDescribeFields> {
+        let common_fields = CommonDescribeFieldsBuilder::default().build().unwrap();
         match &self {
             TaskDescribe::QuerySelector(query_selector) => Some(&query_selector.common_fields),
             TaskDescribe::DescribeNode(describe_node) => Some(&describe_node.common_fields),
@@ -101,6 +95,9 @@ impl TaskDescribe {
             TaskDescribe::RuntimeCallFunctionOn(call_function_on) => {
                 Some(&call_function_on.common_fields)
             }
+            TaskDescribe::CreateTarget(_task) => {
+                None
+            }
             _ => {
                 error!("get_common_fields got queried. but it doesn't implement that.");
                 None
@@ -113,8 +110,11 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
     type Error = failure::Error;
 
     fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
-        let un_exist_session: Option<SessionId> = Some(Self::from("no_session_id").into());
-        let (session_id, call_id): (Option<&SessionId>, usize) = task_describe.get_common_fields().map_or((un_exist_session.as_ref(), 999_999), |v| (v.session_id.as_ref(), v.call_id));
+        let (session_id, call_id) = if let Some(common_fields) = &task_describe.get_common_fields() {
+            (common_fields.session_id.as_ref(), common_fields.call_id)
+        } else {
+            (None, next_call_id())
+        };
         match task_describe {
             TaskDescribe::QuerySelector(query_selector) => {
                 Ok(query_selector.create_method_call_string(session_id, call_id))
@@ -140,19 +140,20 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
             TaskDescribe::PageEnable(page_enable) => {
                 Ok(page_enable.create_method_call_string(session_id, call_id))
             }
-            TaskDescribe::RuntimeEnable(common_fields) => {
-                Ok(create_msg_to_send_with_session_id(
-                    runtime::methods::Enable {},
-                    common_fields.session_id.as_ref(),
-                    common_fields.call_id,
-                ))
-            }
+            TaskDescribe::RuntimeEnable(common_fields) => Ok(create_msg_to_send_with_session_id(
+                runtime::methods::Enable {},
+                common_fields.session_id.as_ref(),
+                common_fields.call_id,
+            )),
             TaskDescribe::TargetSetDiscoverTargets(enable, common_fields) => {
                 Ok(create_msg_to_send(
                     target::methods::SetDiscoverTargets { discover: *enable },
                     MethodDestination::Browser,
                     common_fields.call_id,
                 ))
+            }
+            TaskDescribe::CreateTarget(create_target) => {
+                Ok(create_target.create_method_call_string(session_id, call_id))
             }
             TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
                 Ok(runtime_evaluate.create_method_call_string(session_id, call_id))
@@ -181,17 +182,16 @@ pub struct ResolveNode {
     pub execution_context_id: Option<String>,
 }
 
-
 #[derive(Debug, Clone, Default, Builder)]
 #[builder(setter(into))]
 pub struct CommonDescribeFields {
     #[builder(default = "None")]
     pub target_id: Option<target::TargetId>,
     #[builder(default = "None")]
-    pub session_id: Option<SessionId>,
-    #[builder(default = "unique_number::create_one()")]
+    pub session_id: Option<target::SessionID>,
+    #[builder(default = "create_unique_usize()")]
     #[builder(setter(prefix = "_abc"))]
-    pub task_id: ids::Task,
+    pub task_id: TaskId,
     #[builder(default = "next_call_id()")]
     pub call_id: usize,
 }
@@ -207,7 +207,7 @@ impl From<(Option<String>, Option<String>)> for CommonDescribeFields {
 }
 
 impl CommonDescribeFieldsBuilder {
-    pub fn task_id(&mut self, task_id: impl Into<Option<ids::Task>>) -> &mut Self {
+    pub fn task_id(&mut self, task_id: impl Into<Option<TaskId>>) -> &mut Self {
         let o = task_id.into();
         if o.is_some() {
             self.task_id = o;

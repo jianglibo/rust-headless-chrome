@@ -59,7 +59,7 @@ impl Future for LoadEventFired {
                         if seconds > 19 {
                             assert_eq!(self.debug_session.chrome_debug_session.lock().unwrap().tasks_waiting_for_response_count(), 0);
                             assert_eq!(self.call_count, 3);
-                            let tab = self.debug_session.main_tab_mut().unwrap();
+                            let tab = self.debug_session.first_page_mut().unwrap();
                             assert_eq!(tab.changing_frames.len(), 8);
                             if let Some(frame) = tab.main_frame() {
                                 assert_eq!(tab.target_info.target_id, frame.id);

@@ -36,19 +36,30 @@ impl Future for TargetsContext {
     #[allow(clippy::cognitive_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
+            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
                 let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
                 match value {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
+                    PageResponse::PageCreated(page_idx) => {
+                        let tab = tab.unwrap();
+                        tab.attach_to_page(Some("abc"));
+                        if page_idx == 0 {
+                            self.debug_session.create_new_tab("https://pc.xuexi.cn");
+                        }
+                    }
+                    PageResponse::PageAttached(_page_info, _session_id) => {
+                        let tab = tab.unwrap();
+                        tab.page_enable();
+
+                        if tab.page_name == Some("abc") {
+                            tab.navigate_to(self.url, None);
+                        }
+                    }
                     PageResponse::PageEnable => {
                         self.page_enabled_be_called += 1;
                         info!("page enabled.");
-                        assert!(tab.is_some());
-                        if let Some(t) = tab {
-                            t.navigate_to(self.url, None);
-                        }
                     }
                     PageResponse::RuntimeCallFunctionOn(result) => {
                         info!("got call result: {:?}", result);
@@ -72,7 +83,7 @@ impl Future for TargetsContext {
                         write_base64_str_to(file_name, base64_data).unwrap();
                         assert!(path.exists());
                     }
-                    PageResponse::RuntimeEvaluate(result, exception_details) => {},
+                    PageResponse::RuntimeEvaluate(_result, _exception_details) => {},
                     PageResponse::RuntimeGetProperties(return_object) => {
                         let get_properties_return_object =
                             return_object.expect("should return get_properties_return_object");
@@ -87,7 +98,7 @@ impl Future for TargetsContext {
                             frame_id
                         );
                     }
-                    PageResponse::FrameStoppedLoading(frame_id) => {
+                    PageResponse::FrameStoppedLoading(_frame_id) => {
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);

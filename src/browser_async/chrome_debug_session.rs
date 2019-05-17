@@ -1,4 +1,4 @@
-use super::task_describe::TaskDescribe;
+use super::task_describe::{TaskDescribe, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, page_event, target_event};
 
 use super::inner_event::{self, InnerEvent};
 use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
@@ -64,45 +64,45 @@ impl ChromeDebugSession {
         target_id: Option<target::TargetId>,
     ) -> Option<TaskDescribe> {
         match inner_event {
-            InnerEvent::SetChildNodes(set_child_nodes_event) => {
-                let params = set_child_nodes_event.params;
-                return TaskDescribe::SetChildNodes(
-                    target_id.unwrap(),
-                    params.parent_id,
-                    params.nodes,
-                )
-                .into();
-            }
-            InnerEvent::LoadEventFired(load_event_fired_event) => {
-                let params = load_event_fired_event.params;
-                return TaskDescribe::LoadEventFired(target_id.unwrap(), params.timestamp).into();
-            }
-            InnerEvent::ExecutionContextCreated(execution_context_created) => {
-                return TaskDescribe::RuntimeExecutionContextCreated(
-                    execution_context_created.params.context,
-                    (session_id, target_id).into(),
-                )
-                .into();
-            }
-            InnerEvent::ExecutionContextDestroyed(execution_context_destroyed) => {
-                return TaskDescribe::RuntimeExecutionContextDestroyed(
-                    execution_context_destroyed.params.execution_context_id,
-                    (session_id, target_id).into(),
-                )
-                .into();
-            }
-            InnerEvent::ConsoleAPICalled(console_api_called) => {
-                return TaskDescribe::RuntimeConsoleAPICalled(
-                    console_api_called.params,
-                    (session_id, target_id).into(),
-                )
-                .into();
-            }
+            // InnerEvent::SetChildNodes(set_child_nodes_event) => {
+            //     let params = set_child_nodes_event.params;
+            //     return TaskDescribe::SetChildNodes(
+            //         target_id.unwrap(),
+            //         params.parent_id,
+            //         params.nodes,
+            //     )
+            //     .into();
+            // }
+            // InnerEvent::LoadEventFired(load_event_fired_event) => {
+            //     let params = load_event_fired_event.params;
+            //     return TaskDescribe::LoadEventFired(target_id.unwrap(), params.timestamp).into();
+            // }
+            // InnerEvent::ExecutionContextCreated(execution_context_created) => {
+            //     return TaskDescribe::RuntimeExecutionContextCreated(
+            //         execution_context_created.params.context,
+            //         (session_id, target_id).into(),
+            //     )
+            //     .into();
+            // }
+            // InnerEvent::ExecutionContextDestroyed(execution_context_destroyed) => {
+            //     return TaskDescribe::RuntimeExecutionContextDestroyed(
+            //         execution_context_destroyed.params.execution_context_id,
+            //         (session_id, target_id).into(),
+            //     )
+            //     .into();
+            // }
+            // InnerEvent::ConsoleAPICalled(console_api_called) => {
+            //     return TaskDescribe::RuntimeConsoleAPICalled(
+            //         console_api_called.params,
+            //         (session_id, target_id).into(),
+            //     )
+            //     .into();
+            // }
             InnerEvent::DomContentEventFired(dom_content_event_fired) => {
                 trace!("{:?}", dom_content_event_fired.params);
             }
             _ => {
-                info!("discard inner event: {:?}", inner_event);
+                warn!("discard inner event: {:?}", inner_event);
             }
         }
         None
@@ -128,12 +128,12 @@ impl ChromeDebugSession {
             "tasks_waiting_for_response: {:?}",
             self.tasks_waiting_for_response
         );
-        if let Some(idx) = self.tasks_waiting_for_response.iter().position(|v| {
-            if let Some(it) = v.get(0) {
-                if let Some(cf) = it.get_common_fields() {
-                    cf.call_id == call_id
-                } else {
-                    false
+        if let Some(idx) = self.tasks_waiting_for_response.iter().position(|tasks| {
+            if let Some(task) = tasks.get(0) {
+                match task {
+                    TaskDescribe::TargetCallMethod(target_call) => target_call.get_call_id() == call_id,
+                    TaskDescribe::BrowserCallMethod(browser_call) => browser_call.get_call_id() == call_id,
+                    _ => false,
                 }
             } else {
                 false
@@ -205,8 +205,8 @@ impl ChromeDebugSession {
         let mut next_task = tasks.get_mut(0).unwrap();
         match (&current_task, &mut next_task) {
             (
-                TaskDescribe::GetDocument(get_document),
-                TaskDescribe::QuerySelector(query_selector),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetDocument(get_document)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
             ) => {
                 query_selector.node_id = get_document
                     .task_result
@@ -215,20 +215,21 @@ impl ChromeDebugSession {
                 return self.execute_next_and_return_remains(tasks);
             }
             (
-                TaskDescribe::QuerySelector(query_selector),
-                TaskDescribe::DescribeNode(describe_node),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DescribeNode(describe_node)),
             ) => {
                 describe_node.node_id = query_selector.task_result;
                 return self.execute_next_and_return_remains(tasks);
             }
             (
-                TaskDescribe::QuerySelector(query_selector),
-                TaskDescribe::GetBoxModel(get_box_model),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)),
             ) => {
                 get_box_model.node_id = query_selector.task_result;
                 return self.execute_next_and_return_remains(tasks);
             }
-            (TaskDescribe::GetBoxModel(get_box_model), TaskDescribe::CaptureScreenshot(screen_shot)) => {
+            (TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)), 
+            TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(screen_shot)) => {
                 if let Some(mb) = &get_box_model.task_result {
                     let viewport = mb.content_viewport();
                     screen_shot.clip = Some(viewport);
@@ -247,68 +248,73 @@ impl ChromeDebugSession {
     fn full_fill_task(
         &self,
         resp: protocol::Response,
-        mut task: &mut TaskDescribe,
+        mut task_describe: &mut TaskDescribe,
     ) -> Result<(), failure::Error> {
-        match &mut task {
-            TaskDescribe::GetDocument(get_document) => {
-                let get_document_return_object =
-                    protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
-                get_document.task_result = Some(get_document_return_object.root);
+        match &mut task_describe {
+            TaskDescribe::TargetCallMethod(target_call) => match target_call {
+                TargetCallMethodTask::GetDocument(get_document) => {
+                    let get_document_return_object =
+                        protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
+                    get_document.task_result = Some(get_document_return_object.root);
+                }
+                TargetCallMethodTask::PageEnable(_common_fields) => {}
+                TargetCallMethodTask::QuerySelector(query_selector) => {
+                    let query_select_return_object =
+                        protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
+                    query_selector.task_result= Some(query_select_return_object.node_id);
+                }
+                TargetCallMethodTask::DescribeNode(describe_node) => {
+                    let describe_node_return_object =
+                        protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
+                    describe_node.task_result= Some(describe_node_return_object.node);
+                }
+                TargetCallMethodTask::GetBoxModel(get_box_model) => {
+                    let get_box_model_return_object =
+                        protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp)?;
+                    let raw_model = get_box_model_return_object.model;
+                    let model_box = BoxModel {
+                        content: ElementQuad::from_raw_points(&raw_model.content),
+                        padding: ElementQuad::from_raw_points(&raw_model.padding),
+                        border: ElementQuad::from_raw_points(&raw_model.border),
+                        margin: ElementQuad::from_raw_points(&raw_model.margin),
+                        width: raw_model.width,
+                        height: raw_model.height,
+                    };
+                    get_box_model.task_result = Some(model_box);
+                }
+                TargetCallMethodTask::CaptureScreenshot(screen_shot) => {
+                    let capture_screenshot_return_object =
+                        protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
+                    screen_shot.task_result= Some(capture_screenshot_return_object.data);
+                }
+                TargetCallMethodTask::RuntimeEvaluate(runtime_evaluate) => {
+                    let evaluate_return_object =
+                        protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
+                    runtime_evaluate.task_result = Some(evaluate_return_object.result);
+                    runtime_evaluate.exception_details = evaluate_return_object.exception_details;
+                }
+                TargetCallMethodTask::NavigateTo(navigate_to) => {
+                    let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
+                    navigate_to.task_result = Some(navigate_to_return_object);
+                }
+                TargetCallMethodTask::RuntimeEnable(common_fields) => {
+                    trace!("runtime enabled: {:?}", common_fields);
+                }
+                TargetCallMethodTask::RuntimeGetProperties(get_properties) => {
+                    let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
+                    get_properties.task_result = Some(get_properties_return_object);
+                }
+                TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
+                    let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
+                    task.task_result = Some(task_return_object);
+                }
+                TargetCallMethodTask::PrintToPDF(task) => {
+                    let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
+                    task.task_result = Some(task_return_object.data);
+                }
             }
-            TaskDescribe::PageEnable(_common_fields) => {}
-            TaskDescribe::QuerySelector(query_selector) => {
-                let query_select_return_object =
-                    protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
-                query_selector.task_result= Some(query_select_return_object.node_id);
-            }
-            TaskDescribe::DescribeNode(describe_node) => {
-                let describe_node_return_object =
-                    protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
-                describe_node.task_result= Some(describe_node_return_object.node);
-            }
-            TaskDescribe::GetBoxModel(get_box_model) => {
-                let get_box_model_return_object =
-                    protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp)?;
-                let raw_model = get_box_model_return_object.model;
-                let model_box = BoxModel {
-                    content: ElementQuad::from_raw_points(&raw_model.content),
-                    padding: ElementQuad::from_raw_points(&raw_model.padding),
-                    border: ElementQuad::from_raw_points(&raw_model.border),
-                    margin: ElementQuad::from_raw_points(&raw_model.margin),
-                    width: raw_model.width,
-                    height: raw_model.height,
-                };
-                get_box_model.task_result = Some(model_box);
-            }
-            TaskDescribe::CaptureScreenshot(screen_shot) => {
-                let capture_screenshot_return_object =
-                    protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
-                screen_shot.task_result= Some(capture_screenshot_return_object.data);
-            }
-            TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
-                let evaluate_return_object =
-                    protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
-                runtime_evaluate.task_result = Some(evaluate_return_object.result);
-                runtime_evaluate.exception_details = evaluate_return_object.exception_details;
-            }
-            TaskDescribe::NavigateTo(navigate_to) => {
-                let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
-                navigate_to.task_result = Some(navigate_to_return_object);
-            }
-            TaskDescribe::RuntimeEnable(common_fields) => {
-                trace!("runtime enabled: {:?}", common_fields);
-            }
-            TaskDescribe::RuntimeGetProperties(get_properties) => {
-                let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
-                get_properties.task_result = Some(get_properties_return_object);
-            }
-            TaskDescribe::RuntimeCallFunctionOn(task) => {
-                let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
-                task.task_result = Some(task_return_object);
-            }
-            TaskDescribe::PrintToPDF(task) => {
-                let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
-                task.task_result = Some(task_return_object.data);
+            TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
+
             }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);
@@ -326,18 +332,20 @@ impl ChromeDebugSession {
     ) -> Option<TaskDescribe> {
         match protocol_event {
             protocol::Event::FrameNavigated(frame_navigated_event) => {
-                // let changing_frame = ChangingFrame::Navigated(frame_navigated_event.params.frame);
-                return Some(TaskDescribe::FrameNavigated(
-                    Box::new(frame_navigated_event.params.frame),
-                    (session_id, target_id).into(),
-                    // Box::new(changing_frame),
-                ));
+                let ev = page_event::FrameNavigated {
+                    frame: frame_navigated_event.params.frame,
+                    session_id,
+                    target_id, 
+                };
+                return Some(TaskDescribe::from(ev));
             }
             protocol::Event::TargetInfoChanged(target_info_changed) => {
-                return Some(TaskDescribe::TargetInfoChanged(
-                    target_info_changed.params.target_info,
-                    (session_id, target_id).into(),
-                ));
+                let te = target_event::TargetInfoChanged {
+                    target_info: target_info_changed.params.target_info,
+                    session_id,
+                    target_id,
+                };
+                return Some(te.into());
             }
             protocol::Event::TargetCreated(target_created_event) => {
                 let target_type = &(target_created_event.params.target_info.target_type);
@@ -347,10 +355,10 @@ impl ChromeDebugSession {
                             "receive page create event. {:?}",
                             target_created_event.params.target_info
                         );
-                        return Some(TaskDescribe::PageCreated(
-                            target_created_event.params.target_info,
-                            None,
-                        ));
+                        let pe = page_event::PageCreated {
+                            target_info: target_created_event.params.target_info,
+                        };
+                        return Some(pe.into());
                     }
                     _ => (),
                 }

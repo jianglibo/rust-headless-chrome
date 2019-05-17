@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -15,14 +15,22 @@ pub struct CaptureScreenshotTask {
     pub task_result: Option<String>,
 }
 
-impl From<CaptureScreenshotTask> for TaskDescribe {
-    fn from(capture_screenshot: CaptureScreenshotTask) -> Self {
-        TaskDescribe::CaptureScreenshot(Box::new(capture_screenshot))
-    }
-}
+// impl From<CaptureScreenshotTask> for TaskDescribe {
+//     fn from(capture_screenshot: CaptureScreenshotTask) -> Self {
+//         TaskDescribe::CaptureScreenshot(Box::new(capture_screenshot))
+//     }
+// }
 
-impl CreateMethodCallString for CaptureScreenshotTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
+impl TargetCallMethodTaskFace for CaptureScreenshotTask {
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
+    }
+
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
+
+    fn get_method_str(&self) -> String {
                 let (format, quality) = match self.format {
             page::ScreenshotFormat::JPEG(quality) => {
                 (page::InternalScreenshotFormat::JPEG, quality)
@@ -38,10 +46,6 @@ impl CreateMethodCallString for CaptureScreenshotTask {
             quality,
             from_surface: self.from_surface,
         };
-                create_msg_to_send_with_session_id(
-                    method,
-                    session_id,
-                    call_id,
-                )
-}
+        self._to_method_str(method)
+    }
 }

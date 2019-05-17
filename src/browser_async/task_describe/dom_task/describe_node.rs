@@ -1,5 +1,5 @@
 use super::super::{
-    create_msg_to_send_with_session_id, CommonDescribeFields, CreateMethodCallString, TaskDescribe,
+    CommonDescribeFields, TaskDescribe, TargetCallMethodTaskFace
 };
 use crate::protocol::{dom, runtime, target};
 use serde::{Deserialize, Serialize};
@@ -27,20 +27,28 @@ pub struct DescribeNodeTask {
     pub task_result: Option<dom::Node>,
 }
 
-impl From<DescribeNodeTask> for TaskDescribe {
-    fn from(describe_node: DescribeNodeTask) -> Self {
-        TaskDescribe::DescribeNode(Box::new(describe_node))
-    }
-}
+// impl From<DescribeNodeTask> for TaskDescribe {
+//     fn from(describe_node: DescribeNodeTask) -> Self {
+//         TaskDescribe::DescribeNode(describe_node)
+//     }
+// }
 
-impl CreateMethodCallString for DescribeNodeTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
+impl TargetCallMethodTaskFace for DescribeNodeTask {
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
+    }
+
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
+
+    fn get_method_str(&self) -> String {
         let method = dom::methods::DescribeNode {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,
             depth: self.depth,
         };
-        create_msg_to_send_with_session_id(method, session_id, call_id)
+        self._to_method_str(method)
     }
 }
 

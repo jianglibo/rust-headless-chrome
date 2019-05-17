@@ -1,10 +1,10 @@
 use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
-use crate::protocol::{page, target};
+use crate::protocol::{target};
+
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
-pub struct PageEnableTask {
-    pub common_fields: CommonDescribeFields,
+pub struct ChromeConnectedTask {
 }
 
 // impl From<PageEnableTask> for TaskDescribe {
@@ -13,17 +13,16 @@ pub struct PageEnableTask {
 //     }
 // }
 
-impl TargetCallMethodTaskFace for PageEnableTask {
+impl TargetCallMethodTaskFace for ChromeConnectedTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
+        None
     }
 
     fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
+        0
     }
 
     fn get_method_str(&self) -> String {
-        let method = page::methods::Enable{};
-        self._to_method_str(method)
+        self._empty_method_str("ChromeConnectedTask")
     }
 }

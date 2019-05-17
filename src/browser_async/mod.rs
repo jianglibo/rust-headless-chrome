@@ -9,7 +9,7 @@ pub mod tab;
 pub mod inner_event;
 
 use failure;
-use task_describe::TaskDescribe;
+use task_describe::{self as tasks, TaskDescribe};
 use crate::protocol::{self, target};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
@@ -129,6 +129,14 @@ pub fn next_call_id() -> usize {
         }
     }
 
-pub trait CreateMethodCallString {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String;
-}
+// pub trait CreateMethodCallString {
+//     fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String;
+// }
+
+
+pub fn get_common_fields_by_task_id(manual_task_id: Option<TaskId>) -> tasks::CommonDescribeFields {
+        tasks::CommonDescribeFieldsBuilder::default()
+            .task_id(manual_task_id)
+            .build()
+            .unwrap()
+    }

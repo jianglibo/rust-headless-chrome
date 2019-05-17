@@ -1,19 +1,13 @@
 use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
-use crate::protocol::{page, target};
+use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
-pub struct PageEnableTask {
+pub struct RuntimeEnableTask {
     pub common_fields: CommonDescribeFields,
 }
 
-// impl From<PageEnableTask> for TaskDescribe {
-//     fn from(task: PageEnableTask) -> Self {
-//         TaskDescribe::PageEnable(task)
-//     }
-// }
-
-impl TargetCallMethodTaskFace for PageEnableTask {
+impl TargetCallMethodTaskFace for RuntimeEnableTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
         self.common_fields.session_id.as_ref()
     }
@@ -23,7 +17,7 @@ impl TargetCallMethodTaskFace for PageEnableTask {
     }
 
     fn get_method_str(&self) -> String {
-        let method = page::methods::Enable{};
+        let method = runtime::methods::Enable {};
         self._to_method_str(method)
     }
 }

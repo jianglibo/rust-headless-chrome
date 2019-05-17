@@ -44,15 +44,15 @@ impl Future for TargetsContext {
                     }
                     PageResponse::PageCreated(page_idx) => {
                         let tab = tab.unwrap();
-                        tab.attach_to_page(Some("abc"));
-                        if page_idx == 0 {
+                        tab.attach_to_page();
+                        if page_idx == 1 {
+                            tab.name_the_page("abc");
                             self.debug_session.create_new_tab("https://pc.xuexi.cn");
                         }
                     }
                     PageResponse::PageAttached(_page_info, _session_id) => {
                         let tab = tab.unwrap();
                         tab.page_enable();
-
                         if tab.page_name == Some("abc") {
                             tab.navigate_to(self.url, None);
                         }

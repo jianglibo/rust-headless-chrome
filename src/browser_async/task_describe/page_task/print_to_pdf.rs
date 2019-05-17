@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -39,14 +39,22 @@ pub struct PrintToPdfTask {
     pub task_result: Option<String>,
 }
 
-impl From<PrintToPdfTask> for TaskDescribe {
-    fn from(print_to_pdf: PrintToPdfTask) -> Self {
-        TaskDescribe::PrintToPDF(Box::new(print_to_pdf))
-    }
-}
+// impl From<PrintToPdfTask> for TaskDescribe {
+//     fn from(print_to_pdf: PrintToPdfTask) -> Self {
+//         TaskDescribe::PrintToPDF(Box::new(print_to_pdf))
+//     }
+// }
 
-impl CreateMethodCallString for PrintToPdfTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
+impl TargetCallMethodTaskFace for PrintToPdfTask {
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
+    }
+
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
+
+    fn get_method_str(&self) -> String {
                 let options = Some(page::PrintToPdfOptions {
             landscape: self.landscape,
             display_header_footer: self.display_header_footer,
@@ -68,11 +76,6 @@ impl CreateMethodCallString for PrintToPdfTask {
         let method = page::methods::PrintToPdf {
             options,
         };
-                create_msg_to_send_with_session_id(
-                    method,
-                    session_id,
-                    call_id,
-                )
-
+        self._to_method_str(method)
     }
 }

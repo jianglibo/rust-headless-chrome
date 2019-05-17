@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
 use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -26,15 +26,22 @@ pub struct RuntimeCallFunctionOnTask {
     pub task_result: Option<runtime::methods::CallFunctionOnReturnObject>,
 }
 
-impl From<RuntimeCallFunctionOnTask> for TaskDescribe {
-    fn from(task: RuntimeCallFunctionOnTask) -> Self {
-        TaskDescribe::RuntimeCallFunctionOn(Box::new(task))
+// impl From<RuntimeCallFunctionOnTask> for TaskDescribe {
+//     fn from(task: RuntimeCallFunctionOnTask) -> Self {
+//         TaskDescribe::RuntimeCallFunctionOn(Box::new(task))
+//     }
+// }
+
+impl TargetCallMethodTaskFace for RuntimeCallFunctionOnTask {
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
     }
-}
 
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
 
-impl CreateMethodCallString for RuntimeCallFunctionOnTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
+    fn get_method_str(&self) -> String {
         let method = runtime::methods::CallFunctionOn {
                 function_declaration: self.function_declaration.as_ref(),
                 object_id: self.object_id.clone(),
@@ -46,10 +53,6 @@ impl CreateMethodCallString for RuntimeCallFunctionOnTask {
                 execution_context_id: self.execution_context_id,
                 object_group: self.object_group.as_ref(),
         };
-                create_msg_to_send_with_session_id(
-                    method,
-                    session_id,
-                    call_id,
-                )
+        self._to_method_str(method)
     }
 }

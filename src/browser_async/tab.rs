@@ -502,8 +502,11 @@ impl Tab {
         }
     }
 
-    pub fn attach_to_page(&mut self, page_name: Option<&'static str>) {
-        self.page_name = page_name;
+    pub fn name_the_page(&mut self, page_name: &'static str) {
+        self.page_name = Some(page_name);
+    }
+
+    pub fn attach_to_page(&mut self) {
         let method_str = create_msg_to_send(
             target::methods::AttachToTarget {
                 target_id: &(self.target_info.target_id),

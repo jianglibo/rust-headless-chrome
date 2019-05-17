@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
 use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -32,15 +32,22 @@ pub struct RuntimeEvaluateTask {
     pub exception_details: Option<runtime::types::ExceptionDetails>,
 }
 
-impl From<RuntimeEvaluateTask> for TaskDescribe {
-    fn from(task: RuntimeEvaluateTask) -> Self {
-        TaskDescribe::RuntimeEvaluate(Box::new(task))
+// impl From<RuntimeEvaluateTask> for TaskDescribe {
+//     fn from(task: RuntimeEvaluateTask) -> Self {
+//         TaskDescribe::RuntimeEvaluate(Box::new(task))
+//     }
+// }
+
+impl TargetCallMethodTaskFace for RuntimeEvaluateTask {
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
     }
-}
 
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
 
-impl CreateMethodCallString for RuntimeEvaluateTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
+    fn get_method_str(&self) -> String {
         let method = runtime::methods::Evaluate {
             expression: self.expression.as_str(),
             object_group: self.object_group.as_ref().map(String::as_str),
@@ -54,10 +61,6 @@ impl CreateMethodCallString for RuntimeEvaluateTask {
             throw_on_side_effect: self.throw_on_side_effect,
             time_out: self.time_out,
         };
-                create_msg_to_send_with_session_id(
-                    method,
-                    session_id,
-                    call_id,
-                )
+        self._to_method_str(method)
     }
 }

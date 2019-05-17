@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, TargetCallMethodTaskFace, CommonDescribeFields};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -16,24 +16,28 @@ pub struct NavigateToTask {
     pub task_result: Option<page::methods::NavigateReturnObject>,
 }
 
-impl From<NavigateToTask> for TaskDescribe {
-    fn from(task: NavigateToTask) -> Self {
-        TaskDescribe::NavigateTo(Box::new(task))
-    }
-}
+// impl From<NavigateToTask> for TaskDescribe {
+//     fn from(task: NavigateToTask) -> Self {
+//         TaskDescribe::NavigateTo(Box::new(task))
+//     }
+// }
 
-impl CreateMethodCallString for NavigateToTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
-        let method = page::methods::Navigate {
+impl TargetCallMethodTaskFace for NavigateToTask{
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
+    }
+
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
+
+    fn get_method_str(&self) -> String {
+                let method = page::methods::Navigate {
             url: self.url,
             referrer: self.referrer.clone(),
             transition_type: self.transition_type.clone(),
             frame_id: self.frame_id.clone(),
         };
-                create_msg_to_send_with_session_id(
-                    method,
-                    session_id,
-                    call_id,
-                )
+        self._to_method_str(method)
     }
 }

@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, CreateMethodCallString, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
 use crate::protocol::{dom, target};
 
 #[derive(Debug, Builder, Default)]
@@ -13,22 +13,26 @@ pub struct GetDocumentTask {
     pub task_result: Option<dom::Node>,
 }
 
-impl From<GetDocumentTask> for TaskDescribe {
-    fn from(get_document: GetDocumentTask) -> Self {
-        TaskDescribe::GetDocument(Box::new(get_document))
-    }
-}
+// impl From<GetDocumentTask> for TaskDescribe {
+//     fn from(get_document: GetDocumentTask) -> Self {
+//         TaskDescribe::GetDocument(Box::new(get_document))
+//     }
+// }
 
-impl CreateMethodCallString for GetDocumentTask {
-    fn create_method_call_string(&self, session_id: Option<&target::SessionID>, call_id: usize) -> String {
+impl TargetCallMethodTaskFace for GetDocumentTask {
+    fn get_session_id(&self) -> Option<&target::SessionID> {
+        self.common_fields.session_id.as_ref()
+    }
+
+    fn get_call_id(&self) -> usize {
+        self.common_fields.call_id
+    }
+
+    fn get_method_str(&self) -> String {
         let method = dom::methods::GetDocument {
             depth: self.depth.or(Some(0)),
             pierce: Some(self.pierce),
         };
-                create_msg_to_send_with_session_id(
-                    method,
-                    session_id,
-                    call_id,
-                )
+        self._to_method_str(method)
     }
 }

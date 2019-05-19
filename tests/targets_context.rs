@@ -36,9 +36,9 @@ impl Future for TargetsContext {
     #[allow(clippy::cognitive_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
@@ -61,7 +61,7 @@ impl Future for TargetsContext {
                         self.page_enabled_be_called += 1;
                         info!("page enabled.");
                     }
-                    PageResponse::RuntimeCallFunctionOn(result) => {
+                    PageResponse::CallFunctionOnDone(result) => {
                         info!("got call result: {:?}", result);
                         let file_name = "target/qrcode.png";
                         let path = Path::new(file_name);
@@ -83,8 +83,8 @@ impl Future for TargetsContext {
                         write_base64_str_to(file_name, base64_data).unwrap();
                         assert!(path.exists());
                     }
-                    PageResponse::RuntimeEvaluate(_result, _exception_details) => {},
-                    PageResponse::RuntimeGetProperties(return_object) => {
+                    PageResponse::EvaluateDone(_result, _exception_details) => {},
+                    PageResponse::GetPropertiesDone(return_object) => {
                         let get_properties_return_object =
                             return_object.expect("should return get_properties_return_object");
                         info!(
@@ -107,7 +107,7 @@ impl Future for TargetsContext {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {

@@ -26,19 +26,19 @@ impl Future for LoadEventFired {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     },
                     PageResponse::PageEnable => {
                         info!("page enabled.");
-                        tab.unwrap().navigate_to(self.url, None);
+                        tab.expect("tab should exists.").navigate_to(self.url, None);
                     },
                     PageResponse::FrameNavigated(frame_id) => {
-                        let tab = tab.unwrap();
-                        let frame = tab.find_frame_by_id(&frame_id).unwrap();
+                        let tab = tab.expect("tab should exists.");
+                        let frame = tab.find_frame_by_id(&frame_id).expect("should found frame.");
                         info!("got frame: {:?}", frame_id);
                         if frame.name == Some("ddlogin-iframe".into()) {
                             info!("send get document command.");
@@ -49,7 +49,7 @@ impl Future for LoadEventFired {
                     }
                     PageResponse::GetDocument => {
                         self.call_count += 1;
-                        if let Some(nd) = &tab.unwrap().root_node {
+                        if let Some(nd) = &tab.expect("get_document tab should exists.").root_node {
                             self.root_node = Some(nd.node_id);
                         }
                         
@@ -57,9 +57,9 @@ impl Future for LoadEventFired {
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
                         if seconds > 19 {
-                            assert_eq!(self.debug_session.chrome_debug_session.lock().unwrap().tasks_waiting_for_response_count(), 0);
+                            assert_eq!(self.debug_session.chrome_debug_session.lock().expect("chrome_debug_session should obtained.").tasks_waiting_for_response_count(), 0);
                             assert_eq!(self.call_count, 3);
-                            let tab = self.debug_session.first_page_mut().unwrap();
+                            let tab = self.debug_session.first_page_mut().expect("first page should exists.");
                             assert_eq!(tab.changing_frames.len(), 8);
                             if let Some(frame) = tab.main_frame() {
                                 assert_eq!(tab.target_info.target_id, frame.id);
@@ -71,7 +71,7 @@ impl Future for LoadEventFired {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {
@@ -92,7 +92,7 @@ fn t_load_event_fired() {
         ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    runtime.block_on(my_page.into_future()).expect("tokio should success.");
 }
 
 // enum Thing {

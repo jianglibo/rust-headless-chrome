@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::target;
 
 #[derive(Debug, Builder, Clone)]
@@ -8,12 +8,6 @@ pub struct SetDiscoverTargetsTask {
     pub common_fields: CommonDescribeFields,
     pub discover: bool,
 }
-
-// impl From<CreateTargetTask> for TaskDescribe {
-//     fn from(task: CreateTargetTask) -> Self {
-//         TaskDescribe::CreateTarget(Box::new(task))
-//     }
-// }
 
 impl TargetCallMethodTaskFace for SetDiscoverTargetsTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -29,3 +23,5 @@ impl TargetCallMethodTaskFace for SetDiscoverTargetsTask {
         create_msg_to_send(method, MethodDestination::Browser, self.get_call_id())
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::TargetSetDiscoverTargets, SetDiscoverTargetsTask);

@@ -1,8 +1,7 @@
 use super::chrome_debug_session::ChromeDebugSession;
-use super::inner_event::inner_events;
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, TaskDescribe};
-use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id};
+use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask,};
+use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events};
 use crate::protocol::{self, dom, page, runtime, target};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -132,7 +131,7 @@ impl Tab {
 
     pub fn verify_execution_context_id(
         &self,
-        console_api_called: &inner_events::ConsoleAPICalledParams,
+        console_api_called: &embedded_events::ConsoleAPICalledParams,
     ) {
         let ex = self
             .execution_context_descriptions
@@ -408,12 +407,12 @@ impl Tab {
     }
 
     pub fn runtime_enable(&mut self, manual_task_id: Option<TaskId>) {
+        let common_fields = self.get_c_f(manual_task_id);
+        let task = RuntimeEnableTask{common_fields};
         self.chrome_session
             .lock()
             .unwrap()
-            .execute_task(vec![TaskDescribe::RuntimeEnable(
-                self.get_c_f(manual_task_id),
-            )]);
+            .execute_task(vec![task.into()]);
     }
 
     pub fn runtime_evaluate_expression(

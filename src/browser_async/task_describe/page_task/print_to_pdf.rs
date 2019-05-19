@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -39,12 +39,6 @@ pub struct PrintToPdfTask {
     pub task_result: Option<String>,
 }
 
-// impl From<PrintToPdfTask> for TaskDescribe {
-//     fn from(print_to_pdf: PrintToPdfTask) -> Self {
-//         TaskDescribe::PrintToPDF(Box::new(print_to_pdf))
-//     }
-// }
-
 impl TargetCallMethodTaskFace for PrintToPdfTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
         self.common_fields.session_id.as_ref()
@@ -79,3 +73,5 @@ impl TargetCallMethodTaskFace for PrintToPdfTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::PrintToPDF, PrintToPdfTask);

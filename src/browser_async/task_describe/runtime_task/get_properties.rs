@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -15,12 +15,6 @@ pub struct RuntimeGetPropertiesTask {
     #[builder(default = "None")]
     pub task_result: Option<runtime::methods::GetPropertiesReturnObject>,
 }
-
-// impl From<RuntimeGetPropertiesTask> for TaskDescribe {
-//     fn from(get_properties: RuntimeGetPropertiesTask) -> Self {
-//         TaskDescribe::RuntimeGetProperties(Box::new(get_properties))
-//     }
-// }
 
 impl TargetCallMethodTaskFace for RuntimeGetPropertiesTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -41,3 +35,5 @@ impl TargetCallMethodTaskFace for RuntimeGetPropertiesTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::RuntimeGetProperties, RuntimeGetPropertiesTask);

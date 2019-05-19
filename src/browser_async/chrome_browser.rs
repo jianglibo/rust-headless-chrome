@@ -131,7 +131,7 @@ impl Stream for ChromeBrowser {
                             if let OwnedMessage::Text(msg) = message {
                                 let parsed_message = protocol::parse_raw_message(&msg);
                                 trace!("got message (***every message***): {:?}", msg);
-                                return Ok(Async::Ready(Some(parsed_message.unwrap())));
+                                return Ok(Async::Ready(Some(parsed_message.expect("parsed_message"))));
                             } else {
                                 error!("got unknown message: {:?}", message);
                             }

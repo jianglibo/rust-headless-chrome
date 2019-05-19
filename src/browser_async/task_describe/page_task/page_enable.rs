@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -6,12 +6,6 @@ use crate::protocol::{page, target};
 pub struct PageEnableTask {
     pub common_fields: CommonDescribeFields,
 }
-
-// impl From<PageEnableTask> for TaskDescribe {
-//     fn from(task: PageEnableTask) -> Self {
-//         TaskDescribe::PageEnable(task)
-//     }
-// }
 
 impl TargetCallMethodTaskFace for PageEnableTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -27,3 +21,5 @@ impl TargetCallMethodTaskFace for PageEnableTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::PageEnable, PageEnableTask);

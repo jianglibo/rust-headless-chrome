@@ -26,7 +26,7 @@ struct QuerySelector {
 
 impl QuerySelector {
     fn assert_result(&self) {
-        let tab = self.debug_session.main_tab().unwrap();
+        let tab = self.debug_session.main_tab().expect("main tab should exists.");
         assert_eq!(self.call_count, 4);
         assert!(self.task_id_100_called);
         assert!(tab.temporary_node_holder.len() >= 7);
@@ -40,19 +40,23 @@ impl Future for QuerySelector {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let mut tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let mut tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                let task_id = page_response_wrapper.task_id;
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
-                    PageResponse::PageEnable => {
-                        info!("page enabled.");
-                        assert!(tab.is_some());
-                        if let Some(t) = tab {
-                            t.navigate_to(self.url, None);
-                        }
+                    PageResponse::PageCreated(page_idx) => {
+                        let tab = tab.expect("tab should exists.");
+                        tab.attach_to_page();
                     }
+                    PageResponse::PageAttached(_page_info, _session_id) => {
+                        let tab = tab.expect("tab should exists. PageAttached");
+                        tab.page_enable();
+                        tab.navigate_to(self.url, None);
+                    }
+                    PageResponse::PageEnable => {}
                     PageResponse::FrameNavigated(frame_id) => {
                         let frame = tab
                             .and_then(|t| t.find_frame_by_id(&frame_id))
@@ -65,7 +69,7 @@ impl Future for QuerySelector {
                             }
                         }
                     }
-                    PageResponse::QuerySelector(selector, node_id) => {
+                    PageResponse::QuerySelectorDone(selector, node_id) => {
                         self.call_count += 1;
                         if task_id == Some(102) {
                             assert_eq!(selector, "#not-existed");
@@ -84,19 +88,18 @@ impl Future for QuerySelector {
                             let content_document_id = content_document.map(|cd| cd.node_id);
                             let mut task_builder = tasks::DescribeNodeTaskBuilder::default();
                             task_builder.backend_node_id(backend_node_id).depth(10);
-                            tab.as_mut()
-                                .map(|t| t.describe_node(task_builder, Some(105)));
+                            if let Some(t) = tab.as_mut() { t.describe_node(task_builder, Some(105)) }
                             let mut task_builder = tasks::QuerySelectorTaskBuilder::default();
                             task_builder
                                 .node_id(content_document_id)
                                 .selector("#qrcode img"); // got nothing.
-                            tab.map(|t| t.query_selector(task_builder, Some(106)));
+                            if let Some(t) = tab { t.query_selector(task_builder, Some(106)) }
                         } else {
                             assert_eq!(Some(0), node_id);
                             info!("got node_id in frame: {:?}", node_id);
                         }
                     }
-                    PageResponse::DescribeNode(_selector, node_id) => {
+                    PageResponse::DescribeNodeDone(_selector, node_id) => {
                         if task_id == Some(105) {
                             if let Some(t) = tab {
                                 info!(
@@ -114,7 +117,7 @@ impl Future for QuerySelector {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {
@@ -126,7 +129,7 @@ impl Future for QuerySelector {
 
 #[test]
 fn t_dom_query_selector() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
@@ -137,5 +140,5 @@ fn t_dom_query_selector() {
         ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    runtime.block_on(my_page.into_future()).expect("tokio should success.")
 }

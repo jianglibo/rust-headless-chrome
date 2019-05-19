@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -14,12 +14,6 @@ pub struct CaptureScreenshotTask {
     #[builder(default = "None")]
     pub task_result: Option<String>,
 }
-
-// impl From<CaptureScreenshotTask> for TaskDescribe {
-//     fn from(capture_screenshot: CaptureScreenshotTask) -> Self {
-//         TaskDescribe::CaptureScreenshot(Box::new(capture_screenshot))
-//     }
-// }
 
 impl TargetCallMethodTaskFace for CaptureScreenshotTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -49,3 +43,5 @@ impl TargetCallMethodTaskFace for CaptureScreenshotTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::CaptureScreenshot, CaptureScreenshotTask);

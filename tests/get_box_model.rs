@@ -28,9 +28,10 @@ impl Future for GetBoxModelTest {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
@@ -54,7 +55,7 @@ impl Future for GetBoxModelTest {
                             }
                         }
                     }
-                    PageResponse::GetBoxModel(selector, box_model) => {
+                    PageResponse::GetBoxModelDone(selector, box_model) => {
                         trace!("got box model: {:?}", box_model);
                         assert!(box_model.is_some());
                         assert_eq!(selector, Some(self.selector.into()));
@@ -62,7 +63,7 @@ impl Future for GetBoxModelTest {
                         break Ok(().into());
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {

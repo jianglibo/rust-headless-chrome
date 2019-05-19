@@ -15,7 +15,34 @@ pub enum ChangingFrame {
 }
 
 
-pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<TaskId>, PageResponse);
+#[derive(Debug)]
+pub struct PageResponseWrapper {
+    pub target_id: Option<target::TargetId>,
+    pub task_id: Option<TaskId>,
+    pub page_response: PageResponse,
+}
+
+impl PageResponseWrapper {
+    pub fn new(page_response: PageResponse) -> Self {
+        Self {
+            target_id: None,
+            task_id: None,
+            page_response,
+        }
+    }
+}
+
+impl std::default::Default for PageResponseWrapper {
+    fn default() -> Self { 
+        Self {
+            target_id: None,
+            task_id: None,
+            page_response: PageResponse::Fail,
+        }
+    }
+}
+
+// pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<TaskId>, PageResponse);
 
 // just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
@@ -23,7 +50,7 @@ pub enum PageResponse {
     ChromeConnected,
     SecondsElapsed(usize),
     PageCreated(usize),
-    QuerySelector(String, Option<dom::NodeId>),
+    QuerySelectorDone(String, Option<dom::NodeId>),
     PageAttached(target::TargetInfo, target::SessionID),
     PageEnable,
     RuntimeEnable,
@@ -32,16 +59,16 @@ pub enum PageResponse {
     FrameNavigated(page::types::FrameId),
     FrameStoppedLoading(page::types::FrameId),
     LoadEventFired(network::types::MonotonicTime),
-    PrintToPDF(Option<String>),
-    DescribeNode(Option<String>, Option<dom::NodeId>),
-    GetBoxModel(Option<String>, Option<Box<BoxModel>>),
+    PrintToPdfDone(Option<String>),
+    DescribeNodeDone(Option<String>, Option<dom::NodeId>),
+    GetBoxModelDone(Option<String>, Option<Box<BoxModel>>),
     SetChildNodes(dom::NodeId, Vec<dom::Node>),
     GetDocument,
-    CaptureScreenshot(response_object::CaptureScreenshot),
-    RuntimeEvaluate(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
+    CaptureScreenshotDone(response_object::CaptureScreenshot),
+    EvaluateDone(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
     RuntimeExecutionContextCreated(Option<page::types::FrameId>),
-    RuntimeGetProperties(Option<runtime::methods::GetPropertiesReturnObject>),
-    RuntimeCallFunctionOn(Option<runtime::methods::CallFunctionOnReturnObject>),
+    GetPropertiesDone(Option<runtime::methods::GetPropertiesReturnObject>),
+    CallFunctionOnDone(Option<runtime::methods::CallFunctionOnReturnObject>),
     Fail,
 }
 

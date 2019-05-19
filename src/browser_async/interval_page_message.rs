@@ -3,6 +3,7 @@ use websocket::futures::{Stream};
 use tokio::timer::{Interval};
 use super::task_describe::TaskDescribe;
 use std::time::{Duration};
+use crate::protocol::target;
 
 #[derive(Debug)]
 pub struct IntervalPageMessage {
@@ -24,13 +25,13 @@ impl Default for IntervalPageMessage {
 }
 
 impl Stream for IntervalPageMessage {
-    type Item = TaskDescribe;
+    type Item = (Option<target::SessionID>, Option<target::TargetId>, TaskDescribe);
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             if try_ready!(self.interval.poll()).is_some() {
-                return Ok(Some(TaskDescribe::Interval).into());
+                return Ok(Some((None, None, TaskDescribe::Interval)).into());
             }
         }
     }

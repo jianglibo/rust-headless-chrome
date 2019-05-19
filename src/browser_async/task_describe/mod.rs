@@ -1,8 +1,8 @@
-use super::inner_event::inner_events;
+// use super::target_message_event::target_message_events;
 use crate::browser_async::{
     create_msg_to_send_with_session_id,create_msg_to_send, MethodDestination, create_unique_usize, next_call_id, TaskId,
 };
-use crate::protocol::{self, dom, page, runtime, target};
+use crate::protocol::{self, target};
 use log::*;
 
 pub mod dom_task;
@@ -13,28 +13,34 @@ pub mod target_task;
 
 pub use dom_task::{
     DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
-    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder,
+    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events,
 };
 pub use page_task::{
     CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder,
-    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_event,
+    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events,
 };
 pub use runtime_task::{
     RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
     RuntimeEnableTaskBuilder, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder,
-    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_event,
-};
-
-pub use other_task::{
-    ChromeConnectedTask, ChromeConnectedTaskBuilder, FailTask, FailTaskBuilder, IntervalTask,
-    IntervalTaskBuilder,
+    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events,
 };
 
 pub use target_task::{
     CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
-    SetDiscoverTargetsTaskBuilder, target_event,
+    SetDiscoverTargetsTaskBuilder, target_events,
 };
 
+pub trait HasSessionId {
+    fn get_session_id(&self) -> target::SessionID;
+}
+
+pub trait HasCallId {
+    fn get_call_id(&self) -> protocol::CallId;
+}
+
+pub trait HasTaskId {
+    fn get_task_id(&self) -> TaskId;
+}
 
 pub trait TargetCallMethodTaskFace {
     fn get_session_id(&self) -> Option<&target::SessionID>;
@@ -71,9 +77,6 @@ pub trait BrowserCallMethodTaskFace {
     }    
 }
 
-pub trait HasCallId {
-    fn get_call_id(&self) -> usize;
-}
 
 #[derive(Debug)]
 pub enum BrowserCallMethodTask {
@@ -127,33 +130,46 @@ impl HasCallId for TargetCallMethodTask {
 
 #[derive(Debug)]
 pub enum PageEvent {
-    DomContentEventFired(page_event::DomContentEventFired),
-    FrameAttached(page_event::FrameAttached),
-    FrameDetached(page_event::FrameDetached),
-    FrameNavigated(page_event::FrameNavigated),
-    FrameStartedLoading(page_event::FrameStartedLoading),
-    FrameStoppedLoading(page_event::FrameStoppedLoading),
-    LoadEventFired(page_event::LoadEventFired),
-    PageCreated(page_event::PageCreated),
+    DomContentEventFired(page_events::DomContentEventFired),
+    FrameAttached(page_events::FrameAttached),
+    FrameDetached(page_events::FrameDetached),
+    FrameNavigated(page_events::FrameNavigated),
+    FrameStartedLoading(page_events::FrameStartedLoading),
+    FrameStoppedLoading(page_events::FrameStoppedLoading),
+    LoadEventFired(page_events::LoadEventFired),
+    // PageCreated(page_events::PageCreated),
 }
 
 #[derive(Debug)]
 pub enum RuntimeEvent {
-    ConsoleAPICalled(runtime_event::ConsoleAPICalled),
-    ExceptionRevoked(runtime_event::ExceptionRevoked),
-    ExceptionThrown(runtime_event::ExceptionThrown),
-    ExecutionContextCreated(runtime_event::ExecutionContextCreated),
-    ExecutionContextDestroyed(runtime_event::ExecutionContextDestroyed),
-    ExecutionContextsCleared(runtime_event::ExecutionContextsCleared),
-    InspectRequested(runtime_event::InspectRequested),
+    ConsoleAPICalled(runtime_events::ConsoleAPICalled),
+    ExceptionRevoked(runtime_events::ExceptionRevoked),
+    ExceptionThrown(runtime_events::ExceptionThrown),
+    ExecutionContextCreated(runtime_events::ExecutionContextCreated),
+    ExecutionContextDestroyed(runtime_events::ExecutionContextDestroyed),
+    ExecutionContextsCleared(runtime_events::ExecutionContextsCleared),
+    InspectRequested(runtime_events::InspectRequested),
+}
+
+#[derive(Debug)]
+pub enum DomEvent {
+    AttributeModified(dom_events::AttributeModified),
+    AttributeRemoved(dom_events::AttributeRemoved),
+    CharacterDataModified(dom_events::CharacterDataModified),
+    ChildNodeCountUpdated(dom_events::ChildNodeCountUpdated),
+    ChildNodeInserted(dom_events::ChildNodeInserted),
+    ChildNodeRemoved(dom_events::ChildNodeRemoved),
+    DocumentUpdated(dom_events::DocumentUpdated),
+    SetChildNodes(dom_events::SetChildNodes),
 }
 
 #[derive(Debug)]
 pub enum TargetEvent {
-    ReceivedMessageFromTarget(target_event::ReceivedMessageFromTarget),
-    TargetCreated(target_event::TargetCreated),
-    TargetCrashed(target_event::TargetCrashed),
-    TargetInfoChanged(target_event::TargetInfoChanged),
+    ReceivedMessageFromTarget(target_events::ReceivedMessageFromTarget),
+    TargetCreated(target_events::TargetCreated),
+    TargetCrashed(target_events::TargetCrashed),
+    TargetInfoChanged(target_events::TargetInfoChanged),
+    AttachedToTarget(target_events::AttachedToTarget),
 }
 
 #[derive(Debug)]
@@ -163,57 +179,22 @@ pub enum TaskDescribe {
     PageEvent(PageEvent),
     RuntimeEvent(RuntimeEvent),
     TargetEvent(TargetEvent),
+    DomEvent(DomEvent),
+    Interval,
+    ChromeConnected,
 }
-
-// #[derive(Debug)]
-// pub enum TaskDescribe {
-//     NavigateTo(NavigateToTask),
-//     QuerySelector(QuerySelectorTask),
-//     DescribeNode(DescribeNodeTask),
-//     // ResolveNode(ResolveNode),
-//     PrintToPDF(PrintToPdfTask),
-//     GetBoxModel(GetBoxModelTask),
-//     SetChildNodes(target::TargetId, dom::NodeId, Vec<dom::Node>),
-//     GetDocument(GetDocumentTask),
-//     PageEnable(PageEnableTask),
-//     RuntimeEnable(RuntimeEnableTask),
-//     Interval(IntervalTask),
-//     FrameAttached(page::events::FrameAttachedParams, CommonDescribeFields),
-//     FrameDetached(page::types::FrameId, CommonDescribeFields),
-//     FrameStartedLoading(String, CommonDescribeFields),
-//     FrameNavigated(Box<page::Frame>, CommonDescribeFields),
-//     FrameStoppedLoading(String, CommonDescribeFields),
-//     LoadEventFired(target::TargetId, f32),
-//     TargetInfoChanged(target::TargetInfo, CommonDescribeFields),
-//     PageCreated(target::TargetInfo, Option<String>),
-//     PageAttached(target::TargetInfo, target::SessionID),
-//     CaptureScreenshot(CaptureScreenshotTask),
-//     TargetSetDiscoverTargets(SetDiscoverTargetsTask),
-//     ChromeConnected(ChromeConnectedTask),
-//     Fail(FailTask),
-//     RuntimeEvaluate(RuntimeEvaluateTask),
-//     RuntimeGetProperties(RuntimeGetPropertiesTask),
-//     RuntimeExecutionContextCreated(
-//         runtime::types::ExecutionContextDescription,
-//         CommonDescribeFields,
-//     ),
-//     RuntimeExecutionContextDestroyed(runtime::types::ExecutionContextId, CommonDescribeFields),
-//     RuntimeConsoleAPICalled(inner_events::ConsoleAPICalledParams, CommonDescribeFields),
-//     RuntimeCallFunctionOn(RuntimeCallFunctionOnTask),
-//     CreateTarget(CreateTargetTask),
-// }
 
 impl std::convert::From<&TaskDescribe> for String {
     fn from(task_describe: &TaskDescribe) -> Self {
         match task_describe {
             TaskDescribe::TargetCallMethod(target_call) => match target_call {
-                TargetCallMethodTask::QuerySelector(query_selector) => query_selector.get_method_str(),
-                TargetCallMethodTask::DescribeNode(describe_node) => describe_node.get_method_str(),
-                TargetCallMethodTask::PrintToPDF(print_to_pdf) => print_to_pdf.get_method_str(),
-                TargetCallMethodTask::GetBoxModel(get_box_model) => get_box_model.get_method_str(),
-                TargetCallMethodTask::CaptureScreenshot(capture_screenshot) => capture_screenshot.get_method_str(),
-                TargetCallMethodTask::GetDocument(get_document) => get_document.get_method_str(),
-                TargetCallMethodTask::NavigateTo(navigate_to) => navigate_to.get_method_str(),
+                TargetCallMethodTask::QuerySelector(task) => task.get_method_str(),
+                TargetCallMethodTask::DescribeNode(task) => task.get_method_str(),
+                TargetCallMethodTask::PrintToPDF(task) => task.get_method_str(),
+                TargetCallMethodTask::GetBoxModel(task) => task.get_method_str(),
+                TargetCallMethodTask::CaptureScreenshot(task) => task.get_method_str(),
+                TargetCallMethodTask::GetDocument(task) => task.get_method_str(),
+                TargetCallMethodTask::NavigateTo(task) => task.get_method_str(),
                 TargetCallMethodTask::PageEnable(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeEnable(task) => task.get_method_str(),
                 TargetCallMethodTask::TargetSetDiscoverTargets(task) => task.get_method_str(),
@@ -276,32 +257,58 @@ impl CommonDescribeFieldsBuilder {
     }
 }
 
+
+// https://doc.rust-lang.org/reference/macros-by-example.html
+// macro_rules! example {
+//     ($(I $i:ident)* E $e:expr) => { ($($i)-*) * $e };
+// }
+// let foo = 2;
+// let bar = 3;
+// // The following expands to `(foo - bar) * 5`
+// example!(I foo I bar E 5);
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use log::*;
-
-    trait Traited1 { 
-        fn get_call_id(&self) -> usize;
+    trait TraitOne { 
+        fn get_one(&self) -> usize;
     }
 
-    enum A1 {
-        A11
+    trait TraitTwo {
+        fn get_two(&self) -> usize;
     }
 
-    enum A2 {
-        A22
+    trait TraitSum {
+        fn sum(&self) -> usize;
     }
 
-    enum A12 {
-        A1(A1),
-        A2(A2),
+    struct WithOneTwo {
+        pub one: usize,
+        pub two: usize,
     }
+
+    impl TraitOne for WithOneTwo {
+        fn get_one(&self) -> usize {
+            self.one
+        }
+    }
+
+    impl TraitTwo for WithOneTwo {
+        fn get_two(&self) -> usize {
+            self.two
+        }
+    }
+
+    impl<T> TraitSum for T where T : TraitOne + TraitTwo {
+        fn sum(&self) -> usize {
+            self.get_one() + self.get_two()
+        }
+    }
+
 
     #[test]
     fn enum_and_trait() {
-        assert!(true);
-        let v = A12::A1(A1::A11);
+        let v = WithOneTwo{one: 5, two: 10};
+        assert_eq!(v.sum(), 15);
     }
 
 }

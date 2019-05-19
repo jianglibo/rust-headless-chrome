@@ -3,7 +3,7 @@ pub mod call_function_on;
 pub mod evaluate;
 pub mod get_properties;
 pub mod enable;
-pub mod runtime_event;
+pub mod runtime_events;
 
 pub use call_function_on::{RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder};
 pub use evaluate::{RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder};

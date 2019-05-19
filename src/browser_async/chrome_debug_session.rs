@@ -1,6 +1,6 @@
-use super::task_describe::{TaskDescribe, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, page_event, target_event};
+use super::task_describe::{TaskDescribe, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, page_events, target_events, dom_events, runtime_events};
 
-use super::inner_event::{self, InnerEvent};
+use super::embedded_events::{self, EmbeddedEvent};
 use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
@@ -59,50 +59,37 @@ impl ChromeDebugSession {
     #[allow(unreachable_patterns)]
     pub fn handle_inner_target_events(
         &mut self,
-        inner_event: InnerEvent,
+        target_message_event: EmbeddedEvent,
         session_id: Option<String>,
         target_id: Option<target::TargetId>,
     ) -> Option<TaskDescribe> {
-        match inner_event {
-            // InnerEvent::SetChildNodes(set_child_nodes_event) => {
-            //     let params = set_child_nodes_event.params;
-            //     return TaskDescribe::SetChildNodes(
-            //         target_id.unwrap(),
-            //         params.parent_id,
-            //         params.nodes,
-            //     )
-            //     .into();
-            // }
-            // InnerEvent::LoadEventFired(load_event_fired_event) => {
-            //     let params = load_event_fired_event.params;
-            //     return TaskDescribe::LoadEventFired(target_id.unwrap(), params.timestamp).into();
-            // }
-            // InnerEvent::ExecutionContextCreated(execution_context_created) => {
-            //     return TaskDescribe::RuntimeExecutionContextCreated(
-            //         execution_context_created.params.context,
-            //         (session_id, target_id).into(),
-            //     )
-            //     .into();
-            // }
-            // InnerEvent::ExecutionContextDestroyed(execution_context_destroyed) => {
-            //     return TaskDescribe::RuntimeExecutionContextDestroyed(
-            //         execution_context_destroyed.params.execution_context_id,
-            //         (session_id, target_id).into(),
-            //     )
-            //     .into();
-            // }
-            // InnerEvent::ConsoleAPICalled(console_api_called) => {
-            //     return TaskDescribe::RuntimeConsoleAPICalled(
-            //         console_api_called.params,
-            //         (session_id, target_id).into(),
-            //     )
-            //     .into();
-            // }
-            InnerEvent::DomContentEventFired(dom_content_event_fired) => {
-                trace!("{:?}", dom_content_event_fired.params);
+        match target_message_event {
+            EmbeddedEvent::SetChildNodes(embedded_event) => {
+                let event = dom_events::SetChildNodes::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::LoadEventFired(embedded_event) => {
+                let event = page_events::LoadEventFired::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::ExecutionContextCreated(embedded_event) => {
+                let event = runtime_events::ExecutionContextCreated::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::ExecutionContextDestroyed(embedded_event) => {
+                let event = runtime_events::ExecutionContextDestroyed::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::ConsoleAPICalled(embedded_event) => {
+                let event = runtime_events::ConsoleAPICalled::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::DomContentEventFired(embedded_event) => {
+                let event = page_events::DomContentEventFired::new(embedded_event);
+                return TaskDescribe::from(event).into();
             }
             _ => {
-                warn!("discard inner event: {:?}", inner_event);
+                warn!("discard inner event: {:?}", target_message_event);
             }
         }
         None
@@ -185,24 +172,19 @@ impl ChromeDebugSession {
     fn execute_next_and_return_remains(
         &mut self,
         tasks: Vec<TaskDescribe>,
-    ) -> Result<(), failure::Error> {
-        let next_task = tasks.get(0).unwrap();
-        match String::try_from(next_task) {
-            Ok(method_str) => {
-                self.tasks_waiting_for_response.push(tasks);
-                self.send_message_direct(method_str);
-                Ok(())
-            }
-            Err(error) => Err(ChromePageError::NextTaskExecution { tasks, error }.into()),
-        }
-    }
+    ) {
+        let next_task = tasks.get(0).expect("execute_next_and_return_remains got empty tasks.");
+        let method_str = String::from(next_task);
+        self.tasks_waiting_for_response.push(tasks);
+        self.send_message_direct(method_str);
+     }
 
     fn handle_next_task(
         &mut self,
         current_task: TaskDescribe,
         mut tasks: Vec<TaskDescribe>,
     ) -> Result<(), failure::Error> {
-        let mut next_task = tasks.get_mut(0).unwrap();
+        let mut next_task = tasks.get_mut(0).expect("handle_next_task received empty tasks.");
         match (&current_task, &mut next_task) {
             (
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetDocument(get_document)),
@@ -212,28 +194,30 @@ impl ChromeDebugSession {
                     .task_result
                     .as_ref()
                     .and_then(|nd| Some(nd.node_id));
-                return self.execute_next_and_return_remains(tasks);
+                self.execute_next_and_return_remains(tasks);
             }
             (
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::DescribeNode(describe_node)),
             ) => {
                 describe_node.node_id = query_selector.task_result;
-                return self.execute_next_and_return_remains(tasks);
+                self.execute_next_and_return_remains(tasks);
             }
             (
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)),
             ) => {
                 get_box_model.node_id = query_selector.task_result;
-                return self.execute_next_and_return_remains(tasks);
+                self.execute_next_and_return_remains(tasks);
             }
-            (TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)), 
-            TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(screen_shot)) => {
+            (
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)), 
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(screen_shot)),
+            ) => {
                 if let Some(mb) = &get_box_model.task_result {
                     let viewport = mb.content_viewport();
                     screen_shot.clip = Some(viewport);
-                    return self.execute_next_and_return_remains(tasks);
+                    self.execute_next_and_return_remains(tasks);
                 } else {
                     failure::bail!("found_box is None!");
                 }
@@ -312,9 +296,15 @@ impl ChromeDebugSession {
                     let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
                     task.task_result = Some(task_return_object.data);
                 }
+                TargetCallMethodTask::TargetSetDiscoverTargets(task) => {
+                    warn!("got unprocessed task_describe: {:?}", task);
+                }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
-
+                BrowserCallMethodTask::CreateTarget(task) => {
+                    warn!("got unprocessed task_describe: {:?}", task);
+                }
+                _ => ()
             }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);
@@ -331,84 +321,101 @@ impl ChromeDebugSession {
         target_id: Option<String>,
     ) -> Option<TaskDescribe> {
         match protocol_event {
-            protocol::Event::FrameNavigated(frame_navigated_event) => {
-                let ev = page_event::FrameNavigated {
-                    frame: frame_navigated_event.params.frame,
-                    session_id,
-                    target_id, 
-                };
-                return Some(TaskDescribe::from(ev));
+            protocol::Event::FrameNavigated(raw_event) => {
+                let event = page_events::FrameNavigated::new(raw_event);
+                return Some(event.into());
+                // let ev = page_events::FrameNavigated {
+                //     frame: frame_navigated_event.params.frame,
+                //     session_id,
+                //     target_id, 
+                // };
+                // return Some(TaskDescribe::from(ev));
             }
-            protocol::Event::TargetInfoChanged(target_info_changed) => {
-                let te = target_event::TargetInfoChanged {
-                    target_info: target_info_changed.params.target_info,
-                    session_id,
-                    target_id,
-                };
-                return Some(te.into());
+            protocol::Event::TargetInfoChanged(raw_event) => {
+                let event = target_events::TargetInfoChanged::new(raw_event);
+                return Some(event.into());
+                // let te = target_events::TargetInfoChanged {
+                //     target_info: target_info_changed.params.target_info,
+                //     session_id,
+                //     target_id,
+                // };
+                // return Some(te.into());
             }
-            protocol::Event::TargetCreated(target_created_event) => {
-                let target_type = &(target_created_event.params.target_info.target_type);
-                match target_type {
-                    protocol::target::TargetType::Page => {
-                        trace!(
-                            "receive page create event. {:?}",
-                            target_created_event.params.target_info
-                        );
-                        let pe = page_event::PageCreated {
-                            target_info: target_created_event.params.target_info,
-                        };
-                        return Some(pe.into());
-                    }
-                    _ => (),
-                }
+            protocol::Event::TargetCreated(raw_event) => {
+                let event = target_events::TargetCreated::new(raw_event);
+                return Some(event.into());
+                // let target_type = &(target_created_event.params.target_info.target_type);
+                // match target_type {
+                //     protocol::target::TargetType::Page => {
+                //         trace!(
+                //             "receive page create event. {:?}",
+                //             target_created_event.params.target_info
+                //         );
+                //         let pe = page_events::PageCreated {
+                //             target_info: target_created_event.params.target_info,
+                //         };
+                //         return Some(pe.into());
+                //     }
+                //     _ => (),
+                // }
             }
-            protocol::Event::AttachedToTarget(event) => {
-                let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
-                    event.params;
-                let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
+            protocol::Event::AttachedToTarget(raw_event) => {
+                let event = target_events::AttachedToTarget::new(raw_event);
+                return Some(event.into());
+                // return TaskDescribe::from(target_events::AttachedToTarget::new(event.params)).into();
+                // let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
+                //     event.params;
+                // let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
 
-                match target_info.target_type {
-                    protocol::target::TargetType::Page => {
-                        trace!(
-                            "got attach to page event and sessionId: {}",
-                            attach_to_target_params.session_id
-                        );
-                        return Some(TaskDescribe::PageAttached(
-                            target_info,
-                            attach_to_target_params.session_id.into(),
-                        ));
-                        // return Some((attach_to_target_params.session_id, target_info));
-                    }
-                    _ => (),
-                }
+                // match target_info.target_type {
+                //     protocol::target::TargetType::Page => {
+                //         trace!(
+                //             "got attach to page event and sessionId: {}",
+                //             attach_to_target_params.session_id
+                //         );
+                //         return Some(TaskDescribe::PageAttached(
+                //             target_info,
+                //             attach_to_target_params.session_id.into(),
+                //         ));
+                //         // return Some((attach_to_target_params.session_id, target_info));
+                //     }
+                //     _ => (),
+                // }
             }
-            protocol::Event::FrameAttached(evt) => {
-                return Some(TaskDescribe::FrameAttached(
-                    evt.params,
-                    (session_id, target_id).into(),
-                ));
+            protocol::Event::FrameAttached(raw_event) => {
+                let event = page_events::FrameAttached::new(raw_event);
+                return Some(event.into());
+                // return TaskDescribe::from(page_events::FrameAttached::new(event.params)).into();
+                // return Some(TaskDescribe::FrameAttached(
+                //     evt.params,
+                //     (session_id, target_id).into(),
+                // ));
             }
             protocol::Event::FrameStoppedLoading(evt) => {
                 let frame_id = evt.params.frame_id;
-                return Some(TaskDescribe::FrameStoppedLoading(
-                    frame_id,
-                    (session_id, target_id).into(),
-                ));
+                return TaskDescribe::from(page_events::FrameStoppedLoading{frame_id}).into();
+                // return Some(TaskDescribe::FrameStoppedLoading(
+                //     frame_id,
+                //     (session_id, target_id).into(),
+                // ));
             }
             protocol::Event::FrameStartedLoading(evt) => {
                 let frame_id = evt.params.frame_id;
-                return Some(TaskDescribe::FrameStartedLoading(
-                    frame_id,
-                    (session_id, target_id).into(),
-                ));
+                return TaskDescribe::from(page_events::FrameStartedLoading{frame_id}).into();
+                // return Some(TaskDescribe::FrameStartedLoading(
+                //     frame_id,
+                //     (session_id, target_id).into(),
+                // ));
             }
-            protocol::Event::FrameDetached(evt) => {
-                let frame_id = evt.params.frame_id;
-                return Some(TaskDescribe::FrameDetached(
-                    frame_id,
-                    (session_id, target_id).into(),
-                ));
+            protocol::Event::FrameDetached(raw_event) => {
+                let event = page_events::FrameDetached::new(raw_event);
+                return Some(event.into());
+                // let frame_id = evt.params.frame_id;
+                // return TaskDescribe::from(page_events::FrameDetached{frame_id}).into();
+                // return Some(TaskDescribe::FrameDetached(
+                //     frame_id,
+                //     (session_id, target_id).into(),
+                // ));
             }
             _ => {
                 warn!("unprocessed inner event: {:?}", protocol_event);
@@ -416,26 +423,14 @@ impl ChromeDebugSession {
         }
         None
     }
-}
 
-pub fn parse_raw_message(raw_message: &str) -> Result<inner_event::InnerEventWrapper, Error> {
-    Ok(serde_json::from_str::<inner_event::InnerEventWrapper>(
-        raw_message,
-    )?)
-}
-
-// The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
-impl Stream for ChromeDebugSession {
-    type Item = TaskDescribe;
-    type Error = failure::Error;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            if let Some(value) = try_ready!(self.chrome_browser.poll()) {
+fn process_message(&mut self, value: protocol::Message) -> Option<(Option<target::SessionID>, Option<target::TargetId>, TaskDescribe)> {
                 match value {
                     protocol::Message::Response(resp) => {
                         if let Some(page_message) = self.handle_response(resp, None, None) {
-                            break Ok(Some(page_message).into());
+                            (None, None, page_message).into()
+                        } else{
+                            None
                         }
                     }
                     protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
@@ -448,29 +443,35 @@ impl Stream for ChromeDebugSession {
                         match protocol::parse_raw_message(&message_field) {
                             Ok(protocol::Message::Response(resp)) => {
                                 if let Some(page_message) =
-                                    self.handle_response(resp, Some(session_id), Some(target_id))
+                                    self.handle_response(resp, Some(session_id.clone()), Some(target_id.clone()))
                                 {
-                                    break Ok(Some(page_message).into());
+                                    (Some(session_id), Some(target_id), page_message).into()
+                                } else {
+                                    None
                                 }
                             }
                             Ok(protocol::Message::Event(protocol_event)) => {
                                 if let Some(page_message) = self.handle_protocol_event(
                                     protocol_event,
-                                    Some(session_id),
-                                    Some(target_id),
+                                    Some(session_id.clone()),
+                                    Some(target_id.clone()),
                                 ) {
-                                    break Ok(Some(page_message).into());
+                                    (Some(session_id), Some(target_id), page_message).into()
+                                } else {
+                                    None
                                 }
                             }
                             _ => match parse_raw_message(&message_field) {
-                                Ok(inner_event::InnerEventWrapper::InnerEvent(inner_event)) => {
-                                    trace!("got inner event: {:?}", inner_event);
+                                Ok(embedded_events::EmbeddedEventWrapper::EmbeddedEvent(target_message_event)) => {
+                                    trace!("got inner event: {:?}", target_message_event);
                                     if let Some(page_message) = self.handle_inner_target_events(
-                                        inner_event,
-                                        Some(session_id),
-                                        Some(target_id),
+                                        target_message_event,
+                                        Some(session_id.clone()),
+                                        Some(target_id.clone()),
                                     ) {
-                                        break Ok(Some(page_message).into());
+                                        (Some(session_id), Some(target_id), page_message).into()
+                                    } else{
+                                        None
                                     }
                                 }
                                 Err(_error) => {
@@ -478,6 +479,7 @@ impl Stream for ChromeDebugSession {
                                         "parse_raw_message failed ** {:?}",
                                         message_field
                                     );
+                                    None
                                 }
                             },
                         }
@@ -486,39 +488,40 @@ impl Stream for ChromeDebugSession {
                         if let Some(page_message) =
                             self.handle_protocol_event(protocol_event, None, None)
                         {
-                            break Ok(Some(page_message).into());
+                            (None, None, page_message).into()
+                        } else {
+                            None
                         }
                     }
                     protocol::Message::Connected => {
-                        break Ok(Some(TaskDescribe::ChromeConnected).into());
+                        Some((None, None, TaskDescribe::ChromeConnected))
                     }
-                    //   pub enum Event {
-                    //     #[serde(rename = "Target.attachedToTarget")]
-                    //     AttachedToTarget(target::events::AttachedToTargetEvent),
-                    //     #[serde(rename = "Target.receivedMessageFromTarget")]
-                    //     ReceivedMessageFromTarget(target::events::ReceivedMessageFromTargetEvent),
-                    //     #[serde(rename = "Target.targetInfoChanged")]
-                    //     TargetInfoChanged(target::events::TargetInfoChangedEvent),
-                    //     #[serde(rename = "Target.targetCreated")]
-                    //     TargetCreated(target::events::TargetCreatedEvent),
-                    //     #[serde(rename = "Target.targetDestroyed")]
-                    //     TargetDestroyed(target::events::TargetDestroyedEvent),
-                    //     #[serde(rename = "Page.frameStartedLoading")]
-                    //     FrameStartedLoading(page::events::FrameStartedLoadingEvent),
-                    //     #[serde(rename = "Page.frameNavigated")]
-                    //     FrameNavigated(page::events::FrameNavigatedEvent),
-                    //     #[serde(rename = "Page.frameAttached")]
-                    //     FrameAttached(page::events::FrameAttachedEvent),
-                    //     #[serde(rename = "Page.frameStoppedLoading")]
-                    //     FrameStoppedLoading(page::events::FrameStoppedLoadingEvent),
-                    //     #[serde(rename = "Page.lifecycleEvent")]
-                    //     Lifecycle(page::events::LifecycleEvent),
-                    //     #[serde(rename = "Network.requestIntercepted")]
-                    //     RequestIntercepted(network::events::RequestInterceptedEvent),
-                    // }
                     other => {
                         warn!("got unknown message1: {:?}", other);
+                        None
                     }
+                }
+}
+}
+
+pub fn parse_raw_message(raw_message: &str) -> Result<embedded_events::EmbeddedEventWrapper, Error> {
+    Ok(serde_json::from_str::<embedded_events::EmbeddedEventWrapper>(
+        raw_message,
+    )?)
+}
+
+
+// The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
+impl Stream for ChromeDebugSession {
+    type Item = (Option<target::SessionID>, Option<target::TargetId>, TaskDescribe);
+    type Error = failure::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        loop {
+            if let Some(value) = try_ready!(self.chrome_browser.poll()) {
+
+                if let Some(task_describe) = self.process_message(value) {
+                    break Ok(Some(task_describe).into());
                 }
             // trace!("receive message: {:?}", value);
             // return Ok(Some(PageMessage::MessageAvailable(value)).into());
@@ -530,11 +533,3 @@ impl Stream for ChromeDebugSession {
         }
     }
 }
-
-// pub type OnePageWithTimeout = TimeoutStream<OnePage>;
-// Page.frameAttached -> Page.frameStartedLoading(44) -> Page.frameNavigated(48) -> Page.domContentEventFired(64) -> Page.loadEventFired(131) -> Page.frameStoppedLoading(132)
-
-// target_id and browser_context_id keep unchanged.
-// Event(TargetInfoChanged(TargetInfoChangedEvent { params: TargetInfoChangedParams {
-// target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "about:blank", url: "about:blank", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))
-// target_info: TargetInfo { target_id: "7AF7B8E3FC73BFB961EF5F16A814EECC", target_type: Page, title: "https://pc", url: "https://pc", attached: true, opener_id: None, browser_context_id: Some("1771E7BCAE49411BB7D7C9C152191641") } } }))

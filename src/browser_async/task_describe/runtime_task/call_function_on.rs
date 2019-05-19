@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -26,12 +26,6 @@ pub struct RuntimeCallFunctionOnTask {
     pub task_result: Option<runtime::methods::CallFunctionOnReturnObject>,
 }
 
-// impl From<RuntimeCallFunctionOnTask> for TaskDescribe {
-//     fn from(task: RuntimeCallFunctionOnTask) -> Self {
-//         TaskDescribe::RuntimeCallFunctionOn(Box::new(task))
-//     }
-// }
-
 impl TargetCallMethodTaskFace for RuntimeCallFunctionOnTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
         self.common_fields.session_id.as_ref()
@@ -56,3 +50,5 @@ impl TargetCallMethodTaskFace for RuntimeCallFunctionOnTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::RuntimeCallFunctionOn, RuntimeCallFunctionOnTask);

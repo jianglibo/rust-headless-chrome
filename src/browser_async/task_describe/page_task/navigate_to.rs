@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, TargetCallMethodTaskFace, CommonDescribeFields};
+use super::super::{TaskDescribe, TargetCallMethodTaskFace, TargetCallMethodTask, CommonDescribeFields};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -15,12 +15,6 @@ pub struct NavigateToTask {
     #[builder(default = "None")]
     pub task_result: Option<page::methods::NavigateReturnObject>,
 }
-
-// impl From<NavigateToTask> for TaskDescribe {
-//     fn from(task: NavigateToTask) -> Self {
-//         TaskDescribe::NavigateTo(Box::new(task))
-//     }
-// }
 
 impl TargetCallMethodTaskFace for NavigateToTask{
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -41,3 +35,5 @@ impl TargetCallMethodTaskFace for NavigateToTask{
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::NavigateTo, NavigateToTask);

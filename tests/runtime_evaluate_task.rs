@@ -32,9 +32,10 @@ impl Future for RuntimeEvaluateTask {
     #[allow(clippy::cognitive_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                let task_id = page_response_wrapper.task_id;
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
@@ -44,7 +45,7 @@ impl Future for RuntimeEvaluateTask {
                             t.navigate_to(url, None)
                         }
                     }
-                    PageResponse::RuntimeEvaluate(result, exception_details) => {
+                    PageResponse::EvaluateDone(result, exception_details) => {
                         info!("got result: {:?}, {:?}", result, exception_details);
                         if let Some(t) = tab {
                             if let Some(oid) = result.and_then(|ro| ro.object_id) {
@@ -70,7 +71,7 @@ impl Future for RuntimeEvaluateTask {
                             break Ok(().into());
                         }
                     }
-                    PageResponse::RuntimeGetProperties(return_object) => {
+                    PageResponse::GetPropertiesDone(return_object) => {
                         if let Some(t) = tab {
                             if task_id == Some(111) {
                                 let get_properties_return_object =
@@ -92,7 +93,7 @@ impl Future for RuntimeEvaluateTask {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {

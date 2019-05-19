@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, TargetCallMethodTaskFace};
 use crate::protocol::{dom, target};
 
 #[derive(Debug, Builder, Default)]
@@ -11,12 +11,6 @@ pub struct QuerySelectorTask {
     #[builder(default = "None")]
     pub task_result: Option<dom::NodeId>,
 }
-
-// impl From<QuerySelectorTask> for TaskDescribe {
-//     fn from(query_selector: QuerySelectorTask) -> Self {
-//         TaskDescribe::QuerySelector(query_selector)
-//     }
-// }
 
 impl TargetCallMethodTaskFace for QuerySelectorTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -35,3 +29,5 @@ impl TargetCallMethodTaskFace for QuerySelectorTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::QuerySelector, QuerySelectorTask);

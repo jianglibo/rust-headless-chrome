@@ -32,9 +32,9 @@ impl Future for PrintToPdf {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, _task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
@@ -47,7 +47,7 @@ impl Future for PrintToPdf {
                     PageResponse::LoadEventFired(_monotonic_time) => {
                         tab.map(|t| t.print_to_pdf(Some(101), None));
                     }
-                    PageResponse::PrintToPDF(base64_data) => {
+                    PageResponse::PrintToPdfDone(base64_data) => {
                         let file_name = "target/print_to_pdf.pdf";
                         let path = Path::new(file_name);
                         if path.exists() && path.is_file() {
@@ -70,7 +70,7 @@ impl Future for PrintToPdf {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {

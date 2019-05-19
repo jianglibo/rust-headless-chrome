@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -32,12 +32,6 @@ pub struct RuntimeEvaluateTask {
     pub exception_details: Option<runtime::types::ExceptionDetails>,
 }
 
-// impl From<RuntimeEvaluateTask> for TaskDescribe {
-//     fn from(task: RuntimeEvaluateTask) -> Self {
-//         TaskDescribe::RuntimeEvaluate(Box::new(task))
-//     }
-// }
-
 impl TargetCallMethodTaskFace for RuntimeEvaluateTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
         self.common_fields.session_id.as_ref()
@@ -64,3 +58,5 @@ impl TargetCallMethodTaskFace for RuntimeEvaluateTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::RuntimeEvaluate, RuntimeEvaluateTask);

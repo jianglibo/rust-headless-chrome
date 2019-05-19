@@ -1,5 +1,5 @@
 use super::super::{
-    CommonDescribeFields, TaskDescribe, TargetCallMethodTaskFace
+    CommonDescribeFields, TaskDescribe, TargetCallMethodTaskFace, TargetCallMethodTask
 };
 use crate::protocol::{dom, runtime, target};
 use serde::{Deserialize, Serialize};
@@ -27,12 +27,6 @@ pub struct DescribeNodeTask {
     pub task_result: Option<dom::Node>,
 }
 
-// impl From<DescribeNodeTask> for TaskDescribe {
-//     fn from(describe_node: DescribeNodeTask) -> Self {
-//         TaskDescribe::DescribeNode(describe_node)
-//     }
-// }
-
 impl TargetCallMethodTaskFace for DescribeNodeTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
         self.common_fields.session_id.as_ref()
@@ -51,6 +45,8 @@ impl TargetCallMethodTaskFace for DescribeNodeTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::DescribeNode, DescribeNodeTask);
 
 #[cfg(test)]
 mod tests {

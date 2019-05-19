@@ -36,9 +36,10 @@ impl Future for DescribeNode {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                let task_id = page_response_wrapper.task_id;
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
@@ -63,7 +64,7 @@ impl Future for DescribeNode {
                             }
                         }
                     }
-                    PageResponse::DescribeNode(selector, node_id) => {
+                    PageResponse::DescribeNodeDone(selector, node_id) => {
                         if task_id == Some(101) {
                             assert!(node_id.is_none());
                             info!("{:?}", selector);
@@ -80,7 +81,7 @@ impl Future for DescribeNode {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {

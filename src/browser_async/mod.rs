@@ -1,3 +1,6 @@
+#[macro_use]
+pub mod sukosi_macro;
+
 pub mod chrome_browser;
 pub mod chrome_debug_session;
 pub mod interval_page_message;
@@ -6,7 +9,7 @@ pub mod page_message;
 pub mod json_assistor;
 pub mod task_describe;
 pub mod tab;
-pub mod inner_event;
+pub mod embedded_events;
 
 use failure;
 use task_describe::{self as tasks, TaskDescribe};
@@ -83,7 +86,7 @@ pub enum ChromePageError {
 
 pub static GLOBAL_METHOD_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-pub fn next_call_id() -> usize {
+pub fn next_call_id() -> protocol::CallId {
     GLOBAL_METHOD_CALL_COUNT.fetch_add(1, Ordering::SeqCst)
 }
  pub fn create_msg_to_send_with_session_id<C>(

@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
 use crate::protocol::{dom, target};
 
 #[derive(Debug, Builder, Default)]
@@ -12,12 +12,6 @@ pub struct GetDocumentTask {
     #[builder(setter(skip))]
     pub task_result: Option<dom::Node>,
 }
-
-// impl From<GetDocumentTask> for TaskDescribe {
-//     fn from(get_document: GetDocumentTask) -> Self {
-//         TaskDescribe::GetDocument(Box::new(get_document))
-//     }
-// }
 
 impl TargetCallMethodTaskFace for GetDocumentTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
@@ -36,3 +30,5 @@ impl TargetCallMethodTaskFace for GetDocumentTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::GetDocument, GetDocumentTask);

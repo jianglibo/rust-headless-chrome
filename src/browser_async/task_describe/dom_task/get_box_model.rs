@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, TargetCallMethodTaskFace, create_msg_to_send_with_session_id};
 use crate::protocol::{dom, runtime, target};
 use crate::browser::tab::element::BoxModel;
 
@@ -19,11 +19,6 @@ pub struct GetBoxModelTask {
     pub task_result: Option<BoxModel>,
 }
 
-// impl From<GetBoxModelTask> for TaskDescribe {
-//     fn from(get_box_model: GetBoxModelTask) -> Self {
-//         TaskDescribe::GetBoxModel(Box::new(get_box_model))
-//     }
-// }
 impl TargetCallMethodTaskFace for GetBoxModelTask {
     fn get_session_id(&self) -> Option<&target::SessionID> {
         self.common_fields.session_id.as_ref()
@@ -42,3 +37,5 @@ impl TargetCallMethodTaskFace for GetBoxModelTask {
         self._to_method_str(method)
     }
 }
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::GetBoxModel, GetBoxModelTask);

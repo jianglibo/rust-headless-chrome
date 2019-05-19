@@ -42,17 +42,17 @@ impl Future for RuntimeEvaluate {
     #[allow(clippy::cognitive_complexity)]
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            if let Some((tab_id, task_id, value)) = try_ready!(self.debug_session.poll()) {
-                let tab = self.debug_session.get_tab_by_id_mut(tab_id.as_ref()).ok();
-                match value {
+            if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                let task_id = page_response_wrapper.task_id;
+                match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
                     PageResponse::PageEnable => {
                         info!("page enabled.");
                         assert!(tab.is_some());
-                        let url = self.url;
-                        tab.map(|t| t.navigate_to(url, None));
+                        if let Some(t) = tab { t.navigate_to(self.url, None) }
                     }
                     PageResponse::FrameNavigated(frame_id) => {
                         let frame =
@@ -75,7 +75,7 @@ impl Future for RuntimeEvaluate {
                             });
                         }
                     }
-                    PageResponse::RuntimeCallFunctionOn(result) => {
+                    PageResponse::CallFunctionOnDone(result) => {
                         info!("got call result: {:?}", result);
                         let file_name = "target/qrcode.png";
                         let path = Path::new(file_name);
@@ -97,7 +97,7 @@ impl Future for RuntimeEvaluate {
                         write_base64_str_to(file_name, base64_data).unwrap();
                         assert!(path.exists());
                     }
-                    PageResponse::RuntimeEvaluate(result, exception_details) => match task_id {
+                    PageResponse::EvaluateDone(result, exception_details) => match task_id {
                         Some(100) => {
                             self.task_100_called = true;
                             assert!(result.is_some());
@@ -139,7 +139,7 @@ impl Future for RuntimeEvaluate {
                         }
                         _ => unreachable!(),
                     },
-                    PageResponse::RuntimeGetProperties(return_object) => {
+                    PageResponse::GetPropertiesDone(return_object) => {
                         let get_properties_return_object =
                             return_object.expect("should return get_properties_return_object");
                         info!(
@@ -183,7 +183,7 @@ impl Future for RuntimeEvaluate {
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", value);
+                        trace!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {

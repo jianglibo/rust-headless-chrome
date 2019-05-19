@@ -391,17 +391,21 @@ impl ChromeDebugSession {
                 //     (session_id, target_id).into(),
                 // ));
             }
-            protocol::Event::FrameStoppedLoading(evt) => {
-                let frame_id = evt.params.frame_id;
-                return TaskDescribe::from(page_events::FrameStoppedLoading{frame_id}).into();
+            protocol::Event::FrameStoppedLoading(raw_event) => {
+                let event = page_events::FrameStoppedLoading::new(raw_event);
+                return Some(event.into());
+                // let frame_id = evt.params.frame_id;
+                // return TaskDescribe::from(page_events::FrameStoppedLoading{frame_id}).into();
                 // return Some(TaskDescribe::FrameStoppedLoading(
                 //     frame_id,
                 //     (session_id, target_id).into(),
                 // ));
             }
-            protocol::Event::FrameStartedLoading(evt) => {
-                let frame_id = evt.params.frame_id;
-                return TaskDescribe::from(page_events::FrameStartedLoading{frame_id}).into();
+            protocol::Event::FrameStartedLoading(raw_event) => {
+                let event = page_events::FrameStartedLoading::new(raw_event);
+                return Some(event.into());
+                // let frame_id = evt.params.frame_id;
+                // return TaskDescribe::from(page_events::FrameStartedLoading{frame_id}).into();
                 // return Some(TaskDescribe::FrameStartedLoading(
                 //     frame_id,
                 //     (session_id, target_id).into(),

@@ -216,8 +216,8 @@ impl DebugSession {
     fn handle_target_event(
         &mut self,
         target_event: TargetEvent,
-        session_id: Option<target::SessionID>,
-        target_id: Option<target::TargetId>,
+        maybe_session_id: Option<target::SessionID>,
+        maybe_target_id: Option<target::TargetId>,
     ) -> PageResponseWrapper {
         match target_event {
             TargetEvent::ReceivedMessageFromTarget(event) => {}
@@ -225,12 +225,12 @@ impl DebugSession {
                 if let target::TargetType::Page = event.get_target_type() {
                     info!("receive page created event: {:?}", event);
                     let target_info = event.to_target_info();
-                    let this_target_id = target_info.target_id.clone();
+                    let target_id = target_info.target_id.clone();
                     let tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                     self.tabs.push(tab);
                     let idx = self.tabs.len();
                     return PageResponseWrapper{
-                        target_id: Some(this_target_id),
+                        target_id: Some(target_id),
                         task_id: None,
                         page_response: PageResponse::PageCreated(idx),
                     };
@@ -240,8 +240,13 @@ impl DebugSession {
             }
             TargetEvent::TargetCrashed(event) => {}
             TargetEvent::AttachedToTarget(event) => {
-                if let Some(pg) = event.page_attached() {
-                    return pg;
+                if event.is_page_attached() {
+                    let target_id = event.get_target_id();
+                    let tab = self.get_tab_by_id_mut(Some(&target_id)).expect("when the page attached, tab should have been exists.");
+                    tab.session_id.replace(event.get_session_id());
+                    return event.try_into_page_attached().expect("should be a page attached.");
+                } else {
+                    info!("got AttachedToTarget event it's target_type was other than page.");
                 }
             }
             TargetEvent::TargetInfoChanged(event) => {}

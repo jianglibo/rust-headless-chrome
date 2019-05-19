@@ -37,3 +37,6 @@ impl TargetCallMethodTaskFace for NavigateToTask{
 }
 
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::NavigateTo, NavigateToTask);
+
+// {\"method\":\"Target.sendMessageToTarget\",\"id\":5,\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.navigate\\\",\\\"id\\\":4,\\\"params\\\":{\\\"url\\\":\\\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\\\"}}\"}}
+// {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"id\\\":4,\\\"result\\\":{\\\"frameId\\\":\\\"74FEEFE9CACC814F52F89930129A15ED\\\",\\\"loaderId\\\":\\\"53524592197E3E19D8E72E1379A32393\\\"}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}

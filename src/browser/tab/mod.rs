@@ -327,6 +327,7 @@ impl<'a> Tab {
             .call_method(dom::methods::DescribeNode {
                 node_id: Some(node_id),
                 backend_node_id: None,
+                object_id: None,
                 depth: Some(100),
             })?
             .node;

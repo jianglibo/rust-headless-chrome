@@ -199,7 +199,7 @@ impl DebugSession {
     //     }
     // }
 
-    fn handle_dom_event(&self, dom_event: DomEvent) -> PageResponseWrapper {
+    fn handle_dom_event(&self, dom_event: DomEvent) -> Result<PageResponseWrapper, failure::Error> {
         match dom_event {
             DomEvent::AttributeModified(event) => {}
             DomEvent::AttributeRemoved(event) => {}
@@ -210,7 +210,7 @@ impl DebugSession {
             DomEvent::DocumentUpdated(event) => {}
             DomEvent::SetChildNodes(event) => {}
         }
-        PageResponseWrapper::default()
+        Ok(PageResponseWrapper::default())
     }
 
     fn handle_target_event(
@@ -218,7 +218,7 @@ impl DebugSession {
         target_event: TargetEvent,
         maybe_session_id: Option<target::SessionID>,
         maybe_target_id: Option<target::TargetId>,
-    ) -> PageResponseWrapper {
+    ) -> Result<PageResponseWrapper, failure::Error> {
         match target_event {
             TargetEvent::ReceivedMessageFromTarget(event) => {}
             TargetEvent::TargetCreated(event) => {
@@ -229,11 +229,11 @@ impl DebugSession {
                     let tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                     self.tabs.push(tab);
                     let idx = self.tabs.len();
-                    return PageResponseWrapper {
+                    return Ok(PageResponseWrapper {
                         target_id: Some(target_id),
                         task_id: None,
                         page_response: PageResponse::PageCreated(idx),
-                    };
+                    });
                 } else {
                     info!("got other target_event: {:?}", event);
                 }
@@ -246,19 +246,19 @@ impl DebugSession {
                         .get_tab_by_id_mut(Some(&target_id))
                         .expect("when the page attached, tab should have been exists.");
                     tab.session_id.replace(event.get_session_id());
-                    return event
+                    return Ok(event
                         .try_into_page_attached()
-                        .expect("should be a page attached.");
+                        .expect("should be a page attached."));
                 } else {
                     info!("got AttachedToTarget event it's target_type was other than page.");
                 }
             }
             TargetEvent::TargetInfoChanged(event) => {}
         }
-        PageResponseWrapper::default()
+        Ok(PageResponseWrapper::default())
     }
 
-    fn handle_runtime_event(&self, runtime_event: RuntimeEvent) -> PageResponseWrapper {
+    fn handle_runtime_event(&self, runtime_event: RuntimeEvent) -> Result<PageResponseWrapper, failure::Error> {
         match runtime_event {
             RuntimeEvent::ConsoleAPICalled(event) => {}
             RuntimeEvent::ExceptionRevoked(event) => {}
@@ -268,7 +268,7 @@ impl DebugSession {
             RuntimeEvent::ExecutionContextsCleared(event) => {}
             RuntimeEvent::InspectRequested(event) => {}
         }
-        PageResponseWrapper::default()
+        Ok(PageResponseWrapper::default())
     }
 
     fn handle_page_event(
@@ -276,7 +276,7 @@ impl DebugSession {
         page_event: PageEvent,
         maybe_session_id: Option<target::SessionID>,
         maybe_target_id: Option<target::TargetId>,
-    ) -> PageResponseWrapper {
+    ) -> Result<PageResponseWrapper, failure::Error> {
         match page_event {
             PageEvent::DomContentEventFired(event) => {}
             PageEvent::FrameAttached(event) => {}
@@ -292,37 +292,68 @@ impl DebugSession {
                 self.get_tab_by_id_mut(maybe_target_id.as_ref())
                     .expect("FrameNavigated event should have target_id.")
                     ._frame_navigated(frame);
-                return PageResponseWrapper {
+                return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: None,
                     page_response: PageResponse::FrameNavigated(frame_id),
-                };
+                });
             }
             PageEvent::FrameStoppedLoading(event) => {}
             PageEvent::LoadEventFired(event) => {}
         }
-        PageResponseWrapper::default()
+        Ok(PageResponseWrapper::default())
     }
     fn handle_target_method_call(
-        &self,
+        &mut self,
         target_call_method_task: TargetCallMethodTask,
         maybe_session_id: Option<target::SessionID>,
         maybe_target_id: Option<target::TargetId>,
-    ) -> PageResponseWrapper {
+    ) -> Result<PageResponseWrapper, failure::Error> {
         match target_call_method_task {
-            TargetCallMethodTask::GetDocument(task) => {}
+            TargetCallMethodTask::GetDocument(task) => {
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let v = Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::GetDocumentDone,
+                });
+                tab.root_node = task.task_result;
+                return v;
+            }
             TargetCallMethodTask::NavigateTo(task) => {}
             TargetCallMethodTask::QuerySelector(task) => {
-                return PageResponseWrapper {
+                return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: Some(task.get_task_id()),
                     page_response: task.into_page_response(),
-                };
+                });
             }
-            TargetCallMethodTask::DescribeNode(task) => {}
+            TargetCallMethodTask::DescribeNode(task) => {
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let node_id = task
+                    .task_result
+                    .as_ref()
+                    .and_then(|n| Some(n.node_id));
+
+                let v = Ok(PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::DescribeNodeDone(task.selector, node_id),
+                });
+
+                tab.node_returned(task.task_result);
+                return v;
+            }
             TargetCallMethodTask::PrintToPDF(task) => {}
             TargetCallMethodTask::GetBoxModel(task) => {}
-            TargetCallMethodTask::PageEnable(task) => {}
+            TargetCallMethodTask::PageEnable(task) => {
+                info!("page_enabled: {:?}", task);
+                return Ok(PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::PageEnabled,
+                });
+            }
             TargetCallMethodTask::RuntimeEnable(task) => {}
             TargetCallMethodTask::CaptureScreenshot(task) => {}
             TargetCallMethodTask::TargetSetDiscoverTargets(task) => {}
@@ -330,7 +361,7 @@ impl DebugSession {
             TargetCallMethodTask::RuntimeGetProperties(task) => {}
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => {}
         }
-        PageResponseWrapper::default()
+        Ok(PageResponseWrapper::default())
     }
 
     // fn convert_to_page_response(
@@ -367,19 +398,19 @@ impl DebugSession {
                 )))
                 .into())
             }
-            TaskDescribe::TargetCallMethod(target_call_method_task) => {
-                Ok(Some(self.handle_target_method_call(target_call_method_task, session_id, target_id)).into())
+            TaskDescribe::TargetCallMethod(task) => {
+                Ok(self.handle_target_method_call(task, session_id, target_id).ok().into())
             }
             TaskDescribe::PageEvent(page_event) => {
-                Ok(Some(self.handle_page_event(page_event, session_id, target_id)).into())
+                Ok(self.handle_page_event(page_event, session_id, target_id).ok().into())
             }
             TaskDescribe::RuntimeEvent(runtime_event) => {
-                Ok(Some(self.handle_runtime_event(runtime_event)).into())
+                Ok(self.handle_runtime_event(runtime_event).ok().into())
             }
             TaskDescribe::TargetEvent(target_event) => {
-                Ok(Some(self.handle_target_event(target_event, session_id, target_id)).into())
+                Ok(self.handle_target_event(target_event, session_id, target_id).ok().into())
             }
-            TaskDescribe::DomEvent(dom_event) => Ok(Some(self.handle_dom_event(dom_event)).into()),
+            TaskDescribe::DomEvent(dom_event) => Ok(self.handle_dom_event(dom_event).ok().into()),
             TaskDescribe::ChromeConnected => {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));
                 Ok(resp.into())
@@ -409,14 +440,6 @@ impl DebugSession {
             //             self.send_fail(None, None)
             //         }
             //     }
-            // }
-            // TaskDescribe::PageEnable(page_enable) => {
-            //     info!("page_enabled: {:?}", page_enable);
-            //     let resp = self.convert_to_page_response(
-            //         Some(&page_enable.common_fields),
-            //         PageResponse::PageEnable,
-            //     );
-            //     Ok(resp.into())
             // }
             // // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             // TaskDescribe::FrameNavigated(frame, common_fields) => {

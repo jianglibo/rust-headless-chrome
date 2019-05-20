@@ -34,3 +34,5 @@ impl QuerySelectorTask {
 }
 
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::QuerySelector, QuerySelectorTask);
+
+// {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"A40CB7B0D59181D43BEC8EDC8C78EFB4\",\"message\":\"{\\\"id\\\":13,\\\"result\\\":{\\\"nodeId\\\":25}}\",\"targetId\":\"FDFC29FA777DCB12E9FE09D48E0B40DE\"}}

@@ -130,6 +130,7 @@ impl<'a, F: FnMut(&Node) -> bool> SearchVisitor<'a, F> {
 pub mod methods {
     use crate::protocol::Method;
     use serde::{Deserialize, Serialize};
+    use crate::protocol::runtime;
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
@@ -154,6 +155,8 @@ pub mod methods {
         pub node_id: Option<super::NodeId>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub backend_node_id: Option<super::NodeId>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub object_id: Option<runtime::types::RemoteObjectId>,
         pub depth: Option<i8>,
     }
     #[derive(Debug, Deserialize)]

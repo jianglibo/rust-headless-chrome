@@ -301,6 +301,7 @@ impl<'a> Element<'a> {
             .parent
             .call_method(dom::methods::DescribeNode {
                 node_id: None,
+                object_id: None,
                 backend_node_id: Some(self.backend_node_id),
                 depth: Some(100),
             })?

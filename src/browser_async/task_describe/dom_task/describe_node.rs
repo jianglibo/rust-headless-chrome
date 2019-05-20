@@ -32,16 +32,23 @@ impl_has_common_fields!(DescribeNodeTask);
 
 impl AsMethodCallString for DescribeNodeTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{
+        let b = self.node_id.is_some() || self.backend_node_id.is_some() || self.object_id.is_some();
+        failure::ensure!(b, "Either nodeId, backendNodeId or objectId must be specified");
         let method = dom::methods::DescribeNode {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,
+            object_id: self.object_id.clone(),
             depth: self.depth,
         };
         Ok(self.create_method_str(method))
     }
 }
 
+
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::DescribeNode, DescribeNodeTask);
+
+
+// {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"A40CB7B0D59181D43BEC8EDC8C78EFB4\",\"message\":\"{\\\"error\\\":{\\\"code\\\":-32000,\\\"message\\\":\\\"Either nodeId, backendNodeId or objectId must be specified\\\"},\\\"id\\\":18}\",\"targetId\":\"FDFC29FA777DCB12E9FE09D48E0B40DE\"}}
 
 #[cfg(test)]
 mod tests {

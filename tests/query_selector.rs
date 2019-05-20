@@ -56,7 +56,7 @@ impl Future for QuerySelector {
                         tab.page_enable();
                         tab.navigate_to(self.url, None);
                     }
-                    PageResponse::PageEnable => {}
+                    PageResponse::PageEnabled => {}
                     PageResponse::FrameNavigated(frame_id) => {
                         // error!("got frame_id: {:?}", frame_id);
                         let tab = tab.expect("tab should exists. FrameNavigated");
@@ -74,42 +74,34 @@ impl Future for QuerySelector {
                     }
                     PageResponse::QuerySelectorDone(selector, node_id) => {
                         self.call_count += 1;
+                        let tab = tab.expect("tab should exists. QuerySelectorDone");
                         if task_id == Some(102) {
                             assert_eq!(selector, "#not-existed");
                             assert_eq!(node_id, None);
                         } else if task_id == Some(100) {
                             self.task_id_100_called = true;
-                        } else if task_id == Some(101) {
-                            assert_eq!(task_id, Some(101));
+                        } else if task_id == Some(101) { // should got node_id, but not node.
 
-                            let content_document = tab
-                                .as_ref()
-                                .and_then(|t| t.find_node_by_id(node_id))
+                            let mut task_builder = tasks::DescribeNodeTaskBuilder::default();
+                            task_builder.node_id(node_id).depth(10);
+                            tab.describe_node(task_builder, Some(105));
+                        } else {
+                            assert!(node_id.is_none());
+                        }
+                    }
+                    PageResponse::DescribeNodeDone(_selector, node_id) => {
+                        let tab = tab.expect("tab should exists. DescribeNodeDone.");
+                        if task_id == Some(105) {
+                            let content_document = tab.find_node_by_id(node_id)
                                 .and_then(|n| n.content_document.as_ref());
 
-                            let backend_node_id = content_document.map(|cd| cd.backend_node_id);
+                            failure::ensure!(content_document.is_some(), "content_document should be some.");
                             let content_document_id = content_document.map(|cd| cd.node_id);
-                            let mut task_builder = tasks::DescribeNodeTaskBuilder::default();
-                            task_builder.backend_node_id(backend_node_id).depth(10);
-                            if let Some(t) = tab.as_mut() { t.describe_node(task_builder, Some(105)) }
                             let mut task_builder = tasks::QuerySelectorTaskBuilder::default();
                             task_builder
                                 .node_id(content_document_id)
                                 .selector("#qrcode img"); // got nothing.
-                            if let Some(t) = tab { t.query_selector(task_builder, Some(106)) }
-                        } else {
-                            assert_eq!(Some(0), node_id);
-                            info!("got node_id in frame: {:?}", node_id);
-                        }
-                    }
-                    PageResponse::DescribeNodeDone(_selector, node_id) => {
-                        if task_id == Some(105) {
-                            if let Some(t) = tab {
-                                info!(
-                                    "got node by backend_node_id: {:?}",
-                                    t.find_node_by_id(node_id)
-                                );
-                            }
+                            tab.query_selector(task_builder, Some(106));
                         }
                     }
                     PageResponse::SecondsElapsed(seconds) => {
@@ -132,7 +124,7 @@ impl Future for QuerySelector {
 
 #[test]
 fn t_dom_query_selector() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 

@@ -38,7 +38,7 @@ impl Future for PrintToPdf {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
-                    PageResponse::PageEnable => {
+                    PageResponse::PageEnabled => {
                         info!("page enabled.");
                         assert!(tab.is_some());
                         let url = self.url;

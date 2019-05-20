@@ -32,7 +32,7 @@ impl Future for LoadEventFired {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     },
-                    PageResponse::PageEnable => {
+                    PageResponse::PageEnabled => {
                         info!("page enabled.");
                         tab.expect("tab should exists.").navigate_to(self.url, None);
                     },
@@ -47,7 +47,7 @@ impl Future for LoadEventFired {
                             tab.get_document(Some(1), Some(102));
                         }
                     }
-                    PageResponse::GetDocument => {
+                    PageResponse::GetDocumentDone => {
                         self.call_count += 1;
                         if let Some(nd) = &tab.expect("get_document tab should exists.").root_node {
                             self.root_node = Some(nd.node_id);

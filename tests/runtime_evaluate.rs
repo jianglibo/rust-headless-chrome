@@ -49,7 +49,7 @@ impl Future for RuntimeEvaluate {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
-                    PageResponse::PageEnable => {
+                    PageResponse::PageEnabled => {
                         info!("page enabled.");
                         assert!(tab.is_some());
                         if let Some(t) = tab { t.navigate_to(self.url, None) }

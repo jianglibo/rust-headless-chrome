@@ -57,7 +57,7 @@ impl Future for TargetsContext {
                             tab.navigate_to(self.url, None);
                         }
                     }
-                    PageResponse::PageEnable => {
+                    PageResponse::PageEnabled => {
                         self.page_enabled_be_called += 1;
                         info!("page enabled.");
                     }

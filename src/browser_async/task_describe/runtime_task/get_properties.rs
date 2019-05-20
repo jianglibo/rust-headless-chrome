@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{runtime, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -19,14 +20,14 @@ pub struct RuntimeGetPropertiesTask {
 impl_has_common_fields!(RuntimeGetPropertiesTask);
 
 impl AsMethodCallString for RuntimeGetPropertiesTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error>{
         let method = runtime::methods::GetProperties {
                         object_id: self.object_id.as_str(),
                         own_properties: self.own_properties,
                         accessor_properties_only: self.accessor_properties_only,
                         generate_preview: self.generate_preview,
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

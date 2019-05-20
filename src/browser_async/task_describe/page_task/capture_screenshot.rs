@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{page, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -18,7 +19,7 @@ pub struct CaptureScreenshotTask {
 impl_has_common_fields!(CaptureScreenshotTask);
 
 impl AsMethodCallString for CaptureScreenshotTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error> {
                 let (format, quality) = match self.format {
             page::ScreenshotFormat::JPEG(quality) => {
                 (page::InternalScreenshotFormat::JPEG, quality)
@@ -34,7 +35,7 @@ impl AsMethodCallString for CaptureScreenshotTask {
             quality,
             from_surface: self.from_surface,
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

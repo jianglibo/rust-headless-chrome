@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom, target};
+use failure;
 
 #[derive(Debug, Builder, Default)]
 #[builder(setter(into))]
@@ -16,12 +17,12 @@ pub struct GetDocumentTask {
 impl_has_common_fields!(GetDocumentTask);
 
 impl AsMethodCallString for GetDocumentTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error> {
         let method = dom::methods::GetDocument {
             depth: self.depth.or(Some(0)),
             pierce: Some(self.pierce),
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

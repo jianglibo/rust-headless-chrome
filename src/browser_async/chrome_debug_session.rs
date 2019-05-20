@@ -132,13 +132,13 @@ impl ChromeDebugSession {
             // if has remote error.
             if resp.error.is_some() {
                 error!("got remote error: {:?}", resp);
-                let t = if let Some(tk) = tasks.pop() {
+                let last_task = if let Some(tk) = tasks.pop() {
                     tk
                 } else {
                     current_task
                 };
-                error!("the task: {:?}", t);
-                return Some(t);
+                error!("return current or last task with unfullfilled result: {:?}", last_task);
+                return Some(last_task);
             }
 
             if let Err(err) = self.full_fill_task(resp, &mut current_task) {
@@ -174,9 +174,12 @@ impl ChromeDebugSession {
         tasks: Vec<TaskDescribe>,
     ) {
         let next_task = tasks.get(0).expect("execute_next_and_return_remains got empty tasks.");
-        let method_str = String::from(next_task);
-        self.tasks_waiting_for_response.push(tasks);
-        self.send_message_direct(method_str);
+        if let Ok(method_str) =  String::try_from(next_task) {
+            self.tasks_waiting_for_response.push(tasks);
+            self.send_message_direct(method_str);
+        } else {
+            error!("execute_next_and_return_remains to_methd_str failed. {:?}", next_task);
+        }
      }
 
     fn handle_next_task(

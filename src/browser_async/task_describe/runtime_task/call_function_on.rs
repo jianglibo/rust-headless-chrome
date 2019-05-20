@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{runtime, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -29,7 +30,7 @@ pub struct RuntimeCallFunctionOnTask {
 impl_has_common_fields!(RuntimeCallFunctionOnTask);
 
 impl AsMethodCallString for RuntimeCallFunctionOnTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error> {
         let method = runtime::methods::CallFunctionOn {
                 function_declaration: self.function_declaration.as_ref(),
                 object_id: self.object_id.clone(),
@@ -41,7 +42,7 @@ impl AsMethodCallString for RuntimeCallFunctionOnTask {
                 execution_context_id: self.execution_context_id,
                 object_group: self.object_group.as_ref(),
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

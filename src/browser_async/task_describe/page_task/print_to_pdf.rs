@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{page, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -42,7 +43,7 @@ pub struct PrintToPdfTask {
 impl_has_common_fields!(PrintToPdfTask);
 
 impl AsMethodCallString for PrintToPdfTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) ->  Result<String, failure::Error>{
                 let options = Some(page::PrintToPdfOptions {
             landscape: self.landscape,
             display_header_footer: self.display_header_footer,
@@ -64,7 +65,7 @@ impl AsMethodCallString for PrintToPdfTask {
         let method = page::methods::PrintToPdf {
             options,
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

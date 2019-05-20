@@ -1,6 +1,7 @@
 use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, create_msg_to_send_with_session_id, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom, runtime, target};
 use crate::browser::tab::element::BoxModel;
+use failure;
 
 
 #[derive(Debug, Builder, Default)]
@@ -22,13 +23,13 @@ pub struct GetBoxModelTask {
 impl_has_common_fields!(GetBoxModelTask);
 
 impl AsMethodCallString for GetBoxModelTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error> {
         let method = dom::methods::GetBoxModel {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,
             object_id: self.object_id.as_ref().map(String::as_str)
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

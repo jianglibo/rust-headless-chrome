@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, AsMethodCallString, TargetCallMethodTask, CommonDescribeFields, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{page, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -19,14 +20,14 @@ pub struct NavigateToTask {
 impl_has_common_fields!(NavigateToTask);
 
 impl AsMethodCallString for NavigateToTask{
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error>{
                 let method = page::methods::Navigate {
             url: self.url,
             referrer: self.referrer.clone(),
             transition_type: self.transition_type.clone(),
             frame_id: self.frame_id.clone(),
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

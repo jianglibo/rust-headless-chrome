@@ -1,6 +1,7 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask,  HasCommonField, HasCallId};
 use crate::protocol::target;
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -22,7 +23,7 @@ pub struct CreateTargetTask {
 impl_has_common_fields!(CreateTargetTask);
 
 impl AsMethodCallString for CreateTargetTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) ->  Result<String, failure::Error> {
         let method = target::methods::CreateTarget {
             url: self.url.as_ref(),
             width: self.width,
@@ -30,7 +31,7 @@ impl AsMethodCallString for CreateTargetTask {
             browser_context_id: self.browser_context_id.as_ref().map(String::as_str),
             enable_begin_frame_control: self.enable_begin_frame_control,
         };
-        create_msg_to_send(method, MethodDestination::Browser, self.get_call_id())
+        Ok(create_msg_to_send(method, MethodDestination::Browser, self.get_call_id()))
     }
 }
 

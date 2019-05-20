@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{page, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -10,9 +11,9 @@ pub struct PageEnableTask {
 impl_has_common_fields!(PageEnableTask);
 
 impl AsMethodCallString for PageEnableTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error>{
         let method = page::methods::Enable{};
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

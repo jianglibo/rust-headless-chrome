@@ -58,11 +58,11 @@ impl Future for QuerySelector {
                     }
                     PageResponse::PageEnable => {}
                     PageResponse::FrameNavigated(frame_id) => {
-                        error!("got frame_id: {:?}", frame_id);
+                        // error!("got frame_id: {:?}", frame_id);
                         let tab = tab.expect("tab should exists. FrameNavigated");
                         let frame = tab.find_frame_by_id(&frame_id)
                             .filter(|f| f.name == Some("ddlogin-iframe".into()));
-                        error!("got frame: {:?}", frame);
+                        // error!("got frame: {:?}", frame);
                         if frame.is_some() {
                             let tt = self.debug_session.first_page_mut().expect("first_page_mut should exists.");
 
@@ -132,7 +132,7 @@ impl Future for QuerySelector {
 
 #[test]
 fn t_dom_query_selector() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 

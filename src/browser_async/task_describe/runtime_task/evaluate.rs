@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{runtime, target};
+use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -35,7 +36,7 @@ pub struct RuntimeEvaluateTask {
 impl_has_common_fields!(RuntimeEvaluateTask);
 
 impl AsMethodCallString for RuntimeEvaluateTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) ->  Result<String, failure::Error>{
         let method = runtime::methods::Evaluate {
             expression: self.expression.as_str(),
             object_group: self.object_group.as_ref().map(String::as_str),
@@ -49,7 +50,7 @@ impl AsMethodCallString for RuntimeEvaluateTask {
             throw_on_side_effect: self.throw_on_side_effect,
             time_out: self.time_out,
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

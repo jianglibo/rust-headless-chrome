@@ -1,6 +1,7 @@
 use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom, target};
 use crate::browser_async::{page_message::PageResponse};
+use failure;
 
 #[derive(Debug, Builder, Default)]
 #[builder(setter(into))]
@@ -16,12 +17,13 @@ pub struct QuerySelectorTask {
 impl_has_common_fields!(QuerySelectorTask);
 
 impl AsMethodCallString for QuerySelectorTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error> {
+        failure::ensure!(self.node_id.is_some(), "node_id is a must for QuerySelectorTask.");
         let method = dom::methods::QuerySelector {
-            node_id: self.node_id.expect("query_selector expect node_id."),
+            node_id: self.node_id.unwrap(),
             selector: self.selector.as_str(),
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

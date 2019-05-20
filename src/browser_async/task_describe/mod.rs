@@ -71,7 +71,7 @@ impl<T> CanCreateMethodString for T where T: HasCommonField {
 }
 
 pub trait AsMethodCallString {
-    fn get_method_str(&self) -> String;
+    fn get_method_str(&self) -> Result<String, failure::Error>;
 
     fn _empty_method_str(&self, tip: &str) -> String {
         warn!("be called unexpectedly. {:?}", tip);
@@ -185,8 +185,10 @@ pub enum TaskDescribe {
     ChromeConnected,
 }
 
-impl std::convert::From<&TaskDescribe> for String {
-    fn from(task_describe: &TaskDescribe) -> Self {
+impl std::convert::TryFrom<&TaskDescribe> for String {
+    type Error = failure::Error;
+
+    fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
         match task_describe {
             TaskDescribe::TargetCallMethod(target_call) => match target_call {
                 TargetCallMethodTask::QuerySelector(task) => task.get_method_str(),
@@ -208,7 +210,7 @@ impl std::convert::From<&TaskDescribe> for String {
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);
-                "should not be called.".into()
+                failure::bail!("should not be called.")
             }
         }
     }

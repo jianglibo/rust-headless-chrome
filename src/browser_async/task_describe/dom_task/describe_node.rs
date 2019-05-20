@@ -3,6 +3,7 @@ use super::super::{
 };
 use crate::protocol::{dom, runtime, target};
 use serde::{Deserialize, Serialize};
+use failure;
 
 #[derive(Debug, Builder, Default, Deserialize, Serialize)]
 #[builder(setter(into))]
@@ -30,13 +31,13 @@ pub struct DescribeNodeTask {
 impl_has_common_fields!(DescribeNodeTask);
 
 impl AsMethodCallString for DescribeNodeTask {
-    fn get_method_str(&self) -> String {
+    fn get_method_str(&self) -> Result<String, failure::Error>{
         let method = dom::methods::DescribeNode {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,
             depth: self.depth,
         };
-        self.create_method_str(method)
+        Ok(self.create_method_str(method))
     }
 }
 

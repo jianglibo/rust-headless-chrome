@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom, target};
 
 #[derive(Debug, Builder, Default)]
@@ -13,22 +13,19 @@ pub struct GetDocumentTask {
     pub task_result: Option<dom::Node>,
 }
 
-impl TargetCallMethodTaskFace for GetDocumentTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(GetDocumentTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for GetDocumentTask {
     fn get_method_str(&self) -> String {
         let method = dom::methods::GetDocument {
             depth: self.depth.or(Some(0)),
             pierce: Some(self.pierce),
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::GetDocument, GetDocumentTask);
+
+// {\"method\":\"Target.sendMessageToTarget\",\"id\":8,\"params\":{\"sessionId\":\"F85DC1275CA6B260B8CDB193EE948721\",\"message\":\"{\\\"method\\\":\\\"DOM.getDocument\\\",\\\"id\\\":6,\\\"params\\\":{\\\"depth\\\":0,\\\"pierce\\\":false}}\"}}
+// {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"F85DC1275CA6B260B8CDB193EE948721\",\"message\":\"{\\\"id\\\":6,\\\"result\\\":{\\\"root\\\":{\\\"nodeId\\\":1,\\\"backendNodeId\\\":3,\\\"nodeType\\\":9,\\\"nodeName\\\":\\\"#document\\\",\\\"localName\\\":\\\"\\\",\\\"nodeValue\\\":\\\"\\\",\\\"childNodeCount\\\":2,\\\"documentURL\\\":\\\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\\\",\\\"baseURL\\\":\\\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\\\",\\\"xmlVersion\\\":\\\"\\\"}}}\",\"targetId\":\"7A7BE708FCFEA9E7452B642492FD18EA\"}}

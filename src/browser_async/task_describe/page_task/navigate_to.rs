@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, TargetCallMethodTaskFace, TargetCallMethodTask, CommonDescribeFields};
+use super::super::{TaskDescribe, AsMethodCallString, TargetCallMethodTask, CommonDescribeFields, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -16,15 +16,9 @@ pub struct NavigateToTask {
     pub task_result: Option<page::methods::NavigateReturnObject>,
 }
 
-impl TargetCallMethodTaskFace for NavigateToTask{
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(NavigateToTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for NavigateToTask{
     fn get_method_str(&self) -> String {
                 let method = page::methods::Navigate {
             url: self.url,
@@ -32,7 +26,7 @@ impl TargetCallMethodTaskFace for NavigateToTask{
             transition_type: self.transition_type.clone(),
             frame_id: self.frame_id.clone(),
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 

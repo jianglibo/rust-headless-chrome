@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{page, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -15,15 +15,9 @@ pub struct CaptureScreenshotTask {
     pub task_result: Option<String>,
 }
 
-impl TargetCallMethodTaskFace for CaptureScreenshotTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(CaptureScreenshotTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for CaptureScreenshotTask {
     fn get_method_str(&self) -> String {
                 let (format, quality) = match self.format {
             page::ScreenshotFormat::JPEG(quality) => {
@@ -40,7 +34,7 @@ impl TargetCallMethodTaskFace for CaptureScreenshotTask {
             quality,
             from_surface: self.from_surface,
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 

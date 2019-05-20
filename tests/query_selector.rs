@@ -58,15 +58,18 @@ impl Future for QuerySelector {
                     }
                     PageResponse::PageEnable => {}
                     PageResponse::FrameNavigated(frame_id) => {
-                        let frame = tab
-                            .and_then(|t| t.find_frame_by_id(&frame_id))
+                        error!("got frame_id: {:?}", frame_id);
+                        let tab = tab.expect("tab should exists. FrameNavigated");
+                        let frame = tab.find_frame_by_id(&frame_id)
                             .filter(|f| f.name == Some("ddlogin-iframe".into()));
+                        error!("got frame: {:?}", frame);
                         if frame.is_some() {
-                            if let Some(tab) = self.debug_session.first_page_mut() {
-                                tab.dom_query_selector_by_selector(self.selector, Some(100));
-                                tab.dom_query_selector_by_selector("#not-existed", Some(102));
-                                tab.dom_query_selector_by_selector(self.selector, Some(101));
-                            }
+                            let tt = self.debug_session.first_page_mut().expect("first_page_mut should exists.");
+
+                            tt.dom_query_selector_by_selector(self.selector, Some(100));
+                            tt.dom_query_selector_by_selector("#not-existed", Some(102));
+                            tt.dom_query_selector_by_selector(self.selector, Some(101));
+                            
                         }
                     }
                     PageResponse::QuerySelectorDone(selector, node_id) => {

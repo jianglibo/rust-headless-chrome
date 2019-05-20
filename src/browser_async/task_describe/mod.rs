@@ -42,41 +42,36 @@ pub trait HasTaskId {
     fn get_task_id(&self) -> TaskId;
 }
 
-pub trait TargetCallMethodTaskFace {
-    fn get_session_id(&self) -> Option<&target::SessionID>;
-    fn get_call_id(&self) -> usize;
-    fn get_method_str(&self) -> String;
+pub trait HasCommonField {
+    fn get_common_fields(&self) -> &CommonDescribeFields;
+}
 
-    fn _to_method_str<C>(&self, method: C) -> String
-    where
-        C: protocol::Method + serde::Serialize,
-    {
-        create_msg_to_send_with_session_id(method, self.get_session_id(), self.get_call_id())
+impl<T> HasCallId for T where T: HasCommonField {
+    fn get_call_id(&self) -> protocol::CallId {
+        self.get_common_fields().call_id
     }
+}
+
+pub trait CanCreateMethodString {
+    fn create_method_str<C>(&self, method: C) -> String where
+        C: protocol::Method + serde::Serialize,;
+}
+
+impl<T> CanCreateMethodString for T where T: HasCommonField {
+    fn create_method_str<C>(&self, method: C) -> String where
+        C: protocol::Method + serde::Serialize, {
+            create_msg_to_send_with_session_id(method, self.get_common_fields().session_id.as_ref(), self.get_common_fields().call_id)
+        }
+}
+
+pub trait AsMethodCallString {
+    fn get_method_str(&self) -> String;
 
     fn _empty_method_str(&self, tip: &str) -> String {
         warn!("be called unexpectedly. {:?}", tip);
         String::from("")
     }    
 }
-
-pub trait BrowserCallMethodTaskFace {
-    fn get_call_id(&self) -> usize;
-    fn get_method_str(&self) -> String;
-
-    fn _to_method_str<C>(&self, method: C) -> String
-    where
-        C: protocol::Method + serde::Serialize,
-    {
-        create_msg_to_send(method, MethodDestination::Browser, self.get_call_id())
-    }
-
-    fn _empty_method_str(&self, tip: &str) -> String {
-        warn!("be called unexpectedly. {:?}", tip);
-        String::from("")
-    }    
-}
-
 
 #[derive(Debug)]
 pub enum BrowserCallMethodTask {

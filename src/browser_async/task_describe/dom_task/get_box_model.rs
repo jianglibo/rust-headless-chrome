@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, TargetCallMethodTaskFace, create_msg_to_send_with_session_id};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, create_msg_to_send_with_session_id, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom, runtime, target};
 use crate::browser::tab::element::BoxModel;
 
@@ -19,22 +19,16 @@ pub struct GetBoxModelTask {
     pub task_result: Option<BoxModel>,
 }
 
-impl TargetCallMethodTaskFace for GetBoxModelTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(GetBoxModelTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for GetBoxModelTask {
     fn get_method_str(&self) -> String {
         let method = dom::methods::GetBoxModel {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,
             object_id: self.object_id.as_ref().map(String::as_str)
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 

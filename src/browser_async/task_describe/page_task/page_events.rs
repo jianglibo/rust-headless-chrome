@@ -1,5 +1,5 @@
 use super::super::{PageEvent, TaskDescribe};
-use crate::browser_async::embedded_events;
+use crate::browser_async::{embedded_events};
 use crate::protocol::{page, target};
 
 // {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.domContentEventFired\\\",\\\"params\\\":{\\\"timestamp\\\":130939.223244}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}
@@ -32,6 +32,12 @@ wrapper_raw_event!(
     FrameNavigated,
     page::events::FrameNavigatedEvent
 );
+
+impl FrameNavigated {
+    pub fn into_frame(self) -> page::Frame {
+        self.raw_event.params.frame
+    }
+}
 
 // {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.loadEventFired\\\",\\\"params\\\":{\\\"timestamp\\\":130944.691823}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}
 wrapper_raw_event!(

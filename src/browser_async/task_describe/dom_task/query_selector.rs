@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, TargetCallMethodTaskFace};
+use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom, target};
 
 #[derive(Debug, Builder, Default)]
@@ -12,21 +12,15 @@ pub struct QuerySelectorTask {
     pub task_result: Option<dom::NodeId>,
 }
 
-impl TargetCallMethodTaskFace for QuerySelectorTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(QuerySelectorTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for QuerySelectorTask {
     fn get_method_str(&self) -> String {
         let method = dom::methods::QuerySelector {
             node_id: self.node_id.unwrap(),
             selector: self.selector.as_str(),
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 

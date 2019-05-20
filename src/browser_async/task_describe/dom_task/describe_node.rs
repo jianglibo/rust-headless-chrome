@@ -1,5 +1,5 @@
 use super::super::{
-    CommonDescribeFields, TaskDescribe, TargetCallMethodTaskFace, TargetCallMethodTask
+    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,
 };
 use crate::protocol::{dom, runtime, target};
 use serde::{Deserialize, Serialize};
@@ -27,22 +27,16 @@ pub struct DescribeNodeTask {
     pub task_result: Option<dom::Node>,
 }
 
-impl TargetCallMethodTaskFace for DescribeNodeTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(DescribeNodeTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for DescribeNodeTask {
     fn get_method_str(&self) -> String {
         let method = dom::methods::DescribeNode {
             node_id: self.node_id,
             backend_node_id: self.backend_node_id,
             depth: self.depth,
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 

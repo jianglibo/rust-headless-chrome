@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, BrowserCallMethodTask};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask,  HasCommonField, HasCallId};
 use crate::protocol::target;
 
 #[derive(Debug, Builder, Clone)]
@@ -19,18 +19,9 @@ pub struct CreateTargetTask {
     pub task_result: Option<target::TargetId>,
 }
 
+impl_has_common_fields!(CreateTargetTask);
 
-impl_into_task_describe!(TaskDescribe::BrowserCallMethod, BrowserCallMethodTask::CreateTarget, CreateTargetTask);
-
-impl TargetCallMethodTaskFace for CreateTargetTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
-
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for CreateTargetTask {
     fn get_method_str(&self) -> String {
         let method = target::methods::CreateTarget {
             url: self.url.as_ref(),
@@ -42,3 +33,5 @@ impl TargetCallMethodTaskFace for CreateTargetTask {
         create_msg_to_send(method, MethodDestination::Browser, self.get_call_id())
     }
 }
+
+impl_into_task_describe!(TaskDescribe::BrowserCallMethod, BrowserCallMethodTask::CreateTarget, CreateTargetTask);

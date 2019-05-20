@@ -47,6 +47,17 @@ macro_rules! wrapper_raw_event {
     };
 }
 
+#[macro_export]
+macro_rules! impl_has_common_fields {
+    ($target_type:ty) => {
+        impl HasCommonField for $target_type {
+            fn get_common_fields(&self) -> &CommonDescribeFields {
+                &self.common_fields
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

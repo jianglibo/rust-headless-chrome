@@ -191,7 +191,7 @@ impl DebugSession {
             let pr = PageResponseWrapper {
                 target_id: cf.target_id.clone(),
                 task_id: Some(cf.task_id),
-                page_response: PageResponse::Fail
+                page_response: PageResponse::Fail,
             };
             Ok(Some(pr).into())
         } else {
@@ -229,7 +229,7 @@ impl DebugSession {
                     let tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
                     self.tabs.push(tab);
                     let idx = self.tabs.len();
-                    return PageResponseWrapper{
+                    return PageResponseWrapper {
                         target_id: Some(target_id),
                         task_id: None,
                         page_response: PageResponse::PageCreated(idx),
@@ -242,9 +242,13 @@ impl DebugSession {
             TargetEvent::AttachedToTarget(event) => {
                 if event.is_page_attached() {
                     let target_id = event.get_target_id();
-                    let tab = self.get_tab_by_id_mut(Some(&target_id)).expect("when the page attached, tab should have been exists.");
+                    let tab = self
+                        .get_tab_by_id_mut(Some(&target_id))
+                        .expect("when the page attached, tab should have been exists.");
                     tab.session_id.replace(event.get_session_id());
-                    return event.try_into_page_attached().expect("should be a page attached.");
+                    return event
+                        .try_into_page_attached()
+                        .expect("should be a page attached.");
                 } else {
                     info!("got AttachedToTarget event it's target_type was other than page.");
                 }
@@ -267,14 +271,33 @@ impl DebugSession {
         PageResponseWrapper::default()
     }
 
-    fn handle_page_event(&self, page_event: PageEvent) -> PageResponseWrapper {
+    fn handle_page_event(
+        &mut self,
+        page_event: PageEvent,
+        maybe_session_id: Option<target::SessionID>,
+        maybe_target_id: Option<target::TargetId>,
+    ) -> PageResponseWrapper {
         match page_event {
-            // PageEvent::PageCreated(event) => {}
             PageEvent::DomContentEventFired(event) => {}
             PageEvent::FrameAttached(event) => {}
             PageEvent::FrameDetached(event) => {}
             PageEvent::FrameStartedLoading(event) => {}
-            PageEvent::FrameNavigated(event) => {}
+            PageEvent::FrameNavigated(event) => {
+                info!(
+                    "-----------------frame_navigated-----------------{:?}",
+                    event
+                );
+                let frame = event.into_frame();
+                let frame_id = frame.id.clone();
+                self.get_tab_by_id_mut(maybe_target_id.as_ref())
+                    .expect("FrameNavigated event should have target_id.")
+                    ._frame_navigated(frame);
+                return PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: None,
+                    page_response: PageResponse::FrameNavigated(frame_id),
+                };
+            }
             PageEvent::FrameStoppedLoading(event) => {}
             PageEvent::LoadEventFired(event) => {}
         }
@@ -283,11 +306,27 @@ impl DebugSession {
     fn handle_target_method_call(
         &self,
         target_call_method_task: TargetCallMethodTask,
+        maybe_session_id: Option<target::SessionID>,
+        maybe_target_id: Option<target::TargetId>,
     ) -> PageResponseWrapper {
         match target_call_method_task {
             TargetCallMethodTask::GetDocument(task) => {}
             TargetCallMethodTask::NavigateTo(task) => {}
-            TargetCallMethodTask::QuerySelector(task) => {}
+            TargetCallMethodTask::QuerySelector(task) => {
+                // return PageResponseWrapper {
+                //     target_id: maybe_target_id,
+                //     task_id: task.task_id.clone(),
+                //     page_response: PageResponse::QuerySelectorDone(),
+                // };
+                // TaskDescribe::QuerySelector(query_selector) => {
+                //     let pr = PageResponse::QuerySelector(
+                //         query_selector.selector,
+                //         query_selector.task_result,
+                //     );
+                //     let resp = self.convert_to_page_response(Some(&query_selector.common_fields), pr);
+                //     Ok(resp.into())
+                // }
+            }
             TargetCallMethodTask::DescribeNode(task) => {}
             TargetCallMethodTask::PrintToPDF(task) => {}
             TargetCallMethodTask::GetBoxModel(task) => {}
@@ -309,7 +348,7 @@ impl DebugSession {
     ) -> Option<PageResponseWrapper> {
         trace!("got page response: {:?}", page_response);
         if let Some(cf) = common_fields {
-            Some(PageResponseWrapper{
+            Some(PageResponseWrapper {
                 target_id: cf.target_id.clone(),
                 task_id: Some(cf.task_id),
                 page_response,
@@ -331,13 +370,16 @@ impl DebugSession {
         match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
-                Ok(Some(PageResponseWrapper::new(PageResponse::SecondsElapsed(self.seconds_from_start))).into())
+                Ok(Some(PageResponseWrapper::new(PageResponse::SecondsElapsed(
+                    self.seconds_from_start,
+                )))
+                .into())
             }
             TaskDescribe::TargetCallMethod(target_call_method_task) => {
-                Ok(Some(self.handle_target_method_call(target_call_method_task)).into())
+                Ok(Some(self.handle_target_method_call(target_call_method_task, session_id, target_id)).into())
             }
             TaskDescribe::PageEvent(page_event) => {
-                Ok(Some(self.handle_page_event(page_event)).into())
+                Ok(Some(self.handle_page_event(page_event, session_id, target_id)).into())
             }
             TaskDescribe::RuntimeEvent(runtime_event) => {
                 Ok(Some(self.handle_runtime_event(runtime_event)).into())

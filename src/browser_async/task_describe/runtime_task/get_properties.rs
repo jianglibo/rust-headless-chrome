@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTaskFace, TargetCallMethodTask};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{runtime, target};
 
 #[derive(Debug, Builder, Clone)]
@@ -16,15 +16,9 @@ pub struct RuntimeGetPropertiesTask {
     pub task_result: Option<runtime::methods::GetPropertiesReturnObject>,
 }
 
-impl TargetCallMethodTaskFace for RuntimeGetPropertiesTask {
-    fn get_session_id(&self) -> Option<&target::SessionID> {
-        self.common_fields.session_id.as_ref()
-    }
+impl_has_common_fields!(RuntimeGetPropertiesTask);
 
-    fn get_call_id(&self) -> usize {
-        self.common_fields.call_id
-    }
-
+impl AsMethodCallString for RuntimeGetPropertiesTask {
     fn get_method_str(&self) -> String {
         let method = runtime::methods::GetProperties {
                         object_id: self.object_id.as_str(),
@@ -32,7 +26,7 @@ impl TargetCallMethodTaskFace for RuntimeGetPropertiesTask {
                         accessor_properties_only: self.accessor_properties_only,
                         generate_preview: self.generate_preview,
         };
-        self._to_method_str(method)
+        self.create_method_str(method)
     }
 }
 

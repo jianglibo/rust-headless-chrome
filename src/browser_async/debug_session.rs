@@ -1,11 +1,11 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{response_object, PageResponse, PageResponseWrapper};
+use super::page_message::{PageResponse, PageResponseWrapper};
 use super::tab::Tab;
 use super::task_describe::{
-    self as tasks, BrowserCallMethodTask, CommonDescribeFields, DomEvent, PageEvent,
-    RuntimeEnableTask, RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent,
+    self as tasks, CommonDescribeFields, DomEvent, PageEvent,
+    RuntimeEnableTask, RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent, HasTaskId,
     TaskDescribe,
 };
 
@@ -183,21 +183,21 @@ impl DebugSession {
             .execute_task(vec![task.into()]);
     }
 
-    fn send_fail_1(
-        &mut self,
-        common_fields: Option<&CommonDescribeFields>,
-    ) -> Poll<Option<PageResponseWrapper>, failure::Error> {
-        if let Some(cf) = common_fields {
-            let pr = PageResponseWrapper {
-                target_id: cf.target_id.clone(),
-                task_id: Some(cf.task_id),
-                page_response: PageResponse::Fail,
-            };
-            Ok(Some(pr).into())
-        } else {
-            Ok(Some(PageResponseWrapper::default()).into())
-        }
-    }
+    // fn send_fail_1(
+    //     &mut self,
+    //     common_fields: Option<&CommonDescribeFields>,
+    // ) -> Poll<Option<PageResponseWrapper>, failure::Error> {
+    //     if let Some(cf) = common_fields {
+    //         let pr = PageResponseWrapper {
+    //             target_id: cf.target_id.clone(),
+    //             task_id: Some(cf.task_id),
+    //             page_response: PageResponse::Fail,
+    //         };
+    //         Ok(Some(pr).into())
+    //     } else {
+    //         Ok(Some(PageResponseWrapper::default()).into())
+    //     }
+    // }
 
     fn handle_dom_event(&self, dom_event: DomEvent) -> PageResponseWrapper {
         match dom_event {
@@ -313,19 +313,11 @@ impl DebugSession {
             TargetCallMethodTask::GetDocument(task) => {}
             TargetCallMethodTask::NavigateTo(task) => {}
             TargetCallMethodTask::QuerySelector(task) => {
-                // return PageResponseWrapper {
-                //     target_id: maybe_target_id,
-                //     task_id: task.task_id.clone(),
-                //     page_response: PageResponse::QuerySelectorDone(),
-                // };
-                // TaskDescribe::QuerySelector(query_selector) => {
-                //     let pr = PageResponse::QuerySelector(
-                //         query_selector.selector,
-                //         query_selector.task_result,
-                //     );
-                //     let resp = self.convert_to_page_response(Some(&query_selector.common_fields), pr);
-                //     Ok(resp.into())
-                // }
+                return PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: task.into_page_response(),
+                };
             }
             TargetCallMethodTask::DescribeNode(task) => {}
             TargetCallMethodTask::PrintToPDF(task) => {}
@@ -341,22 +333,22 @@ impl DebugSession {
         PageResponseWrapper::default()
     }
 
-    fn convert_to_page_response(
-        &self,
-        common_fields: Option<&CommonDescribeFields>,
-        page_response: PageResponse,
-    ) -> Option<PageResponseWrapper> {
-        trace!("got page response: {:?}", page_response);
-        if let Some(cf) = common_fields {
-            Some(PageResponseWrapper {
-                target_id: cf.target_id.clone(),
-                task_id: Some(cf.task_id),
-                page_response,
-            })
-        } else {
-            Some(PageResponseWrapper::new(page_response))
-        }
-    }
+    // fn convert_to_page_response(
+    //     &self,
+    //     common_fields: Option<&CommonDescribeFields>,
+    //     page_response: PageResponse,
+    // ) -> Option<PageResponseWrapper> {
+    //     trace!("got page response: {:?}", page_response);
+    //     if let Some(cf) = common_fields {
+    //         Some(PageResponseWrapper {
+    //             target_id: cf.target_id.clone(),
+    //             task_id: Some(cf.task_id),
+    //             page_response,
+    //         })
+    //     } else {
+    //         Some(PageResponseWrapper::new(page_response))
+    //     }
+    // }
 
     pub fn send_page_message(
         &mut self,

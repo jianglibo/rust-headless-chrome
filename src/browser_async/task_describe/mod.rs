@@ -52,6 +52,12 @@ impl<T> HasCallId for T where T: HasCommonField {
     }
 }
 
+impl<T> HasTaskId for T where T: HasCommonField {
+    fn get_task_id(&self) -> TaskId {
+        self.get_common_fields().task_id
+    }
+}
+
 pub trait CanCreateMethodString {
     fn create_method_str<C>(&self, method: C) -> String where
         C: protocol::Method + serde::Serialize,;

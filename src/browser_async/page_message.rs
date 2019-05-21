@@ -62,7 +62,7 @@ pub enum PageResponse {
     PrintToPdfDone(Option<String>),
     DescribeNodeDone(Option<String>, Option<dom::NodeId>),
     GetBoxModelDone(Option<String>, Option<Box<BoxModel>>),
-    SetChildNodesOccured(dom::NodeId, Vec<dom::Node>),
+    SetChildNodesOccured(dom::NodeId),
     GetDocumentDone,
     CaptureScreenshotDone(response_object::CaptureScreenshot),
     EvaluateDone(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),

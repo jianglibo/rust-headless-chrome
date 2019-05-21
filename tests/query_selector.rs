@@ -41,7 +41,7 @@ impl Future for QuerySelector {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
-                let mut tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
                 let task_id = page_response_wrapper.task_id;
                 match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
@@ -81,7 +81,7 @@ impl Future for QuerySelector {
                         } else if task_id == Some(100) {
                             self.task_id_100_called = true;
                         } else if task_id == Some(101) { // should got node_id, but not node.
-
+                            self.found_node_id = node_id;
                             let mut task_builder = tasks::DescribeNodeTaskBuilder::default();
                             task_builder.node_id(node_id).depth(10);
                             tab.describe_node(task_builder, Some(105));

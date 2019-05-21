@@ -183,23 +183,10 @@ impl DebugSession {
             .execute_task(vec![task.into()]);
     }
 
-    // fn send_fail_1(
-    //     &mut self,
-    //     common_fields: Option<&CommonDescribeFields>,
-    // ) -> Poll<Option<PageResponseWrapper>, failure::Error> {
-    //     if let Some(cf) = common_fields {
-    //         let pr = PageResponseWrapper {
-    //             target_id: cf.target_id.clone(),
-    //             task_id: Some(cf.task_id),
-    //             page_response: PageResponse::Fail,
-    //         };
-    //         Ok(Some(pr).into())
-    //     } else {
-    //         Ok(Some(PageResponseWrapper::default()).into())
-    //     }
-    // }
-
-    fn handle_dom_event(&self, dom_event: DomEvent) -> Result<PageResponseWrapper, failure::Error> {
+    fn handle_dom_event(&mut self, dom_event: DomEvent,
+        maybe_session_id: Option<target::SessionID>,
+        maybe_target_id: Option<target::TargetId>,
+    ) -> Result<PageResponseWrapper, failure::Error> {
         match dom_event {
             DomEvent::AttributeModified(event) => {}
             DomEvent::AttributeRemoved(event) => {}
@@ -208,8 +195,18 @@ impl DebugSession {
             DomEvent::ChildNodeInserted(event) => {}
             DomEvent::ChildNodeRemoved(event) => {}
             DomEvent::DocumentUpdated(event) => {}
-            DomEvent::SetChildNodes(event) => {}
+            DomEvent::SetChildNodes(event) => {
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let (parent_id, nodes) = event.into_parent_children();
+                tab.node_arrived(parent_id, nodes);
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: None,
+                    page_response: PageResponse::SetChildNodesOccured(parent_id),
+                });
+            }
         }
+        warn!("unhandled branch handle_dom_event");
         Ok(PageResponseWrapper::default())
     }
 
@@ -255,6 +252,7 @@ impl DebugSession {
             }
             TargetEvent::TargetInfoChanged(event) => {}
         }
+        warn!("unhandled branch handle_target_event");
         Ok(PageResponseWrapper::default())
     }
 
@@ -268,6 +266,7 @@ impl DebugSession {
             RuntimeEvent::ExecutionContextsCleared(event) => {}
             RuntimeEvent::InspectRequested(event) => {}
         }
+        warn!("unhandled branch handle_runtime_event");
         Ok(PageResponseWrapper::default())
     }
 
@@ -299,8 +298,19 @@ impl DebugSession {
                 });
             }
             PageEvent::FrameStoppedLoading(event) => {}
-            PageEvent::LoadEventFired(event) => {}
+            PageEvent::LoadEventFired(event) => {
+            // TaskDescribe::LoadEventFired(target_id, timestamp) => {
+            //     let pr = (
+            //         Some(target_id),
+            //         None,
+            //         PageResponse::LoadEventFired(timestamp),
+            //     );
+            //     Ok(Some(pr).into())
+            // }
+            
+            }
         }
+        warn!("unhandled branch handle_page_event");
         Ok(PageResponseWrapper::default())
     }
     fn handle_target_method_call(
@@ -361,6 +371,7 @@ impl DebugSession {
             TargetCallMethodTask::RuntimeGetProperties(task) => {}
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => {}
         }
+        warn!("unhandled branch handle_target_method_call");
         Ok(PageResponseWrapper::default())
     }
 
@@ -410,7 +421,7 @@ impl DebugSession {
             TaskDescribe::TargetEvent(target_event) => {
                 Ok(self.handle_target_event(target_event, session_id, target_id).ok().into())
             }
-            TaskDescribe::DomEvent(dom_event) => Ok(self.handle_dom_event(dom_event).ok().into()),
+            TaskDescribe::DomEvent(dom_event) => Ok(self.handle_dom_event(dom_event, session_id, target_id).ok().into()),
             TaskDescribe::ChromeConnected => {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));
                 Ok(resp.into())

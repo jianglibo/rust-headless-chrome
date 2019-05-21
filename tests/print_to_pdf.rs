@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 extern crate log;
 
 #[macro_use]
@@ -18,11 +20,13 @@ struct PrintToPdf {
     debug_session: DebugSession,
     url: &'static str,
     base64_data: Option<String>,
+    load_event_fired_count: u8,
 }
 
 impl PrintToPdf {
     fn assert_result(&self) {
         assert!(self.base64_data.is_some());
+        assert_eq!(self.load_event_fired_count, 1);
     }
 }
 
@@ -40,12 +44,12 @@ impl Future for PrintToPdf {
                     }
                     PageResponse::PageEnabled => {
                         info!("page enabled.");
-                        assert!(tab.is_some());
-                        let url = self.url;
-                        tab.map(|t| t.navigate_to(url, None));
+                        let tab = tab.expect("tab should exists.");
+                        tab.navigate_to(self.url, None);
                     }
                     PageResponse::LoadEventFired(_monotonic_time) => {
-                        tab.map(|t| t.print_to_pdf(Some(101), None));
+                        self.load_event_fired_count += 1;
+                        if let Some(t) = tab { t.print_to_pdf(Some(101), None) }
                     }
                     PageResponse::PrintToPdfDone(base64_data) => {
                         let file_name = "target/print_to_pdf.pdf";
@@ -64,7 +68,7 @@ impl Future for PrintToPdf {
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 190 {
+                        if seconds > 19 {
                             self.assert_result();
                             break Ok(().into());
                         }
@@ -88,8 +92,8 @@ fn test_print_file_to_pdf() {
 
     let my_page = PrintToPdf {
         url,
-        ..Default::default()
+        ..PrintToPdf::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    runtime.block_on(my_page.into_future()).expect("tokio should success.");
 }

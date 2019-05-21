@@ -39,19 +39,24 @@ impl Future for RuntimeEvaluateTask {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
-                    PageResponse::PageEnabled => {
-                        let url = self.url;
-                        if let Some(t) = tab {
-                            t.navigate_to(url, None)
-                        }
+                    PageResponse::PageCreated(page_idx) => {
+                        let tab = tab.expect("tab should exists.");
+                        tab.attach_to_page();
                     }
-                    PageResponse::EvaluateDone(result, exception_details) => {
-                        info!("got result: {:?}, {:?}", result, exception_details);
-                        if let Some(t) = tab {
-                            if let Some(oid) = result.and_then(|ro| ro.object_id) {
-                                t.runtime_get_properties_by_object_id(oid, Some(111))
-                            }
+                    PageResponse::PageAttached(_page_info, _session_id) => {
+                        let tab = tab.expect("tab should exists. PageAttached");
+                        tab.page_enable();
+                        tab.navigate_to(self.url, None);
+                    }
+                    PageResponse::PageEnabled => {}
+                    PageResponse::EvaluateDone(evaluate_result) => {
+                        info!("got result: {:?}", evaluate_result);
+                        let tab = tab.expect("tab should exists. EvaluateDone");
+                        
+                        if let Some(oid) = evaluate_result.and_then(|ro| ro.result.object_id) {
+                            tab.runtime_get_properties_by_object_id(oid, Some(111))
                         }
+                        
                     }
                     PageResponse::LoadEventFired(_monotonic_time) => {
                         info!("loadEventFired, start invoke method.");

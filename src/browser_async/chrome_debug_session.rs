@@ -277,8 +277,7 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::RuntimeEvaluate(runtime_evaluate) => {
                     let evaluate_return_object =
                         protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
-                    runtime_evaluate.task_result = Some(evaluate_return_object.result);
-                    runtime_evaluate.exception_details = evaluate_return_object.exception_details;
+                    runtime_evaluate.task_result = Some(evaluate_return_object);
                 }
                 TargetCallMethodTask::NavigateTo(navigate_to) => {
                     let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;

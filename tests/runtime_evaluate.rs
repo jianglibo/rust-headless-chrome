@@ -49,14 +49,20 @@ impl Future for RuntimeEvaluate {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
-                    PageResponse::PageEnabled => {
-                        info!("page enabled.");
-                        assert!(tab.is_some());
-                        if let Some(t) = tab { t.navigate_to(self.url, None) }
+                    PageResponse::PageCreated(page_idx) => {
+                        let tab = tab.expect("tab should exists.");
+                        tab.attach_to_page();
                     }
+                    PageResponse::PageAttached(_page_info, _session_id) => {
+                        let tab = tab.expect("tab should exists. PageAttached");
+                        tab.page_enable();
+                        tab.navigate_to(self.url, None);
+                    }
+                    PageResponse::PageEnabled => {}
                     PageResponse::FrameNavigated(frame_id) => {
+                        let tab = tab.expect("tab should exists. FrameNavigated");
                         let frame =
-                            tab.and_then(|t| t.find_frame_by_id(&frame_id))
+                            tab.find_frame_by_id(&frame_id)
                                 .and_then(|frame| {
                                     if frame.name == Some("ddlogin-iframe".into()) {
                                         Some(frame)
@@ -66,13 +72,11 @@ impl Future for RuntimeEvaluate {
                                 });
 
                         if frame.is_some() {
-                            self.debug_session.first_page_mut().map(|tab|{
-                                tab.runtime_evaluate_expression("3+3".into(), Some(100));
-                                tab.runtime_evaluate_expression("3::0".into(), Some(101));
-                                tab.runtime_enable(Some(102));
-                                tab.runtime_evaluate_expression(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#.into(), Some(103));
-                                ()
-                            });
+                            let mtab = self.debug_session.first_page_mut().expect("main tab should exists.");
+                            mtab.runtime_evaluate_expression("3+3", Some(100));
+                            mtab.runtime_evaluate_expression("3::0", Some(101));
+                            mtab.runtime_enable(Some(102));
+                            mtab.runtime_evaluate_expression(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#, Some(103));
                         }
                     }
                     PageResponse::CallFunctionOnDone(result) => {
@@ -94,23 +98,23 @@ impl Future for RuntimeEvaluate {
                                 ss.next()
                             });
 
-                        write_base64_str_to(file_name, base64_data).unwrap();
+                        write_base64_str_to(file_name, base64_data).expect("write_base64_str_to success.");
                         assert!(path.exists());
                     }
-                    PageResponse::EvaluateDone(result, exception_details) => match task_id {
+                    PageResponse::EvaluateDone(evaluate_result) => match task_id {
                         Some(100) => {
                             self.task_100_called = true;
-                            assert!(result.is_some());
-                            let ro = result.unwrap();
+                            let evaluate_result = evaluate_result.expect("evaluate_result should exists.");
+                            let ro = evaluate_result.result;
                             assert_eq!(ro.object_type, "number");
                             assert_eq!(ro.value, Some(6.into()));
                             assert_eq!(ro.description, Some("6".into()));
-                            assert!(exception_details.is_none());
+                            assert!(evaluate_result.exception_details.is_none());
                         }
                         Some(101) => {
                             self.task_101_called = true;
-                            assert!(result.is_some());
-                            let ro = result.unwrap();
+                            let evaluate_result = evaluate_result.expect("evaluate_result should exists. 101");
+                            let ro = evaluate_result.result;
                             assert_eq!(ro.object_type, "object");
                             assert_eq!(ro.subtype, Some("error".into()));
                             assert_eq!(ro.class_name, Some("SyntaxError".into()));
@@ -118,17 +122,15 @@ impl Future for RuntimeEvaluate {
                                 ro.description,
                                 Some("SyntaxError: Unexpected token :".into())
                             );
-                            assert!(exception_details.is_some());
+                            assert!(evaluate_result.exception_details.is_some());
                         }
                         Some(102) | Some(103) => {
-                            info!("task id: {:?}, {:?}", task_id, result);
-                            info!("task id: {:?}, {:?}", task_id, exception_details);
+                            info!("task id:{:?}, {:?}", task_id, evaluate_result);
                         }
                         Some(110) => {
-                            info!("task id: {:?}, {:?}", task_id, result);
-                            assert!(result.is_some());
-                            let result = result.unwrap();
-                            let tab = tab.unwrap();
+                            info!("task id: {:?}, {:?}", task_id, evaluate_result);
+                            let result = evaluate_result.expect("evaluate_result should exists. 110").result;
+                            let tab = tab.expect("tab should exists. EvaluateDone");
                             let object_id = result.object_id.expect("object_id should exists.");
                             tab.runtime_get_properties_by_object_id(object_id.clone(), Some(111));
 
@@ -157,21 +159,18 @@ impl Future for RuntimeEvaluate {
                         self.runtime_execution_context_created_count += 1;
                     }
                     PageResponse::FrameStoppedLoading(frame_id) => {
-                        let frame = tab
-                            .as_ref()
-                            .and_then(|t| t.find_frame_by_id(&frame_id))
+                        let tab = tab.expect("tab should exists. FrameStoppedLoading");
+                        let frame = tab.find_frame_by_id(&frame_id)
                             .filter(|f| f.name == Some("ddlogin-iframe".into()));
 
                         if frame.is_some() {
-                            let context = tab.as_ref().and_then(|t| {
-                                t.find_execution_context_id_by_frame_name("ddlogin-iframe")
-                            });
+                            let context = tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
                             if context.is_some() {
                                 info!("execution_context_description: {:?}", context);
                                 self.ddlogin_frame_stopped_loading = true;
                                 let mut tb = tasks::RuntimeEvaluateTaskBuilder::default();
                                 tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.unwrap().id);
-                                tab.map(|t| t.runtime_evaluate(tb, Some(110)));
+                                tab.runtime_evaluate(tb, Some(110));
                             }
                         }
                     }
@@ -179,7 +178,7 @@ impl Future for RuntimeEvaluate {
                         trace!("seconds elapsed: {} ", seconds);
                         if seconds > 35 {
                             self.assert_result();
-                            // break Ok(().into());
+                            break Ok(().into());
                         }
                     }
                     _ => {

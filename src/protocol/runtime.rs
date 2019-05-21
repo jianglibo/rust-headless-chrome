@@ -195,7 +195,7 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub time_out: Option<types::TimeDelta>,
     }
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct EvaluateReturnObject {
         pub result: types::RemoteObject,

@@ -28,9 +28,7 @@ pub struct RuntimeEvaluateTask {
     #[builder(default = "None")]
     pub time_out: Option<runtime::types::TimeDelta>,
     #[builder(default = "None")]
-    pub task_result: Option<runtime::types::RemoteObject>,
-    #[builder(default = "None")]
-    pub exception_details: Option<runtime::types::ExceptionDetails>,
+    pub task_result: Option<runtime::methods::EvaluateReturnObject>,
 }
 
 impl_has_common_fields!(RuntimeEvaluateTask);

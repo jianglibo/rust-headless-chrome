@@ -65,7 +65,7 @@ pub enum PageResponse {
     SetChildNodesOccured(dom::NodeId),
     GetDocumentDone,
     CaptureScreenshotDone(response_object::CaptureScreenshot),
-    EvaluateDone(Option<Box<runtime::types::RemoteObject>>, Option<Box<runtime::types::ExceptionDetails>>),
+    EvaluateDone(Option<runtime::methods::EvaluateReturnObject>),
     RuntimeExecutionContextCreated(Option<page::types::FrameId>),
     GetPropertiesDone(Option<runtime::methods::GetPropertiesReturnObject>),
     CallFunctionOnDone(Option<runtime::methods::CallFunctionOnReturnObject>),

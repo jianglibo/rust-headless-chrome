@@ -42,11 +42,16 @@ impl Future for PrintToPdf {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
                     }
-                    PageResponse::PageEnabled => {
-                        info!("page enabled.");
+                    PageResponse::PageCreated(page_idx) => {
                         let tab = tab.expect("tab should exists.");
+                        tab.attach_to_page();
+                    }
+                    PageResponse::PageAttached(_page_info, _session_id) => {
+                        let tab = tab.expect("tab should exists. PageAttached");
+                        tab.page_enable();
                         tab.navigate_to(self.url, None);
                     }
+                    PageResponse::PageEnabled => {}
                     PageResponse::LoadEventFired(_monotonic_time) => {
                         self.load_event_fired_count += 1;
                         if let Some(t) = tab { t.print_to_pdf(Some(101), None) }
@@ -68,7 +73,7 @@ impl Future for PrintToPdf {
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 19 {
+                        if seconds > 90 {
                             self.assert_result();
                             break Ok(().into());
                         }
@@ -86,7 +91,7 @@ impl Future for PrintToPdf {
 
 #[test]
 fn test_print_file_to_pdf() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 

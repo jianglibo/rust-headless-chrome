@@ -299,15 +299,11 @@ impl DebugSession {
             }
             PageEvent::FrameStoppedLoading(event) => {}
             PageEvent::LoadEventFired(event) => {
-            // TaskDescribe::LoadEventFired(target_id, timestamp) => {
-            //     let pr = (
-            //         Some(target_id),
-            //         None,
-            //         PageResponse::LoadEventFired(timestamp),
-            //     );
-            //     Ok(Some(pr).into())
-            // }
-            
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: None,
+                    page_response: event.into_page_response(),
+                });
             }
         }
         warn!("unhandled branch handle_page_event");
@@ -354,7 +350,13 @@ impl DebugSession {
                 tab.node_returned(task.task_result);
                 return v;
             }
-            TargetCallMethodTask::PrintToPDF(task) => {}
+            TargetCallMethodTask::PrintToPDF(task) => {
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::PrintToPdfDone(task.task_result),
+                });
+            }
             TargetCallMethodTask::GetBoxModel(task) => {}
             TargetCallMethodTask::PageEnable(task) => {
                 info!("page_enabled: {:?}", task);
@@ -367,9 +369,32 @@ impl DebugSession {
             TargetCallMethodTask::RuntimeEnable(task) => {}
             TargetCallMethodTask::CaptureScreenshot(task) => {}
             TargetCallMethodTask::TargetSetDiscoverTargets(task) => {}
-            TargetCallMethodTask::RuntimeEvaluate(task) => {}
+            TargetCallMethodTask::RuntimeEvaluate(task) => {
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::EvaluateDone(task.task_result),
+                });
+            // TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
+            //     let common_fields = &runtime_evaluate.common_fields;
+            //     let resp = self.convert_to_page_response(
+            //         Some(&common_fields),
+            //         PageResponse::RuntimeEvaluate(
+            //             runtime_evaluate.task_result.map(Box::new),
+            //             runtime_evaluate.exception_details.map(Box::new),
+            //         ),
+            //     );
+            //     Ok(resp.into())
+            // }
+            }
             TargetCallMethodTask::RuntimeGetProperties(task) => {}
-            TargetCallMethodTask::RuntimeCallFunctionOn(task) => {}
+            TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::CallFunctionOnDone(task.task_result),
+                });
+            }
         }
         warn!("unhandled branch handle_target_method_call");
         Ok(PageResponseWrapper::default())
@@ -571,14 +596,6 @@ impl DebugSession {
             //     );
             //     Ok(resp.into())
             // }
-            // TaskDescribe::LoadEventFired(target_id, timestamp) => {
-            //     let pr = (
-            //         Some(target_id),
-            //         None,
-            //         PageResponse::LoadEventFired(timestamp),
-            //     );
-            //     Ok(Some(pr).into())
-            // }
             // TaskDescribe::CaptureScreenshot(screen_shot) => {
             //     let common_fields = &screen_shot.common_fields;
             //     let ro = response_object::CaptureScreenshot {
@@ -588,17 +605,6 @@ impl DebugSession {
             //     let resp = self.convert_to_page_response(
             //         Some(&common_fields),
             //         PageResponse::CaptureScreenshot(ro),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::RuntimeEvaluate(runtime_evaluate) => {
-            //     let common_fields = &runtime_evaluate.common_fields;
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::RuntimeEvaluate(
-            //             runtime_evaluate.task_result.map(Box::new),
-            //             runtime_evaluate.exception_details.map(Box::new),
-            //         ),
             //     );
             //     Ok(resp.into())
             // }
@@ -666,20 +672,6 @@ impl DebugSession {
             //     let resp = self.convert_to_page_response(
             //         Some(&get_properties.common_fields),
             //         PageResponse::RuntimeGetProperties(get_properties.task_result),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::RuntimeCallFunctionOn(task) => {
-            //     let resp = self.convert_to_page_response(
-            //         Some(&task.common_fields),
-            //         PageResponse::RuntimeCallFunctionOn(task.task_result),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::PrintToPDF(task) => {
-            //     let resp = self.convert_to_page_response(
-            //         Some(&task.common_fields),
-            //         PageResponse::PrintToPDF(task.task_result),
             //     );
             //     Ok(resp.into())
             // }

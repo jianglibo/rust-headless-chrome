@@ -83,7 +83,7 @@ impl Future for TargetsContext {
                         write_base64_str_to(file_name, base64_data).unwrap();
                         assert!(path.exists());
                     }
-                    PageResponse::EvaluateDone(_result, _exception_details) => {},
+                    PageResponse::EvaluateDone(evaluate_result) => {},
                     PageResponse::GetPropertiesDone(return_object) => {
                         let get_properties_return_object =
                             return_object.expect("should return get_properties_return_object");

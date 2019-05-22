@@ -111,10 +111,10 @@ impl ChromeDebugSession {
     ) -> Option<TaskDescribe> {
         trace!("got **response**. {:?}", resp);
         let call_id = resp.call_id;
-        trace!(
-            "tasks_waiting_for_response: {:?}",
-            self.tasks_waiting_for_response
-        );
+        // trace!(
+        //     "tasks_waiting_for_response: {:?}",
+        //     self.tasks_waiting_for_response
+        // );
         if let Some(idx) = self.tasks_waiting_for_response.iter().position(|tasks| {
             if let Some(task) = tasks.get(0) {
                 match task {

@@ -119,7 +119,7 @@ impl Future for TargetsContext {
 
 #[test]
 fn t_target_context() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,runtime_evaluate=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,targets_context=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn";
 

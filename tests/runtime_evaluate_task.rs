@@ -110,7 +110,7 @@ impl Future for RuntimeEvaluateTask {
 
 #[test]
 fn t_runtime_evaluate_task() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=info,runtime_evaluate=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=info,runtime_evaluate_task=trace");
     env_logger::init();
     let url = "https://www.xuexi.cn/";
     // div.text-link-item-title

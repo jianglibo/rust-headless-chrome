@@ -91,7 +91,7 @@ impl Future for PrintToPdf {
 
 #[test]
 fn test_print_file_to_pdf() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,print_to_pdf=trace");
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 

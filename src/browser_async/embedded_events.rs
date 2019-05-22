@@ -29,7 +29,7 @@ pub struct LoadEventFiredParams {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DomContentEventFired {
-    pub params: LoadEventFiredParams,
+    pub params: DomContentEventFiredParams,
 }
 
 #[derive(Deserialize, Debug, Clone)]

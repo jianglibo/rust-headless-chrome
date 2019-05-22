@@ -25,8 +25,8 @@ struct PrintToPdfDing {
 
 impl PrintToPdfDing {
     fn assert_result(&self) {
-        assert!(self.base64_data.is_some());
         assert_eq!(self.load_event_fired_count, 1);
+        assert!(self.base64_data.is_some());
     }
 }
 
@@ -37,7 +37,6 @@ impl Future for PrintToPdfDing {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
-                error!("got page_response_wrapper: {:?}", page_response_wrapper);
                 let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
                 match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
@@ -49,6 +48,7 @@ impl Future for PrintToPdfDing {
                     }
                     PageResponse::PageAttached(_page_info, _session_id) => {
                         let tab = tab.expect("tab should exists. PageAttached");
+                        error!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
                         tab.page_enable();
                         tab.navigate_to(self.url, None);
                     }
@@ -59,6 +59,8 @@ impl Future for PrintToPdfDing {
                         if tab.is_chromewebdata() {
                             self.load_event_fired_count += 1;
                             tab.print_to_pdf(Some(101), None);
+                        } else {
+                            error!("not chromewebdata {:?}", tab.target_info.url);
                         }
                     }
                     PageResponse::PrintToPdfDone(base64_data) => {
@@ -78,17 +80,17 @@ impl Future for PrintToPdfDing {
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 90 {
+                        if seconds > 20 {
                             self.assert_result();
                             break Ok(().into());
                         }
                     }
                     _ => {
-                        error!("got unused page message {:?}", page_response_wrapper);
+                        info!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {
-                error!("got None, was stream ended?");
+                warn!("got None, was stream ended?");
             }
         }
     }
@@ -96,7 +98,7 @@ impl Future for PrintToPdfDing {
 
 #[test]
 fn test_print_pdf_ding() {
-    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,query_selector=trace");
+    ::std::env::set_var("RUST_LOG", "headless_chrome=trace,print_to_pdf_ding=trace");
     env_logger::init();
     let url = "https://59.202.58.131";
 

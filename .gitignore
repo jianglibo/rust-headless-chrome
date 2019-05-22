@@ -4,3 +4,4 @@
 logs
 Cargo.lock
 *.log
+/dingding/

@@ -230,7 +230,7 @@ impl DebugSession {
             TargetEvent::ReceivedMessageFromTarget(event) => {}
             TargetEvent::TargetCreated(event) => {
                 if let target::TargetType::Page = event.get_target_type() {
-                    info!("receive page created event: {:?}", event);
+                    // info!("receive page created event: {:?}", event);
                     let target_info = event.to_target_info();
                     let target_id = target_info.target_id.clone();
                     let tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));

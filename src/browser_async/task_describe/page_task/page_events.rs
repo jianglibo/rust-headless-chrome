@@ -61,6 +61,12 @@ wrapper_raw_event!(
     page::events::FrameStoppedLoadingEvent
 );
 
+impl FrameStoppedLoading {
+    pub fn into_frame_id(self) -> page::types::FrameId {
+        self.raw_event.params.frame_id
+    }
+}
+
 // {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.frameStartedLoading\\\",\\\"params\\\":{\\\"frameId\\\":\\\"74FEEFE9CACC814F52F89930129A15ED\\\"}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}
 wrapper_raw_event!(
     TaskDescribe::PageEvent,

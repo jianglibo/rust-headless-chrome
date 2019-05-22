@@ -36,6 +36,19 @@ impl Tab {
             execution_context_descriptions: HashMap::new(),
         }
     }
+
+    pub fn is_blank_url(&self) -> bool {
+        self.is_at_url("about:blank")
+    }
+
+    pub fn is_chromewebdata(&self) -> bool {
+        self.is_at_url("chrome-error://chromewebdata/")
+    }
+
+    pub fn is_at_url(&self, url: &str) -> bool {
+        self.target_info.url == url
+    }
+
     pub fn navigate_to(&mut self, url: &'static str, manual_task_id: Option<TaskId>) {
         let task = tasks::NavigateToTaskBuilder::default()
             .common_fields(self.get_c_f(manual_task_id))

@@ -176,13 +176,13 @@ impl Future for RuntimeEvaluate {
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 35 {
+                        if seconds > 20 {
                             self.assert_result();
                             break Ok(().into());
                         }
                     }
                     _ => {
-                        trace!("got unused page message {:?}", page_response_wrapper);
+                        warn!("got unused page message {:?}", page_response_wrapper);
                     }
                 }
             } else {
@@ -203,5 +203,5 @@ fn t_runtime_evaluate() {
         ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    runtime.block_on(my_page.into_future()).expect("tokio should success.");
 }

@@ -1,6 +1,6 @@
 use super::super::{RuntimeEvent, TaskDescribe};
 use crate::browser_async::embedded_events;
-use crate::protocol::{network, page};
+use crate::protocol::{network, page, runtime};
 
 #[derive(Debug)]
 pub struct ExceptionRevoked {}
@@ -20,6 +20,13 @@ wrapper_raw_event!(
     ExecutionContextCreated,
     embedded_events::ExecutionContextCreated
 );
+
+impl ExecutionContextCreated {
+    pub fn into_exection_context_description(self) -> runtime::types::ExecutionContextDescription {
+        self.raw_event.params.context
+    }
+}
+
 wrapper_raw_event!(
     TaskDescribe::RuntimeEvent,
     RuntimeEvent::ExecutionContextDestroyed,

@@ -1,5 +1,6 @@
-use super::super::{DomEvent, TaskDescribe};
-use crate::browser_async::embedded_events;
+use super::DomEvent;
+use super::super::TaskDescribe;
+use crate::browser_async::{embedded_events};
 use crate::protocol::{dom};
 
 #[derive(Debug)]

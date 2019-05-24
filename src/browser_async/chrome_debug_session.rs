@@ -298,18 +298,20 @@ impl ChromeDebugSession {
                     let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
                     task.task_result = Some(task_return_object.data);
                 }
-                TargetCallMethodTask::TargetSetDiscoverTargets(task) => {
-                    warn!("got unprocessed task_describe: {:?}", task);
-                }
-                TargetCallMethodTask::SecurityEnable(task) => {
+                TargetCallMethodTask::SecurityEnable(_task) => {
                     info!("security enabled.");
+                }
+                TargetCallMethodTask::SetIgnoreCertificateErrors(_task) => {
+                    info!("set ignore certificate errors.");
                 }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {
                     warn!("got unprocessed task_describe: {:?}", task);
                 }
-                _ => ()
+                BrowserCallMethodTask::SetDiscoverTargets(task) => {
+                    warn!("got unprocessed task_describe: {:?}", task);
+                }
             }
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);

@@ -1,6 +1,6 @@
 // use super::target_message_event::target_message_events;
 use crate::browser_async::{
-    create_msg_to_send_with_session_id,create_msg_to_send, MethodDestination, create_unique_usize, next_call_id, TaskId,
+    create_msg_to_send_with_session_id, create_unique_usize, next_call_id, TaskId,
 };
 use crate::protocol::{self, target};
 use log::*;
@@ -11,28 +11,34 @@ pub mod page_task;
 pub mod runtime_task;
 pub mod target_task;
 pub mod security_task;
+pub mod target_call_methods;
+pub mod browser_call_methods;
 
 pub use dom_task::{
     DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
-    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events,
+    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events, DomEvent,
 };
 pub use page_task::{
     CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder,
-    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events,
+    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent,
 };
 pub use runtime_task::{
     RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
     RuntimeEnableTaskBuilder, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder,
-    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events,
+    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events, RuntimeEvent,
 };
 pub use security_task::{
     SecurityEnableTask, SecurityEnableTaskBuilder,
+    SetIgnoreCertificateErrorsTask, SetIgnoreCertificateErrorsTaskBuilder,
 };
 
 pub use target_task::{
     CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
-    SetDiscoverTargetsTaskBuilder, target_events,
+    SetDiscoverTargetsTaskBuilder, target_events, TargetEvent,
 };
+
+pub use target_call_methods::{TargetCallMethodTask};
+pub use browser_call_methods::{BrowserCallMethodTask};
 
 pub trait HasSessionId {
     fn get_session_id(&self) -> target::SessionID;
@@ -84,102 +90,6 @@ pub trait AsMethodCallString {
 }
 
 #[derive(Debug)]
-pub enum BrowserCallMethodTask {
-    CreateTarget(CreateTargetTask),
-}
-
-impl HasCallId for BrowserCallMethodTask {
-    fn get_call_id(&self) -> usize {
-        match self {
-            BrowserCallMethodTask::CreateTarget(task) => task.get_call_id(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum TargetCallMethodTask {
-    NavigateTo(NavigateToTask),
-    QuerySelector(QuerySelectorTask),
-    DescribeNode(DescribeNodeTask),
-    PrintToPDF(PrintToPdfTask),
-    GetBoxModel(GetBoxModelTask),
-    GetDocument(GetDocumentTask),
-    PageEnable(PageEnableTask),
-    RuntimeEnable(RuntimeEnableTask),
-    CaptureScreenshot(CaptureScreenshotTask),
-    TargetSetDiscoverTargets(SetDiscoverTargetsTask),
-    RuntimeEvaluate(RuntimeEvaluateTask),
-    RuntimeGetProperties(RuntimeGetPropertiesTask),
-    RuntimeCallFunctionOn(RuntimeCallFunctionOnTask),
-    SecurityEnable(SecurityEnableTask),
-}
-
-impl HasCallId for TargetCallMethodTask {
-    fn get_call_id(&self) -> usize {
-        match self {
-            TargetCallMethodTask::NavigateTo(task) => task.get_call_id(),
-            TargetCallMethodTask::QuerySelector(task) => task.get_call_id(),
-            TargetCallMethodTask::DescribeNode(task) => task.get_call_id(),
-            TargetCallMethodTask::PrintToPDF(task) => task.get_call_id(),
-            TargetCallMethodTask::GetBoxModel(task) => task.get_call_id(),
-            TargetCallMethodTask::GetDocument(task) => task.get_call_id(),
-            TargetCallMethodTask::PageEnable(task) => task.get_call_id(),
-            TargetCallMethodTask::RuntimeEnable(task) => task.get_call_id(),
-            TargetCallMethodTask::CaptureScreenshot(task) => task.get_call_id(),
-            TargetCallMethodTask::TargetSetDiscoverTargets(task) => task.get_call_id(),
-            TargetCallMethodTask::RuntimeEvaluate(task) => task.get_call_id(),
-            TargetCallMethodTask::RuntimeGetProperties(task) => task.get_call_id(),
-            TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_call_id(),
-            TargetCallMethodTask::SecurityEnable(task) => task.get_call_id(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum PageEvent {
-    DomContentEventFired(page_events::DomContentEventFired),
-    FrameAttached(page_events::FrameAttached),
-    FrameDetached(page_events::FrameDetached),
-    FrameNavigated(page_events::FrameNavigated),
-    FrameStartedLoading(page_events::FrameStartedLoading),
-    FrameStoppedLoading(page_events::FrameStoppedLoading),
-    LoadEventFired(page_events::LoadEventFired),
-    // PageCreated(page_events::PageCreated),
-}
-
-#[derive(Debug)]
-pub enum RuntimeEvent {
-    ConsoleAPICalled(runtime_events::ConsoleAPICalled),
-    ExceptionRevoked(runtime_events::ExceptionRevoked),
-    ExceptionThrown(runtime_events::ExceptionThrown),
-    ExecutionContextCreated(runtime_events::ExecutionContextCreated),
-    ExecutionContextDestroyed(runtime_events::ExecutionContextDestroyed),
-    ExecutionContextsCleared(runtime_events::ExecutionContextsCleared),
-    InspectRequested(runtime_events::InspectRequested),
-}
-
-#[derive(Debug)]
-pub enum DomEvent {
-    AttributeModified(dom_events::AttributeModified),
-    AttributeRemoved(dom_events::AttributeRemoved),
-    CharacterDataModified(dom_events::CharacterDataModified),
-    ChildNodeCountUpdated(dom_events::ChildNodeCountUpdated),
-    ChildNodeInserted(dom_events::ChildNodeInserted),
-    ChildNodeRemoved(dom_events::ChildNodeRemoved),
-    DocumentUpdated(dom_events::DocumentUpdated),
-    SetChildNodes(dom_events::SetChildNodes),
-}
-
-#[derive(Debug)]
-pub enum TargetEvent {
-    ReceivedMessageFromTarget(target_events::ReceivedMessageFromTarget),
-    TargetCreated(target_events::TargetCreated),
-    TargetCrashed(target_events::TargetCrashed),
-    TargetInfoChanged(target_events::TargetInfoChanged),
-    AttachedToTarget(target_events::AttachedToTarget),
-}
-
-#[derive(Debug)]
 pub enum TaskDescribe {
     TargetCallMethod(TargetCallMethodTask),
     BrowserCallMethod(BrowserCallMethodTask),
@@ -206,14 +116,15 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::NavigateTo(task) => task.get_method_str(),
                 TargetCallMethodTask::PageEnable(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeEnable(task) => task.get_method_str(),
-                TargetCallMethodTask::TargetSetDiscoverTargets(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeEvaluate(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeGetProperties(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
                 TargetCallMethodTask::SecurityEnable(task) => task.get_method_str(),
+                TargetCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
+                BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);

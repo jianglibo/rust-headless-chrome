@@ -1,5 +1,6 @@
-use super::super::{TargetEvent, TaskDescribe};
-use crate::protocol::{self, network, page, target};
+use super::TargetEvent;
+use super::super::TaskDescribe;
+use crate::protocol::{self, target};
 use crate::browser_async::page_message::{PageResponse, PageResponseWrapper};
 
 #[derive(Debug)]

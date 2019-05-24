@@ -9,3 +9,16 @@ pub use call_function_on::{RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskB
 pub use evaluate::{RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder};
 pub use get_properties::{RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder};
 pub use enable::{RuntimeEnableTask, RuntimeEnableTaskBuilder};
+
+
+
+#[derive(Debug)]
+pub enum RuntimeEvent {
+    ConsoleAPICalled(runtime_events::ConsoleAPICalled),
+    ExceptionRevoked(runtime_events::ExceptionRevoked),
+    ExceptionThrown(runtime_events::ExceptionThrown),
+    ExecutionContextCreated(runtime_events::ExecutionContextCreated),
+    ExecutionContextDestroyed(runtime_events::ExecutionContextDestroyed),
+    ExecutionContextsCleared(runtime_events::ExecutionContextsCleared),
+    InspectRequested(runtime_events::InspectRequested),
+}

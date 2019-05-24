@@ -41,7 +41,7 @@ impl Tab {
         self.is_at_url("about:blank")
     }
 
-    pub fn is_chromewebdata(&self) -> bool {
+    pub fn is_chrome_error_chromewebdata(&self) -> bool {
         self.is_at_url("chrome-error://chromewebdata/")
     }
 

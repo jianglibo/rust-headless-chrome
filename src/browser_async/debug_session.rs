@@ -4,8 +4,8 @@ use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{PageResponse, PageResponseWrapper, response_object};
 use super::tab::Tab;
 use super::task_describe::{
-    self as tasks, CommonDescribeFields, DomEvent, HasTaskId, PageEvent, RuntimeEnableTask,
-    RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent, TaskDescribe, SecurityEnableTask,
+    self as tasks, DomEvent, HasTaskId, PageEvent, RuntimeEnableTask, SetIgnoreCertificateErrorsTask,
+    RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent, TaskDescribe, SecurityEnableTask, BrowserCallMethodTask,
 };
 
 use crate::browser_async::{ChromePageError, TaskId};
@@ -171,6 +171,17 @@ impl DebugSession {
             .build()
             .unwrap();
         let task = RuntimeEnableTask { common_fields };
+        self.chrome_debug_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![task.into()]);
+    }
+
+    pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
+        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
+        let task = SetIgnoreCertificateErrorsTask { common_fields, ignore };
         self.chrome_debug_session
             .lock()
             .unwrap()
@@ -483,10 +494,6 @@ impl DebugSession {
                     task_id: Some(task_id),
                     page_response: PageResponse::CaptureScreenshotDone(ro),
                 });
-
-            }
-            TargetCallMethodTask::TargetSetDiscoverTargets(task) => {
-                trace!("TargetSetDiscoverTargets returned. {:?}", task);
             }
             TargetCallMethodTask::RuntimeEvaluate(task) => {
                 return Ok(PageResponseWrapper {
@@ -514,6 +521,25 @@ impl DebugSession {
             }
         }
         warn!("unhandled branch handle_target_method_call");
+        Ok(PageResponseWrapper::default())
+    }
+
+
+
+    fn handle_browser_method_call(
+        &mut self,
+        browser_call_method_task: BrowserCallMethodTask,
+        maybe_session_id: Option<target::SessionID>,
+        maybe_target_id: Option<target::TargetId>,
+    ) -> Result<PageResponseWrapper, failure::Error> {
+        match browser_call_method_task {
+            BrowserCallMethodTask::SetDiscoverTargets(task) => {
+                trace!("TargetSetDiscoverTargets returned. {:?}", task);
+            }
+            BrowserCallMethodTask::CreateTarget(task) => {
+                trace!("TargetSetDiscoverTargets returned. {:?}", task);
+            }
+        }
         Ok(PageResponseWrapper::default())
     }
 
@@ -558,6 +584,11 @@ impl DebugSession {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));
                 Ok(resp.into())
             }
+            TaskDescribe::BrowserCallMethod(task) => 
+                Ok(self
+                .handle_browser_method_call(task, session_id, target_id)
+                .ok()
+                .into()),
             _ => {
                 warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)

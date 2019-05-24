@@ -30,15 +30,13 @@ pub enum CertificateErrorAction {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct SecurityStateExplanation {
-    pub securityState: SecurityState,
-
+    pub security_state: SecurityState,
     pub title: String,
-
     pub summary: String,
-
     pub description: String,
-    pub mixedContentType: MixedContentType,
+    pub mixed_content_type: MixedContentType,
     pub certificate: Vec<String>,
     pub recommendations: Option<Vec<String>>,
 }
@@ -80,8 +78,20 @@ pub mod events {
 
 pub mod methods {
     use serde::{Deserialize, Serialize};
-
     use crate::protocol::Method;
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SetIgnoreCertificateErrors {
+        pub ignore: bool,
+    }
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SetIgnoreCertificateErrorsObject {}
+    impl Method for SetIgnoreCertificateErrors {
+        const NAME: &'static str = "Security.setIgnoreCertificateErrors";
+        type ReturnObject = SetIgnoreCertificateErrorsObject;
+    }
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]

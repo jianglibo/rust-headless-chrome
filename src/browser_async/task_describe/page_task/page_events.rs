@@ -1,4 +1,5 @@
-use super::super::{PageEvent, TaskDescribe};
+use super::PageEvent;
+use super::super::TaskDescribe;
 use crate::browser_async::{embedded_events, page_message::PageResponse};
 use crate::protocol::{page, target};
 

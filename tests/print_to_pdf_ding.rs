@@ -34,6 +34,7 @@ impl Future for PrintToPdfDing {
         loop {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
                 let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
+                let task_id = page_response_wrapper.task_id;
                 match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
@@ -53,7 +54,7 @@ impl Future for PrintToPdfDing {
                         self.load_event_fired_count += 1;
                         let tab = tab.expect("tab should exists. LoadEventFired");
                         error!("load_event_fired: {:?}", tab);
-                        if tab.is_chromewebdata() {
+                        if tab.is_chrome_error_chromewebdata() {
                             // tab.runtime_evaluate_expression("document.getElementById('proceed-link').click();", Some(200));
                             tab.runtime_evaluate_expression("document.getElementById('details-button')", Some(200));
                         } else {
@@ -61,7 +62,11 @@ impl Future for PrintToPdfDing {
                         }
                     }
                     PageResponse::EvaluateDone(evaluate_return_object) => {
-                        info!("evaluate_return_object: {:?}", evaluate_return_object);
+                        if task_id == Some(200) {
+                            info!("evaluate_return_object: {:?}", evaluate_return_object);
+                        } else {
+                            self.debug_session.set_ignore_certificate_errors(true);
+                        }
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);

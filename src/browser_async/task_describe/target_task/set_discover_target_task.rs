@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, HasCallId};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId};
 use crate::protocol::target;
 use failure;
 
@@ -19,4 +19,4 @@ impl AsMethodCallString for SetDiscoverTargetsTask {
     }
 }
 
-impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::TargetSetDiscoverTargets, SetDiscoverTargetsTask);
+impl_into_task_describe!(TaskDescribe::BrowserCallMethod, BrowserCallMethodTask::SetDiscoverTargets, SetDiscoverTargetsTask);

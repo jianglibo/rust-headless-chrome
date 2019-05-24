@@ -1,11 +1,11 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{PageResponse, PageResponseWrapper};
+use super::page_message::{PageResponse, PageResponseWrapper, response_object};
 use super::tab::Tab;
 use super::task_describe::{
     self as tasks, CommonDescribeFields, DomEvent, HasTaskId, PageEvent, RuntimeEnableTask,
-    RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent, TaskDescribe,
+    RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent, TaskDescribe, SecurityEnableTask,
 };
 
 use crate::browser_async::{ChromePageError, TaskId};
@@ -191,6 +191,19 @@ impl DebugSession {
             .execute_task(vec![task.into()]);
     }
 
+    pub fn security_enable(&mut self) {
+        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
+        let task = SecurityEnableTask {
+            common_fields,
+        };
+        self.chrome_debug_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![task.into()]);        
+    }
+
     fn handle_dom_event(
         &mut self,
         dom_event: DomEvent,
@@ -260,7 +273,21 @@ impl DebugSession {
                     info!("got AttachedToTarget event it's target_type was other than page.");
                 }
             }
-            TargetEvent::TargetInfoChanged(event) => {}
+            TargetEvent::TargetInfoChanged(event) => {
+                let target_info = event.into_target_info();
+            if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
+                    tab.target_info = target_info;
+                    trace!(
+                        "target info changed: {:?}",
+                        tab.target_info
+                    );
+                } else {
+                    warn!(
+                        "target changed, no correspond tab. {:?}",
+                        target_info
+                    );
+                }
+            }
         }
         warn!("unhandled branch handle_target_event");
         Ok(PageResponseWrapper::default())
@@ -273,7 +300,11 @@ impl DebugSession {
         maybe_target_id: Option<target::TargetId>,
     ) -> Result<PageResponseWrapper, failure::Error> {
         match runtime_event {
-            RuntimeEvent::ConsoleAPICalled(event) => {}
+            RuntimeEvent::ConsoleAPICalled(event) => {
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let console_call_parameters = event.into_raw_parameters();
+                tab.verify_execution_context_id(&console_call_parameters);
+            }
             RuntimeEvent::ExceptionRevoked(event) => {}
             RuntimeEvent::ExceptionThrown(event) => {}
             RuntimeEvent::ExecutionContextCreated(event) => {
@@ -285,7 +316,11 @@ impl DebugSession {
                     PageResponse::RuntimeExecutionContextCreated(frame_id),
                 );
             }
-            RuntimeEvent::ExecutionContextDestroyed(event) => {}
+            RuntimeEvent::ExecutionContextDestroyed(event) => {
+                let execution_context_id = event.into_exection_context_id();
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab.runtime_execution_context_destroyed(execution_context_id);
+            }
             RuntimeEvent::ExecutionContextsCleared(event) => {}
             RuntimeEvent::InspectRequested(event) => {}
         }
@@ -301,9 +336,37 @@ impl DebugSession {
     ) -> Result<PageResponseWrapper, failure::Error> {
         match page_event {
             PageEvent::DomContentEventFired(event) => {}
-            PageEvent::FrameAttached(event) => {}
-            PageEvent::FrameDetached(event) => {}
-            PageEvent::FrameStartedLoading(event) => {}
+            // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
+            PageEvent::FrameAttached(event) => {
+                let raw_parameters = event.into_raw_parameters();
+                let frame_id = raw_parameters.frame_id.clone();
+                info!(
+                    "-----------------frame_attached-----------------{:?}", frame_id
+                );
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab._frame_attached(raw_parameters);
+                return handle_event_return(maybe_target_id, PageResponse::FrameAttached(frame_id));
+            }
+            PageEvent::FrameDetached(event) => {
+                let frame_id = event.into_frame_id();
+                info!(
+                    "-----------------frame_detached-----------------{:?}",
+                    frame_id.clone()
+                );
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab._frame_detached(&frame_id);
+            }
+            PageEvent::FrameStartedLoading(event) => {
+                let frame_id = event.into_frame_id();
+            // started loading is first, then attached.
+                info!(
+                    "-----------------frame_started_loading-----------------{:?}",
+                    frame_id
+                );
+                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab._frame_started_loading(frame_id.clone());
+                return handle_event_return(maybe_target_id, PageResponse::FrameStartedLoading(frame_id));
+            }
             PageEvent::FrameNavigated(event) => {
                 info!(
                     "-----------------frame_navigated-----------------{:?}",
@@ -334,7 +397,6 @@ impl DebugSession {
                 );
             }
             PageEvent::LoadEventFired(event) => {
-                error!("loadEventFired {:?},", event);
                 return handle_event_return(maybe_target_id, event.into_page_response());
             }
         }
@@ -358,7 +420,9 @@ impl DebugSession {
                 tab.root_node = task.task_result;
                 return v;
             }
-            TargetCallMethodTask::NavigateTo(task) => {}
+            TargetCallMethodTask::NavigateTo(task) => {
+                trace!("navigate_to task returned: {:?}", task);
+            }
             TargetCallMethodTask::QuerySelector(task) => {
                 return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
@@ -386,7 +450,13 @@ impl DebugSession {
                     page_response: PageResponse::PrintToPdfDone(task.task_result),
                 });
             }
-            TargetCallMethodTask::GetBoxModel(task) => {}
+            TargetCallMethodTask::GetBoxModel(task) => {
+                return Ok(PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::GetBoxModelDone(task.selector, task.task_result.map(Box::new)),
+                });
+            }
             TargetCallMethodTask::PageEnable(task) => {
                 info!("page_enabled: {:?}", task);
                 return Ok(PageResponseWrapper {
@@ -395,9 +465,29 @@ impl DebugSession {
                     page_response: PageResponse::PageEnabled,
                 });
             }
-            TargetCallMethodTask::RuntimeEnable(task) => {}
-            TargetCallMethodTask::CaptureScreenshot(task) => {}
-            TargetCallMethodTask::TargetSetDiscoverTargets(task) => {}
+            TargetCallMethodTask::RuntimeEnable(task) => {
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::RuntimeEnabled,
+                });
+            }
+            TargetCallMethodTask::CaptureScreenshot(task) => {
+                let task_id = task.get_task_id();
+                let ro = response_object::CaptureScreenshot {
+                    selector: task.selector,
+                    base64: task.task_result,
+                };
+                return Ok(PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: Some(task_id),
+                    page_response: PageResponse::CaptureScreenshotDone(ro),
+                });
+
+            }
+            TargetCallMethodTask::TargetSetDiscoverTargets(task) => {
+                trace!("TargetSetDiscoverTargets returned. {:?}", task);
+            }
             TargetCallMethodTask::RuntimeEvaluate(task) => {
                 return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
@@ -405,7 +495,13 @@ impl DebugSession {
                     page_response: PageResponse::EvaluateDone(task.task_result),
                 });
             }
-            TargetCallMethodTask::RuntimeGetProperties(task) => {}
+            TargetCallMethodTask::RuntimeGetProperties(task) => {
+                return Ok(PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::GetPropertiesDone(task.task_result),
+                });
+            }
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
                 return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
@@ -413,27 +509,13 @@ impl DebugSession {
                     page_response: PageResponse::CallFunctionOnDone(task.task_result),
                 });
             }
+            _ => {
+                info!("ignored method return. {:?}", target_call_method_task);
+            }
         }
         warn!("unhandled branch handle_target_method_call");
         Ok(PageResponseWrapper::default())
     }
-
-    // fn convert_to_page_response(
-    //     &self,
-    //     common_fields: Option<&CommonDescribeFields>,
-    //     page_response: PageResponse,
-    // ) -> Option<PageResponseWrapper> {
-    //     trace!("got page response: {:?}", page_response);
-    //     if let Some(cf) = common_fields {
-    //         Some(PageResponseWrapper {
-    //             target_id: cf.target_id.clone(),
-    //             task_id: Some(cf.task_id),
-    //             page_response,
-    //         })
-    //     } else {
-    //         Some(PageResponseWrapper::new(page_response))
-    //     }
-    // }
 
     pub fn send_page_message(
         &mut self,
@@ -476,203 +558,6 @@ impl DebugSession {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));
                 Ok(resp.into())
             }
-
-            // TaskDescribe::PageAttached(target_info, session_id) => {
-            //     // each attach return different session_id.
-            //     // when the chrome process started, it default creates a target and attach it. the url is: about:blank
-            //     info!(
-            //         "receive page attached event: {:?}, session_id: {:?}",
-            //         target_info,
-            //         session_id.clone()
-            //     );
-            //     match self.get_tab_by_id_mut(Some(&target_info.target_id)) {
-            //         Ok(tab) => {
-            //             tab.session_id.replace(session_id.clone());
-            //             // tab.page_enable();
-            //             let pr = (
-            //                 Some(target_info.target_id.clone()),
-            //                 None,
-            //                 PageResponse::PageAttached(target_info, session_id),
-            //             );
-            //             Ok(Some(pr).into())
-            //         }
-            //         Err(error) => {
-            //             error!("page attached event has caught, but cannot find corresponding tab. {:?}", error);
-            //             self.send_fail(None, None)
-            //         }
-            //     }
-            // }
-            // // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
-            // TaskDescribe::FrameNavigated(frame, common_fields) => {
-            //     info!(
-            //         "-----------------frame_navigated-----------------{:?}",
-            //         frame
-            //     );
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-            //     let frame_id = frame.id.clone();
-            //     tab._frame_navigated(*frame);
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::FrameNavigated(frame_id),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::FrameStartedLoading(frame_id, common_fields) => {
-            //     // started loading is first, then attached.
-            //     info!(
-            //         "-----------------frame_started_loading-----------------{:?}",
-            //         frame_id
-            //     );
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-            //     tab._frame_started_loading(frame_id.clone());
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::FrameStartedLoading(frame_id),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::FrameAttached(frame_attached_params, common_fields) => {
-            //     info!(
-            //         "-----------------frame_attached-----------------{:?}",
-            //         frame_attached_params.frame_id
-            //     );
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-            //     let frame_id = frame_attached_params.frame_id.clone();
-            //     tab._frame_attached(frame_attached_params);
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::FrameAttached(frame_id),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::FrameDetached(frame_id, common_fields) => {
-            //     info!(
-            //         "-----------------frame_detached-----------------{:?}",
-            //         frame_id.clone()
-            //     );
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-            //     tab._frame_detached(&frame_id);
-            //     self.send_fail(None, None)
-            // }
-            // TaskDescribe::GetDocument(get_document) => {
-            //     let common_fields = &get_document.common_fields;
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-
-            //     tab.root_node = get_document.task_result;
-            //     let resp =
-            //         self.convert_to_page_response(Some(common_fields), PageResponse::GetDocument);
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::SetChildNodes(target_id, parent_node_id, nodes) => {
-            //     let tab = self.get_tab_by_id_mut(Some(&target_id))?;
-            //     tab.node_arrived(parent_node_id, nodes);
-            //     let pr = (
-            //         Some(target_id),
-            //         None,
-            //         PageResponse::SetChildNodes(parent_node_id, vec![]),
-            //     );
-            //     Ok(Some(pr).into())
-            // }
-            // TaskDescribe::QuerySelector(query_selector) => {
-            //     let pr = PageResponse::QuerySelector(
-            //         query_selector.selector,
-            //         query_selector.task_result,
-            //     );
-            //     let resp = self.convert_to_page_response(Some(&query_selector.common_fields), pr);
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::DescribeNode(describe_node) => {
-            //     let common_fields = &describe_node.common_fields;
-            //     let node_id = describe_node
-            //         .task_result
-            //         .as_ref()
-            //         .and_then(|n| Some(n.node_id));
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-
-            //     tab.node_returned(describe_node.task_result);
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::DescribeNode(describe_node.selector, node_id),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::GetBoxModel(get_box_model) => {
-            //     let common_fields = &get_box_model.common_fields;
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::GetBoxModel(
-            //             get_box_model.selector,
-            //             get_box_model.task_result.map(Box::new),
-            //         ),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::CaptureScreenshot(screen_shot) => {
-            //     let common_fields = &screen_shot.common_fields;
-            //     let ro = response_object::CaptureScreenshot {
-            //         selector: screen_shot.selector,
-            //         base64: screen_shot.task_result,
-            //     };
-            //     let resp = self.convert_to_page_response(
-            //         Some(&common_fields),
-            //         PageResponse::CaptureScreenshot(ro),
-            //     );
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::ChromeConnected => {
-            //     let resp = Some((None, None, PageResponse::ChromeConnected));
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::RuntimeEnable(common_fields) => {
-            //     let resp = self
-            //         .convert_to_page_response(Some(&common_fields), PageResponse::RuntimeEnable);
-            //     Ok(resp.into())
-            // }
-            // TaskDescribe::RuntimeExecutionContextDestroyed(
-            //     runtime_execution_context_destroyed,
-            //     common_fields,
-            // ) => {
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-            //     tab.runtime_execution_context_destroyed(runtime_execution_context_destroyed);
-            //     self.send_fail_1(Some(&common_fields))
-            // }
-            // TaskDescribe::RuntimeConsoleAPICalled(console_api_called, common_fields) => {
-            //     let tab = self.get_tab_by_id_mut(common_fields.target_id.as_ref())?;
-            //     // let execution_context_id = console_api_called.execution_context_id.clone();
-            //     tab.verify_execution_context_id(&console_api_called);
-            //     self.send_fail(None, None)
-            // }
-            // TaskDescribe::TargetSetDiscoverTargets(value, _common_fields) => {
-            //     assert!(value);
-            //     self.send_fail(None, None)
-            // }
-            // TaskDescribe::TargetInfoChanged(target_info, common_fields) => {
-            //     if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
-            //         tab.target_info = target_info;
-            //         trace!(
-            //             "target info changed: {:?}, {:?}",
-            //             tab.target_info,
-            //             common_fields
-            //         );
-            //     } else {
-            //         warn!(
-            //             "target changed, no correspond tab. {:?}, {:?}",
-            //             target_info, common_fields
-            //         );
-            //     }
-            //     self.send_fail(None, None)
-            // }
-            // TaskDescribe::NavigateTo(navigate_to) => {
-            //     trace!("navigate_to: {:?}", navigate_to);
-            //     self.send_fail(None, None)
-            // }
-            // TaskDescribe::RuntimeGetProperties(get_properties) => {
-            //     let resp = self.convert_to_page_response(
-            //         Some(&get_properties.common_fields),
-            //         PageResponse::RuntimeGetProperties(get_properties.task_result),
-            //     );
-            //     Ok(resp.into())
-            // }
             _ => {
                 warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)

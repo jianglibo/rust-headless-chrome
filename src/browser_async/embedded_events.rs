@@ -23,7 +23,7 @@ pub struct LoadEventFired {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LoadEventFiredParams {
-    pub timestamp: network::types::MonotonicTime,
+    pub timestamp: network::MonotonicTime,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -35,7 +35,7 @@ pub struct DomContentEventFired {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DomContentEventFiredParams {
-    pub timestamp: network::types::MonotonicTime,
+    pub timestamp: network::MonotonicTime,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -47,7 +47,7 @@ pub struct ExecutionContextCreated {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionContextCreatedParams {
-    pub context: runtime::types::ExecutionContextDescription,
+    pub context: runtime::ExecutionContextDescription,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -59,7 +59,7 @@ pub struct ExecutionContextDestroyed {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionContextDestroyedParams {
-    pub execution_context_id: runtime::types::ExecutionContextId,
+    pub execution_context_id: runtime::ExecutionContextId,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -73,9 +73,9 @@ pub struct ConsoleAPICalled {
 pub struct ConsoleAPICalledParams {
     #[serde(rename = "type")]
     pub object_type: String,
-    pub args: Vec<runtime::types::RemoteObject>,
-    pub execution_context_id: runtime::types::ExecutionContextId,
-    pub stack_trace: Option<runtime::types::StackTrace>,
+    pub args: Vec<runtime::RemoteObject>,
+    pub execution_context_id: runtime::ExecutionContextId,
+    pub stack_trace: Option<runtime::StackTrace>,
     pub context: Option<String>,
 }
 

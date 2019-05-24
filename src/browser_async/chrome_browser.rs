@@ -129,9 +129,16 @@ impl Stream for ChromeBrowser {
                     match self.ws_client.as_mut().unwrap().poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
-                                let parsed_message = protocol::parse_raw_message(&msg);
                                 trace!("got message (***every message***): {:?}", msg);
-                                return Ok(Async::Ready(Some(parsed_message.expect("parsed_message"))));
+                                let parsed_message = protocol::parse_raw_message(&msg);
+                                match parsed_message {
+                                    Ok(success_parsed_message) => {
+                                        return Ok(Async::Ready(Some(success_parsed_message)));
+                                    }
+                                    Err(err) => {
+                                        error!("parse message failed: {:?}", err);
+                                    }
+                                }
                             } else {
                                 error!("got unknown message: {:?}", message);
                             }

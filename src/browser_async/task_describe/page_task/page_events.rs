@@ -18,12 +18,25 @@ wrapper_raw_event!(
     page::events::FrameAttachedEvent
 );
 
+impl FrameAttached {
+    pub fn into_raw_parameters(self) -> page::events::FrameAttachedParams {
+        self.raw_event.params
+    }
+}
+
 wrapper_raw_event!(
     TaskDescribe::PageEvent,
     PageEvent::FrameDetached,
     FrameDetached,
     page::events::FrameDetachedEvent
 );
+
+impl FrameDetached {
+    pub fn into_frame_id(self) -> page::FrameId {
+        self.raw_event.params.frame_id
+    }
+}
+
 
 // {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.frameNavigated\\\",\\\"params\\\":{\\\"frame\\\":{\\\"id\\\":\\\"74FEEFE9CACC814F52F89930129A15ED\\\",\\\"loaderId\\\":\\\"53524592197E3E19D8E72E1379A32393\\\",\\\"url\\\":\\\"https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/\\\",\\\"securityOrigin\\\":\\\"https://pc.xuexi.cn\\\",\\\"mimeType\\\":\\\"text/html\\\"}}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}
 wrapper_raw_event!(
@@ -62,7 +75,7 @@ wrapper_raw_event!(
 );
 
 impl FrameStoppedLoading {
-    pub fn into_frame_id(self) -> page::types::FrameId {
+    pub fn into_frame_id(self) -> page::FrameId {
         self.raw_event.params.frame_id
     }
 }
@@ -74,6 +87,12 @@ wrapper_raw_event!(
     FrameStartedLoading,
     page::events::FrameStartedLoadingEvent
 );
+
+impl FrameStartedLoading {
+    pub fn into_frame_id(self) -> page::FrameId {
+        self.raw_event.params.frame_id
+    }
+}
 
 #[cfg(test)]
 mod tests {

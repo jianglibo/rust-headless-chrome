@@ -15,7 +15,7 @@ pub struct GetBoxModelTask {
     #[builder(default = "None")]
     pub backend_node_id: Option<dom::NodeId>,
     #[builder(default = "None")]
-    pub object_id: Option<runtime::types::RemoteObjectId>,
+    pub object_id: Option<runtime::RemoteObjectId>,
     #[builder(setter(skip))]
     pub task_result: Option<BoxModel>,
 }

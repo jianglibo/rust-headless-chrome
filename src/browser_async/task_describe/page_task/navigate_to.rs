@@ -10,9 +10,9 @@ pub struct NavigateToTask {
     #[builder(default = "None")]
     pub referrer: Option<String>,
     #[builder(default = "None")]
-    pub transition_type: Option<page::types::TransitionType>,
+    pub transition_type: Option<page::TransitionType>,
     #[builder(default = "None")]
-    pub frame_id: Option<page::types::FrameId>,
+    pub frame_id: Option<page::FrameId>,
     #[builder(default = "None")]
     pub task_result: Option<page::methods::NavigateReturnObject>,
 }

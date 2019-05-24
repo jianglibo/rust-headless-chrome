@@ -156,7 +156,7 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub backend_node_id: Option<super::NodeId>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub object_id: Option<runtime::types::RemoteObjectId>,
+        pub object_id: Option<runtime::RemoteObjectId>,
         pub depth: Option<i8>,
     }
     #[derive(Debug, Deserialize)]

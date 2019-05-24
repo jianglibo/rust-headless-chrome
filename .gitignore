@@ -5,3 +5,7 @@ logs
 Cargo.lock
 *.log
 /dingding/
+/.mypy_cache/
+/.pytest_cache/
+/__pycache__/
+**/*.py

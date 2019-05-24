@@ -124,7 +124,7 @@ impl Browser {
     }
 
     pub fn get_process_id(&self) -> Option<u32> {
-        self.process.as_ref().map(|process| process.get_id())
+        self.process.as_ref().map(Process::get_id)
     }
 
     /// The tabs are behind an `Arc` and `Mutex` because they're accessible from multiple threads

@@ -1,36 +1,31 @@
 use crate::protocol::network;
 use serde::{Deserialize, Serialize};
 
-pub mod types {
-    use serde::{Deserialize, Serialize};
-    pub type FrameId = String;
+pub type FrameId = String;
 
-    #[derive(Debug, Serialize, Clone)]
-    #[serde(rename_all = "snake_case")]
-    pub enum TransitionType {
-        Link,
-        Typed,
-        AddressBar,
-        AutoBookmark,
-        AutoSubframe,
-        ManualSubframe,
-        Generated,
-        AutoToplevel,
-        FormSubmit,
-        Reload,
-        Keyword,
-        KeywordGenerated,
-        Other,
-    }
-
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitionType {
+    Link,
+    Typed,
+    AddressBar,
+    AutoBookmark,
+    AutoSubframe,
+    ManualSubframe,
+    Generated,
+    AutoToplevel,
+    FormSubmit,
+    Reload,
+    Keyword,
+    KeywordGenerated,
+    Other,
 }
-
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Frame {
     pub id: String,
     pub parent_id: Option<String>,
-    pub loader_id: network::types::LoaderId,
+    pub loader_id: network::LoaderId,
     pub name: Option<String>,
     pub url: String,
     pub security_origin: String,
@@ -158,7 +153,7 @@ pub mod events {
     pub struct FrameAttachedParams {
         pub frame_id: String,
         pub parent_frame_id: String,
-        pub stack: Option<runtime::types::StackTrace>,
+        pub stack: Option<runtime::StackTrace>,
     }
 
     #[derive(Deserialize, Debug, Clone)]
@@ -270,15 +265,15 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub referrer: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub transition_type: Option<types::TransitionType>,
+        pub transition_type: Option<TransitionType>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub frame_id: Option<types::FrameId>,
+        pub frame_id: Option<FrameId>,
     }
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct NavigateReturnObject {
-        pub frame_id: types::FrameId,
-        pub loader_id: Option<network::types::LoaderId>,
+        pub frame_id: FrameId,
+        pub loader_id: Option<network::LoaderId>,
         pub error_text: Option<String>,
     }
     impl<'a> Method for Navigate<'a> {

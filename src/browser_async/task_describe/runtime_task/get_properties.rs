@@ -6,7 +6,7 @@ use failure;
 #[builder(setter(into))]
 pub struct RuntimeGetPropertiesTask {
     pub common_fields: CommonDescribeFields,
-    pub object_id: runtime::types::RemoteObjectId,
+    pub object_id: runtime::RemoteObjectId,
     #[builder(default = "None")]
     pub own_properties: Option<bool>,
     #[builder(default = "None")]

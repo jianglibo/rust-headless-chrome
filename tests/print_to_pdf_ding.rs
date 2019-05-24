@@ -7,11 +7,9 @@ extern crate futures;
 extern crate tokio_timer;
 
 use headless_chrome::browser_async::debug_session::DebugSession;
-use headless_chrome::browser_async::page_message::{write_base64_str_to, PageResponse};
+use headless_chrome::browser_async::page_message::{PageResponse};
 use log::*;
 use std::default::Default;
-use std::fs;
-use std::path::Path;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
@@ -19,14 +17,12 @@ use websocket::futures::{Future, IntoFuture, Poll, Stream};
 struct PrintToPdfDing {
     debug_session: DebugSession,
     url: &'static str,
-    base64_data: Option<String>,
     load_event_fired_count: u8,
 }
 
 impl PrintToPdfDing {
     fn assert_result(&self) {
         assert_eq!(self.load_event_fired_count, 1);
-        assert!(self.base64_data.is_some());
     }
 }
 
@@ -41,6 +37,7 @@ impl Future for PrintToPdfDing {
                 match page_response_wrapper.page_response {
                     PageResponse::ChromeConnected => {
                         self.debug_session.set_discover_targets(true);
+                        self.debug_session.security_enable();
                     }
                     PageResponse::PageCreated(page_idx) => {
                         let tab = tab.expect("tab should exists.");
@@ -48,35 +45,23 @@ impl Future for PrintToPdfDing {
                     }
                     PageResponse::PageAttached(_page_info, _session_id) => {
                         let tab = tab.expect("tab should exists. PageAttached");
-                        error!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
                         tab.page_enable();
                         tab.navigate_to(self.url, None);
                     }
                     PageResponse::PageEnabled => {}
                     PageResponse::LoadEventFired(_monotonic_time) => {
+                        self.load_event_fired_count += 1;
                         let tab = tab.expect("tab should exists. LoadEventFired");
                         error!("load_event_fired: {:?}", tab);
                         if tab.is_chromewebdata() {
-                            self.load_event_fired_count += 1;
-                            tab.print_to_pdf(Some(101), None);
+                            // tab.runtime_evaluate_expression("document.getElementById('proceed-link').click();", Some(200));
+                            tab.runtime_evaluate_expression("document.getElementById('details-button')", Some(200));
                         } else {
                             error!("not chromewebdata {:?}", tab.target_info.url);
                         }
                     }
-                    PageResponse::PrintToPdfDone(base64_data) => {
-                        let file_name = "target/print_to_pdf.pdf";
-                        let path = Path::new(file_name);
-                        if path.exists() && path.is_file() {
-                            fs::remove_file(file_name).unwrap();
-                        }
-                        write_base64_str_to(file_name, base64_data.as_ref())
-                            .map(|_| {
-                                self.base64_data = base64_data;
-                            })
-                            .expect("write_base64_str_to failed.");
-
-                        assert!(path.exists());
-                        // break Ok(().into());
+                    PageResponse::EvaluateDone(evaluate_return_object) => {
+                        info!("evaluate_return_object: {:?}", evaluate_return_object);
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);

@@ -8,7 +8,7 @@ pub struct RuntimeCallFunctionOnTask {
     pub common_fields: CommonDescribeFields,
     pub function_declaration: String,
     #[builder(default = "None")]
-    pub object_id: Option<runtime::types::RemoteObjectId>,
+    pub object_id: Option<runtime::RemoteObjectId>,
     #[builder(default = "None")]
     pub silent: Option<bool>,
     #[builder(default = "None")]
@@ -20,7 +20,7 @@ pub struct RuntimeCallFunctionOnTask {
     #[builder(default = "None")]
     pub await_promise: Option<bool>,
     #[builder(default = "None")]
-    pub execution_context_id: Option<runtime::types::ExecutionContextId>,
+    pub execution_context_id: Option<runtime::ExecutionContextId>,
     #[builder(default = "None")]
     pub object_group: Option<String>,
     #[builder(default = "None")]

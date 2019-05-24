@@ -14,10 +14,10 @@ pub struct Tab {
     pub session_id: Option<target::SessionID>,
     pub root_node: Option<dom::Node>,
     pub page_name: Option<&'static str>,
-    pub changing_frames: HashMap<page::types::FrameId, ChangingFrame>,
+    pub changing_frames: HashMap<page::FrameId, ChangingFrame>,
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
     pub execution_context_descriptions:
-        HashMap<page::types::FrameId, runtime::types::ExecutionContextDescription>,
+        HashMap<page::FrameId, runtime::ExecutionContextDescription>,
 }
 
 impl Tab {
@@ -45,8 +45,15 @@ impl Tab {
         self.is_at_url("chrome-error://chromewebdata/")
     }
 
+    /// where does page's url attribute live? The page target_info holds the url you intent navigate to,
+    /// but if failed cause of some reason, please look into the main frame's url and unreachable_url attributes,
+    /// These two will give you more information.
     pub fn is_at_url(&self, url: &str) -> bool {
-        self.target_info.url == url
+        if let Some(mf) = self.main_frame() {
+            mf.url == url
+        } else {
+            self.target_info.url == url
+        }
     }
 
     pub fn navigate_to(&mut self, url: &'static str, manual_task_id: Option<TaskId>) {
@@ -118,7 +125,7 @@ impl Tab {
             .find(|frame| filter(frame))
     }
 
-    pub fn find_frame_by_id(&self, frame_id: &page::types::FrameId) -> Option<&page::Frame> {
+    pub fn find_frame_by_id(&self, frame_id: &page::FrameId) -> Option<&page::Frame> {
         match self.changing_frames.get(frame_id) {
             Some(ChangingFrame::Navigated(fm)) | Some(ChangingFrame::StoppedLoading(fm)) => {
                 Some(fm)
@@ -130,7 +137,7 @@ impl Tab {
     pub fn find_execution_context_id_by_frame_name(
         &self,
         frame_name: &'static str,
-    ) -> Option<&runtime::types::ExecutionContextDescription> {
+    ) -> Option<&runtime::ExecutionContextDescription> {
         let frame = self.changing_frames.values().find_map(|cf| match cf {
             ChangingFrame::Navigated(fr) | ChangingFrame::StoppedLoading(fr)
                 if fr.name == Some(frame_name.into()) =>
@@ -160,7 +167,7 @@ impl Tab {
 
     pub fn runtime_execution_context_destroyed(
         &mut self,
-        execution_context_id: runtime::types::ExecutionContextId,
+        execution_context_id: runtime::ExecutionContextId,
     ) {
         self.execution_context_descriptions
             .retain(|_, v| v.id != execution_context_id);
@@ -168,8 +175,8 @@ impl Tab {
 
     pub fn runtime_execution_context_created(
         &mut self,
-        execution_context: runtime::types::ExecutionContextDescription,
-    ) -> Option<page::types::FrameId> {
+        execution_context: runtime::ExecutionContextDescription,
+    ) -> Option<page::FrameId> {
         let aux_data = execution_context.aux_data.clone();
         if let Some(frame_id_str) = aux_data["frameId"].as_str() {
             let frame_id = frame_id_str.to_string();
@@ -242,7 +249,7 @@ impl Tab {
             ChangingFrame::Attached(frame_attached_params),
         );
     }
-    pub fn _frame_detached(&mut self, frame_id: &page::types::FrameId) {
+    pub fn _frame_detached(&mut self, frame_id: &page::FrameId) {
         self.changing_frames.remove(frame_id);
     }
 
@@ -482,7 +489,7 @@ impl Tab {
 
     pub fn runtime_get_properties_by_object_id(
         &mut self,
-        object_id: runtime::types::RemoteObjectId,
+        object_id: runtime::RemoteObjectId,
         manual_task_id: Option<TaskId>,
     ) {
         let task = tasks::RuntimeGetPropertiesTaskBuilder::default()

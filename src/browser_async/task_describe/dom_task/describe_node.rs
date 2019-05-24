@@ -20,7 +20,7 @@ pub struct DescribeNodeTask {
     #[builder(default = "Some(0)")]
     pub depth: Option<i8>,
     #[builder(default = "None")]
-    pub object_id: Option<runtime::types::RemoteObjectId>,
+    pub object_id: Option<runtime::RemoteObjectId>,
     #[builder(default = "false")]
     pub pierce: bool,
     #[builder(default = "None")]

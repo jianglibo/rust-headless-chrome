@@ -14,6 +14,12 @@ wrapper_raw_event!(
     ConsoleAPICalled,
     embedded_events::ConsoleAPICalled
 );
+
+impl ConsoleAPICalled {
+    pub fn into_raw_parameters(self) -> embedded_events::ConsoleAPICalledParams {
+        self.raw_event.params
+    }
+}
 wrapper_raw_event!(
     TaskDescribe::RuntimeEvent,
     RuntimeEvent::ExecutionContextCreated,
@@ -22,7 +28,7 @@ wrapper_raw_event!(
 );
 
 impl ExecutionContextCreated {
-    pub fn into_exection_context_description(self) -> runtime::types::ExecutionContextDescription {
+    pub fn into_exection_context_description(self) -> runtime::ExecutionContextDescription {
         self.raw_event.params.context
     }
 }
@@ -33,6 +39,12 @@ wrapper_raw_event!(
     ExecutionContextDestroyed,
     embedded_events::ExecutionContextDestroyed
 );
+
+impl ExecutionContextDestroyed {
+    pub fn into_exection_context_id(self) -> runtime::ExecutionContextId {
+        self.raw_event.params.execution_context_id
+    }
+}
 
 #[derive(Debug)]
 pub struct ExecutionContextsCleared {}

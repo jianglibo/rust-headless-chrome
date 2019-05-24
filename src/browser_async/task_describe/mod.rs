@@ -10,6 +10,7 @@ pub mod other_task;
 pub mod page_task;
 pub mod runtime_task;
 pub mod target_task;
+pub mod security_task;
 
 pub use dom_task::{
     DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
@@ -23,6 +24,9 @@ pub use runtime_task::{
     RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
     RuntimeEnableTaskBuilder, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder,
     RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events,
+};
+pub use security_task::{
+    SecurityEnableTask, SecurityEnableTaskBuilder,
 };
 
 pub use target_task::{
@@ -107,6 +111,7 @@ pub enum TargetCallMethodTask {
     RuntimeEvaluate(RuntimeEvaluateTask),
     RuntimeGetProperties(RuntimeGetPropertiesTask),
     RuntimeCallFunctionOn(RuntimeCallFunctionOnTask),
+    SecurityEnable(SecurityEnableTask),
 }
 
 impl HasCallId for TargetCallMethodTask {
@@ -125,6 +130,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::RuntimeEvaluate(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeGetProperties(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_call_id(),
+            TargetCallMethodTask::SecurityEnable(task) => task.get_call_id(),
         }
     }
 }
@@ -204,6 +210,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::RuntimeEvaluate(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeGetProperties(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
+                TargetCallMethodTask::SecurityEnable(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),

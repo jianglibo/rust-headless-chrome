@@ -51,7 +51,7 @@ impl ChromeDebugSession {
         self.chrome_browser.send_message(method_str);
     }
 
-    pub fn resolve_node(&mut self) -> (Option<TaskId>, Option<runtime::types::RemoteObjectId>) {
+    pub fn resolve_node(&mut self) -> (Option<TaskId>, Option<runtime::RemoteObjectId>) {
         (None, None)
     }
 
@@ -109,7 +109,7 @@ impl ChromeDebugSession {
         _session_id: Option<String>,
         _target_id: Option<String>,
     ) -> Option<TaskDescribe> {
-        trace!("got **response**. {:?}", resp);
+        // trace!("got **response**. {:?}", resp);
         let call_id = resp.call_id;
         // trace!(
         //     "tasks_waiting_for_response: {:?}",
@@ -300,6 +300,9 @@ impl ChromeDebugSession {
                 }
                 TargetCallMethodTask::TargetSetDiscoverTargets(task) => {
                     warn!("got unprocessed task_describe: {:?}", task);
+                }
+                TargetCallMethodTask::SecurityEnable(task) => {
+                    info!("security enabled.");
                 }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {

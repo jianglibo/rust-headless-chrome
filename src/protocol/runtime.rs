@@ -1,5 +1,4 @@
 
-pub mod types {
     use serde::{Deserialize};
 
     pub type ExecutionContextId = u16;
@@ -105,19 +104,18 @@ pub mod types {
         pub name: String,
         pub aux_data: serde_json::Value,
     }
-}
 
 pub mod methods {
     use crate::protocol::Method;
     use serde::{Deserialize, Serialize};
-    use super::types;
+    use super::*;
 
     #[derive(Serialize, Debug, Default)]
     #[serde(rename_all = "camelCase")]
     pub struct CallFunctionOn<'a> {
         pub function_declaration: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub object_id: Option<types::RemoteObjectId>,
+        pub object_id: Option<RemoteObjectId>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub silent: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -129,7 +127,7 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub await_promise: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub execution_context_id: Option<types::ExecutionContextId>,
+        pub execution_context_id: Option<ExecutionContextId>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub object_group: Option<&'a String>,
     }
@@ -137,8 +135,8 @@ pub mod methods {
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct CallFunctionOnReturnObject {
-        pub result: types::RemoteObject,
-        pub exception_details: Option<types::ExceptionDetails>,
+        pub result: RemoteObject,
+        pub exception_details: Option<ExceptionDetails>,
     }
     impl<'a> Method for CallFunctionOn<'a> {
         const NAME: &'static str = "Runtime.callFunctionOn";
@@ -159,10 +157,10 @@ pub mod methods {
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct GetPropertiesReturnObject {
-        pub result: Vec<types::PropertyDescriptor>,
-        pub internal_properties: Option<Vec<types::InternalPropertyDescriptor>>,
-        // pub private_properties: Option<types::PrivatePropertyDescriptor>,
-        pub exception_details: Option<types::ExceptionDetails>,
+        pub result: Vec<PropertyDescriptor>,
+        pub internal_properties: Option<Vec<InternalPropertyDescriptor>>,
+        // pub private_properties: Option<PrivatePropertyDescriptor>,
+        pub exception_details: Option<ExceptionDetails>,
 
     }
     impl<'a> Method for GetProperties<'a> {
@@ -181,7 +179,7 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub silent: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub context_id: Option<types::ExecutionContextId>,
+        pub context_id: Option<ExecutionContextId>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub return_by_value: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -193,13 +191,13 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub throw_on_side_effect: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub time_out: Option<types::TimeDelta>,
+        pub time_out: Option<TimeDelta>,
     }
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct EvaluateReturnObject {
-        pub result: types::RemoteObject,
-        pub exception_details: Option<types::ExceptionDetails>,
+        pub result: RemoteObject,
+        pub exception_details: Option<ExceptionDetails>,
     }
 
     impl<'a> Method for Evaluate<'a> {

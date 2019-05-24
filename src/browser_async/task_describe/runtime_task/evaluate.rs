@@ -14,7 +14,7 @@ pub struct RuntimeEvaluateTask {
     #[builder(default = "None")]
     pub silent: Option<bool>,
     #[builder(default = "None")]
-    pub context_id: Option<runtime::types::ExecutionContextId>,
+    pub context_id: Option<runtime::ExecutionContextId>,
     #[builder(default = "None")]
     pub return_by_value: Option<bool>,
     #[builder(default = "None")]
@@ -26,7 +26,7 @@ pub struct RuntimeEvaluateTask {
     #[builder(default = "None")]
     pub throw_on_side_effect: Option<bool>,
     #[builder(default = "None")]
-    pub time_out: Option<runtime::types::TimeDelta>,
+    pub time_out: Option<runtime::TimeDelta>,
     #[builder(default = "None")]
     pub task_result: Option<runtime::methods::EvaluateReturnObject>,
 }

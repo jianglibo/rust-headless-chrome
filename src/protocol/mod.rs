@@ -15,6 +15,7 @@ pub mod page;
 pub mod profiler;
 pub mod runtime;
 pub mod target;
+pub mod security;
 
 pub type CallId = usize;
 
@@ -111,6 +112,8 @@ pub enum Event {
     Lifecycle(page::events::LifecycleEvent),
     #[serde(rename = "Network.requestIntercepted")]
     RequestIntercepted(network::events::RequestInterceptedEvent),
+    #[serde(rename = "Security.certificateError")]
+    SecurityCertificateError(security::events::CertificateError),
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -213,6 +216,20 @@ mod tests {
         for msg_string in &example_message_strings {
             let _message: super::Message = parse_raw_message(msg_string).unwrap();
         }
+    }
+
+    #[test]
+    fn parse_security_certificate_error() {
+        let message = "{\"method\":\"Security.certificateError\",\"params\":{\"eventId\":1,\"errorType\":\"ERR_CERT_AUTHORITY_INVALID\",\"requestURL\":\"https://59.202.58.131/\"}}";
+        let parsed = serde_json::from_str::<Message>(message.as_ref());
+        let r = match parsed {
+            Ok(_) => true,
+            Err(err) => {
+                dbg!(err);
+                false
+            }
+        };
+        assert!(r);
     }
 }
 

@@ -72,3 +72,9 @@ wrapper_raw_event!(
     TargetInfoChanged,
     target::events::TargetInfoChangedEvent
 );
+
+impl TargetInfoChanged {
+    pub fn into_target_info(self) -> target::TargetInfo {
+        self.raw_event.params.target_info
+    }
+}

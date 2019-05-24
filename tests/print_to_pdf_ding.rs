@@ -22,7 +22,7 @@ struct PrintToPdfDing {
 
 impl PrintToPdfDing {
     fn assert_result(&self) {
-        assert_eq!(self.load_event_fired_count, 1);
+        assert_eq!(self.load_event_fired_count, 2);
     }
 }
 
@@ -64,9 +64,13 @@ impl Future for PrintToPdfDing {
                     PageResponse::EvaluateDone(evaluate_return_object) => {
                         if task_id == Some(200) {
                             info!("evaluate_return_object: {:?}", evaluate_return_object);
-                        } else {
                             self.debug_session.set_ignore_certificate_errors(true);
-                        }
+                        } 
+                    }
+                    PageResponse::SetIgnoreCertificateErrorsDone(_ignore) => {
+                        // let tab = tab.expect("tab should exists. SetIgnoreCertificateErrorsDone");
+                        let tab = self.debug_session.first_page_mut().expect("main tab should exists.");
+                        tab.navigate_to(self.url, None); // this time should success.
                     }
                     PageResponse::SecondsElapsed(seconds) => {
                         trace!("seconds elapsed: {} ", seconds);

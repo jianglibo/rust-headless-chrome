@@ -301,16 +301,16 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::SecurityEnable(_task) => {
                     info!("security enabled.");
                 }
-                TargetCallMethodTask::SetIgnoreCertificateErrors(_task) => {
-                    info!("set ignore certificate errors.");
-                }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {
-                    warn!("got unprocessed task_describe: {:?}", task);
+                    info!("nothing to full fill: {:?}", task);
                 }
                 BrowserCallMethodTask::SetDiscoverTargets(task) => {
-                    warn!("got unprocessed task_describe: {:?}", task);
+                    info!("nothing to full fill:: {:?}", task);
+                }
+                BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => {
+                    info!("nothing to full fill:: {:?}", task);
                 }
             }
             task_describe => {
@@ -331,12 +331,6 @@ impl ChromeDebugSession {
             protocol::Event::FrameNavigated(raw_event) => {
                 let event = page_events::FrameNavigated::new(raw_event);
                 return Some(event.into());
-                // let ev = page_events::FrameNavigated {
-                //     frame: frame_navigated_event.params.frame,
-                //     session_id,
-                //     target_id, 
-                // };
-                // return Some(TaskDescribe::from(ev));
             }
             protocol::Event::TargetInfoChanged(raw_event) => {
                 let event = target_events::TargetInfoChanged::new(raw_event);

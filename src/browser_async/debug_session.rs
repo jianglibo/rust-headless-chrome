@@ -1,11 +1,13 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{PageResponse, PageResponseWrapper, response_object};
+use super::page_message::{response_object, PageResponse, PageResponseWrapper};
 use super::tab::Tab;
 use super::task_describe::{
-    self as tasks, DomEvent, HasTaskId, PageEvent, RuntimeEnableTask, SetIgnoreCertificateErrorsTask,
-    RuntimeEvent, SetDiscoverTargetsTask, TargetCallMethodTask, TargetEvent, TaskDescribe, SecurityEnableTask, BrowserCallMethodTask,
+    self as tasks, handle_browser_method_call, handle_target_method_call, BrowserCallMethodTask,
+    DomEvent, HasTaskId, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
+    SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask, TargetCallMethodTask, TargetEvent,
+    TaskDescribe,
 };
 
 use crate::browser_async::{ChromePageError, TaskId};
@@ -149,7 +151,7 @@ impl DebugSession {
     pub fn first_page_mut(&mut self) -> Option<&mut Tab> {
         self.tabs.get_mut(0)
     }
-    pub fn main_tab(&self) -> Option<&Tab> {
+    pub fn first_page(&self) -> Option<&Tab> {
         self.tabs.get(0)
     }
 
@@ -167,52 +169,72 @@ impl DebugSession {
     }
 
     pub fn runtime_enable(&mut self) {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
-            .build()
-            .unwrap();
-        let task = RuntimeEnableTask { common_fields };
+        let task = self.runtime_enable_task();
         self.chrome_debug_session
             .lock()
             .unwrap()
-            .execute_task(vec![task.into()]);
+            .execute_task(vec![task]);
+    }
+
+    pub fn runtime_enable_task(&mut self) -> TaskDescribe {
+        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
+        RuntimeEnableTask { common_fields }.into()
     }
 
     pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
             .unwrap();
-        let task = SetIgnoreCertificateErrorsTask { common_fields, ignore };
+        let task = self.set_ignore_certificate_errors_task(ignore);
         self.chrome_debug_session
             .lock()
             .unwrap()
-            .execute_task(vec![task.into()]);
+            .execute_task(vec![task]);
+    }
+
+    pub fn set_ignore_certificate_errors_task(&mut self, ignore: bool) -> TaskDescribe{
+        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
+        SetIgnoreCertificateErrorsTask {
+            common_fields,
+            ignore,
+        }.into()
     }
 
     pub fn set_discover_targets(&mut self, enable: bool) {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
-            .build()
-            .unwrap();
-        let task = SetDiscoverTargetsTask {
-            common_fields,
-            discover: enable,
-        };
+        let task = self.set_discover_targets_task(enable);
         self.chrome_debug_session
             .lock()
             .unwrap()
             .execute_task(vec![task.into()]);
     }
 
-    pub fn security_enable(&mut self) {
+    pub fn set_discover_targets_task(&mut self, enable: bool) -> TaskDescribe {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
             .unwrap();
-        let task = SecurityEnableTask {
+        SetDiscoverTargetsTask {
             common_fields,
-        };
+            discover: enable,
+        }.into()
+    }
+
+    pub fn security_enable(&mut self) {
+        let task = self.security_enable_task();
         self.chrome_debug_session
             .lock()
             .unwrap()
-            .execute_task(vec![task.into()]);        
+            .execute_task(vec![task.into()]);
+    }
+
+    pub fn security_enable_task(&mut self) -> TaskDescribe {
+        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
+        SecurityEnableTask { common_fields }.into()
     }
 
     fn handle_dom_event(
@@ -286,17 +308,11 @@ impl DebugSession {
             }
             TargetEvent::TargetInfoChanged(event) => {
                 let target_info = event.into_target_info();
-            if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
+                if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
                     tab.target_info = target_info;
-                    trace!(
-                        "target info changed: {:?}",
-                        tab.target_info
-                    );
+                    trace!("target info changed: {:?}", tab.target_info);
                 } else {
-                    warn!(
-                        "target changed, no correspond tab. {:?}",
-                        target_info
-                    );
+                    warn!("target changed, no correspond tab. {:?}", target_info);
                 }
             }
         }
@@ -352,7 +368,8 @@ impl DebugSession {
                 let raw_parameters = event.into_raw_parameters();
                 let frame_id = raw_parameters.frame_id.clone();
                 info!(
-                    "-----------------frame_attached-----------------{:?}", frame_id
+                    "-----------------frame_attached-----------------{:?}",
+                    frame_id
                 );
                 let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_attached(raw_parameters);
@@ -369,14 +386,17 @@ impl DebugSession {
             }
             PageEvent::FrameStartedLoading(event) => {
                 let frame_id = event.into_frame_id();
-            // started loading is first, then attached.
+                // started loading is first, then attached.
                 info!(
                     "-----------------frame_started_loading-----------------{:?}",
                     frame_id
                 );
                 let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_started_loading(frame_id.clone());
-                return handle_event_return(maybe_target_id, PageResponse::FrameStartedLoading(frame_id));
+                return handle_event_return(
+                    maybe_target_id,
+                    PageResponse::FrameStartedLoading(frame_id),
+                );
             }
             PageEvent::FrameNavigated(event) => {
                 info!(
@@ -414,134 +434,7 @@ impl DebugSession {
         warn!("unhandled branch handle_page_event");
         Ok(PageResponseWrapper::default())
     }
-    fn handle_target_method_call(
-        &mut self,
-        target_call_method_task: TargetCallMethodTask,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match target_call_method_task {
-            TargetCallMethodTask::GetDocument(task) => {
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                let v = Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::GetDocumentDone,
-                });
-                tab.root_node = task.task_result;
-                return v;
-            }
-            TargetCallMethodTask::NavigateTo(task) => {
-                trace!("navigate_to task returned: {:?}", task);
-            }
-            TargetCallMethodTask::QuerySelector(task) => {
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: task.into_page_response(),
-                });
-            }
-            TargetCallMethodTask::DescribeNode(task) => {
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                let node_id = task.task_result.as_ref().and_then(|n| Some(n.node_id));
 
-                let v = Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::DescribeNodeDone(task.selector, node_id),
-                });
-
-                tab.node_returned(task.task_result);
-                return v;
-            }
-            TargetCallMethodTask::PrintToPDF(task) => {
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::PrintToPdfDone(task.task_result),
-                });
-            }
-            TargetCallMethodTask::GetBoxModel(task) => {
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::GetBoxModelDone(task.selector, task.task_result.map(Box::new)),
-                });
-            }
-            TargetCallMethodTask::PageEnable(task) => {
-                info!("page_enabled: {:?}", task);
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::PageEnabled,
-                });
-            }
-            TargetCallMethodTask::RuntimeEnable(task) => {
-                return Ok(PageResponseWrapper{
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::RuntimeEnabled,
-                });
-            }
-            TargetCallMethodTask::CaptureScreenshot(task) => {
-                let task_id = task.get_task_id();
-                let ro = response_object::CaptureScreenshot {
-                    selector: task.selector,
-                    base64: task.task_result,
-                };
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task_id),
-                    page_response: PageResponse::CaptureScreenshotDone(ro),
-                });
-            }
-            TargetCallMethodTask::RuntimeEvaluate(task) => {
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::EvaluateDone(task.task_result),
-                });
-            }
-            TargetCallMethodTask::RuntimeGetProperties(task) => {
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::GetPropertiesDone(task.task_result),
-                });
-            }
-            TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::CallFunctionOnDone(task.task_result),
-                });
-            }
-            _ => {
-                info!("ignored method return. {:?}", target_call_method_task);
-            }
-        }
-        warn!("unhandled branch handle_target_method_call");
-        Ok(PageResponseWrapper::default())
-    }
-
-
-
-    fn handle_browser_method_call(
-        &mut self,
-        browser_call_method_task: BrowserCallMethodTask,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match browser_call_method_task {
-            BrowserCallMethodTask::SetDiscoverTargets(task) => {
-                trace!("TargetSetDiscoverTargets returned. {:?}", task);
-            }
-            BrowserCallMethodTask::CreateTarget(task) => {
-                trace!("TargetSetDiscoverTargets returned. {:?}", task);
-            }
-        }
-        Ok(PageResponseWrapper::default())
-    }
 
     pub fn send_page_message(
         &mut self,
@@ -560,10 +453,11 @@ impl DebugSession {
                 )))
                 .into())
             }
-            TaskDescribe::TargetCallMethod(task) => Ok(self
-                .handle_target_method_call(task, session_id, target_id)
-                .ok()
-                .into()),
+            TaskDescribe::TargetCallMethod(task) => {
+                Ok(handle_target_method_call(self, task, session_id, target_id)
+                    .ok()
+                    .into())
+            }
             TaskDescribe::PageEvent(page_event) => Ok(self
                 .handle_page_event(page_event, session_id, target_id)
                 .ok()
@@ -584,11 +478,11 @@ impl DebugSession {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));
                 Ok(resp.into())
             }
-            TaskDescribe::BrowserCallMethod(task) => 
-                Ok(self
-                .handle_browser_method_call(task, session_id, target_id)
-                .ok()
-                .into()),
+            TaskDescribe::BrowserCallMethod(task) => {
+                Ok(handle_browser_method_call(task, session_id, target_id)
+                    .ok()
+                    .into())
+            }
             _ => {
                 warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)

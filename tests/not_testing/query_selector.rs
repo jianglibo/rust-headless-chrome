@@ -26,7 +26,7 @@ struct QuerySelector {
 
 impl QuerySelector {
     fn assert_result(&self) {
-        let tab = self.debug_session.main_tab().expect("main tab should exists.");
+        let tab = self.debug_session.first_page().expect("main tab should exists.");
         assert_eq!(self.call_count, 4);
         assert!(self.task_id_100_called);
         assert!(tab.temporary_node_holder.len() >= 7);

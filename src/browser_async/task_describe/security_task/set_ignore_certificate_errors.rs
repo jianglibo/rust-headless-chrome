@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, HasCallId};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId};
 use crate::protocol::{security};
 use failure;
 
@@ -21,4 +21,4 @@ impl AsMethodCallString for SetIgnoreCertificateErrorsTask  {
     }
 }
 
-impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::SetIgnoreCertificateErrors, SetIgnoreCertificateErrorsTask);
+impl_into_task_describe!(TaskDescribe::BrowserCallMethod, BrowserCallMethodTask::SetIgnoreCertificateErrors, SetIgnoreCertificateErrorsTask);

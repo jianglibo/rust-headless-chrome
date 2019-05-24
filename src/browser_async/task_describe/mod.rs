@@ -37,8 +37,8 @@ pub use target_task::{
     SetDiscoverTargetsTaskBuilder, target_events, TargetEvent,
 };
 
-pub use target_call_methods::{TargetCallMethodTask};
-pub use browser_call_methods::{BrowserCallMethodTask};
+pub use target_call_methods::{TargetCallMethodTask, handle_target_method_call};
+pub use browser_call_methods::{BrowserCallMethodTask, handle_browser_method_call};
 
 pub trait HasSessionId {
     fn get_session_id(&self) -> target::SessionID;
@@ -120,11 +120,11 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::RuntimeGetProperties(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
                 TargetCallMethodTask::SecurityEnable(task) => task.get_method_str(),
-                TargetCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
+                BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);

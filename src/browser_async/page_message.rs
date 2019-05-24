@@ -69,6 +69,7 @@ pub enum PageResponse {
     RuntimeExecutionContextCreated(Option<page::FrameId>),
     GetPropertiesDone(Option<runtime::methods::GetPropertiesReturnObject>),
     CallFunctionOnDone(Option<runtime::methods::CallFunctionOnReturnObject>),
+    SetIgnoreCertificateErrorsDone(bool),
     Fail,
 }
 

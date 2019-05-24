@@ -1,5 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
-use crate::protocol::{dom, target};
+use crate::protocol::{dom};
 use failure;
 
 #[derive(Debug, Builder, Default)]

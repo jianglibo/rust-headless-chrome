@@ -1,7 +1,7 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{PageResponse, PageResponseWrapper};
+use super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent, MethodCallDone};
 use super::tab::Tab;
 use super::task_describe::{
     self as tasks, handle_browser_method_call, handle_target_method_call, 
@@ -269,7 +269,7 @@ impl DebugSession {
                 return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: None,
-                    page_response: PageResponse::SetChildNodesOccured(parent_id),
+                    page_response: PageResponse::ReceivedEvent(ReceivedEvent::SetChildNodesOccurred(parent_id)),
                 });
             }
         }
@@ -296,7 +296,7 @@ impl DebugSession {
                     return Ok(PageResponseWrapper {
                         target_id: Some(target_id),
                         task_id: None,
-                        page_response: PageResponse::PageCreated(idx),
+                        page_response: PageResponse::ReceivedEvent(ReceivedEvent::PageCreated(idx)),
                     });
                 } else {
                     info!("got other target_event: {:?}", event);
@@ -351,7 +351,7 @@ impl DebugSession {
                     .runtime_execution_context_created(event.into_exection_context_description());
                 return handle_event_return(
                     maybe_target_id,
-                    PageResponse::RuntimeExecutionContextCreated(frame_id),
+                    PageResponse::ReceivedEvent(ReceivedEvent::RuntimeExecutionContextCreated(frame_id)),
                 );
             }
             RuntimeEvent::ExecutionContextDestroyed(event) => {
@@ -384,7 +384,7 @@ impl DebugSession {
                 );
                 let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_attached(raw_parameters);
-                return handle_event_return(maybe_target_id, PageResponse::FrameAttached(frame_id));
+                return handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)));
             }
             PageEvent::FrameDetached(event) => {
                 let frame_id = event.into_frame_id();
@@ -406,7 +406,7 @@ impl DebugSession {
                 tab._frame_started_loading(frame_id.clone());
                 return handle_event_return(
                     maybe_target_id,
-                    PageResponse::FrameStartedLoading(frame_id),
+                    PageResponse::ReceivedEvent(ReceivedEvent::FrameStartedLoading(frame_id)),
                 );
             }
             PageEvent::FrameNavigated(event) => {
@@ -421,7 +421,7 @@ impl DebugSession {
                     ._frame_navigated(frame);
                 return handle_event_return(
                     maybe_target_id,
-                    PageResponse::FrameNavigated(frame_id),
+                    PageResponse::ReceivedEvent(ReceivedEvent::FrameNavigated(frame_id)),
                 );
             }
             PageEvent::FrameStoppedLoading(event) => {
@@ -435,7 +435,7 @@ impl DebugSession {
                 tab._frame_stopped_loading(frame_id.clone());
                 return handle_event_return(
                     maybe_target_id,
-                    PageResponse::FrameStoppedLoading(frame_id),
+                    PageResponse::ReceivedEvent(ReceivedEvent::FrameStoppedLoading(frame_id)),
                 );
             }
             PageEvent::LoadEventFired(event) => {

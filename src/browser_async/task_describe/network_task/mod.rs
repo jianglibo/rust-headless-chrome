@@ -1,12 +1,16 @@
 pub mod network_enable;
 pub mod network_events;
 pub mod set_request_interception;
+pub mod continue_intercepted_request;
+pub mod get_response_body_for_interception;
 
 pub use network_enable::{NetworkEnableTask, NetworkEnableTaskBuilder};
-pub use set_request_interception::{SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder};
+pub use set_request_interception::{SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder,};
+pub use continue_intercepted_request::{ContinueInterceptedRequestTask, ContinueInterceptedRequestTaskBuilder,};
+pub use get_response_body_for_interception::{GetResponseBodyForInterceptionTask, GetResponseBodyForInterceptionTaskBuilder};
 
 use crate::browser_async::debug_session::DebugSession;
-use crate::browser_async::page_message::{PageResponseWrapper, PageResponse};
+use crate::browser_async::page_message::{PageResponseWrapper, PageResponse, ReceivedEvent,};
 use super::super::protocol::{target};
 use log::*;
 
@@ -33,10 +37,17 @@ pub fn handle_network_event(
                 return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: None,
-                    page_response: PageResponse::ResponseReceived(response_details),
+                    page_response: PageResponse::ReceivedEvent(ReceivedEvent::ResponseReceived(response_details)),
                 });
         }
         NetworkEvent::RequestIntercepted(event) => {
+                // let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                // let response_details = event.into_raw_parameters();
+                // return Ok(PageResponseWrapper {
+                //     target_id: maybe_target_id,
+                //     task_id: None,
+                //     page_response: PageResponse::ReceivedEvent(ReceivedEvent::ResponseReceived(response_details)),
+                // });,
             warn!("unhandled network_events RequestIntercepted");
         }
         NetworkEvent::RequestWillBeSent(event) => {

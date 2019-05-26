@@ -1,6 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
 use crate::protocol::{dom};
-use crate::browser_async::{page_message::PageResponse};
+use crate::browser_async::{page_message::{PageResponse, MethodCallDone,}};
 use failure;
 
 #[derive(Debug, Builder, Default)]
@@ -29,7 +29,7 @@ impl AsMethodCallString for QuerySelectorTask {
 
 impl QuerySelectorTask {
     pub fn into_page_response(self) -> PageResponse {
-        PageResponse::QuerySelectorDone(self.selector.to_string(), self.task_result)
+        PageResponse::MethodCallDone(MethodCallDone::QuerySelector(self.selector.to_string(), self.task_result))
     }
 }
 

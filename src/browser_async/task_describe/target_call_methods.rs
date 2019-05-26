@@ -1,10 +1,11 @@
 use super::{CaptureScreenshotTask, NavigateToTask, PageEnableTask, PrintToPdfTask};
 use super::{DescribeNodeTask, GetBoxModelTask, GetDocumentTask, QuerySelectorTask, NetworkEnableTask,
-    RuntimeCallFunctionOnTask, RuntimeEnableTask, RuntimeEvaluateTask, RuntimeGetPropertiesTask, SetRequestInterceptionTask,
+    RuntimeCallFunctionOnTask, RuntimeEnableTask, RuntimeEvaluateTask, 
+    RuntimeGetPropertiesTask, SetRequestInterceptionTask, ContinueInterceptedRequestTask, GetResponseBodyForInterceptionTask,
 };
 
 use super::super::debug_session::DebugSession;
-use super::super::page_message::{response_object, PageResponse, PageResponseWrapper};
+use super::super::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone};
 use crate::protocol::target;
 use log::*;
 
@@ -26,6 +27,8 @@ pub enum TargetCallMethodTask {
     RuntimeCallFunctionOn(RuntimeCallFunctionOnTask),
     NetworkEnable(NetworkEnableTask),
     SetRequestInterception(SetRequestInterceptionTask),
+    ContinueInterceptedRequest(ContinueInterceptedRequestTask),
+    GetResponseBodyForInterception(GetResponseBodyForInterceptionTask),
 }
 
 impl HasCallId for TargetCallMethodTask {
@@ -45,6 +48,8 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_call_id(),
             TargetCallMethodTask::NetworkEnable(task) => task.get_call_id(),
             TargetCallMethodTask::SetRequestInterception(task) => task.get_call_id(),
+            TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_call_id(),
+            TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_call_id(),
         }
     }
 }
@@ -61,7 +66,7 @@ pub fn handle_target_method_call(
             let v = Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::GetDocumentDone,
+                page_response: PageResponse::MethodCallDone(MethodCallDone::GetDocument),
             });
             tab.root_node = task.task_result;
             return v;
@@ -83,7 +88,7 @@ pub fn handle_target_method_call(
             let v = Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::DescribeNodeDone(task.selector, node_id),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::DescribeNode(task.selector, node_id)),
             });
 
             tab.node_returned(task.task_result);
@@ -93,17 +98,17 @@ pub fn handle_target_method_call(
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::PrintToPdfDone(task.task_result),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::PrintToPdf(task.task_result)),
             });
         }
         TargetCallMethodTask::GetBoxModel(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::GetBoxModelDone(
+                page_response: PageResponse::MethodCallDone(MethodCallDone::GetBoxModel(
                     task.selector,
                     task.task_result.map(Box::new),
-                ),
+                )),
             });
         }
         TargetCallMethodTask::PageEnable(task) => {
@@ -111,14 +116,14 @@ pub fn handle_target_method_call(
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::PageEnabled,
+                page_response: PageResponse::MethodCallDone(MethodCallDone::PageEnabled),
             });
         }
         TargetCallMethodTask::RuntimeEnable(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::RuntimeEnabled,
+                page_response: PageResponse::MethodCallDone(MethodCallDone::RuntimeEnabled),
             });
         }
         TargetCallMethodTask::CaptureScreenshot(task) => {
@@ -130,28 +135,28 @@ pub fn handle_target_method_call(
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task_id),
-                page_response: PageResponse::CaptureScreenshotDone(ro),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::CaptureScreenshot(ro)),
             });
         }
         TargetCallMethodTask::RuntimeEvaluate(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::EvaluateDone(task.task_result),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::Evaluate(task.task_result)),
             });
         }
         TargetCallMethodTask::RuntimeGetProperties(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::GetPropertiesDone(task.task_result),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::GetProperties(task.task_result)),
             });
         }
         TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                page_response: PageResponse::CallFunctionOnDone(task.task_result),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::CallFunctionOn(task.task_result)),
             });
         }
         TargetCallMethodTask::SetRequestInterception(task) => {
@@ -159,6 +164,16 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::NetworkEnable(task) => {
             warn!("ignored method return. NetworkEnable");
+        }
+        TargetCallMethodTask::ContinueInterceptedRequest(task) => {
+            warn!("ignored method return. ContinueInterceptedRequest");
+        }
+        TargetCallMethodTask::GetResponseBodyForInterception(task) => {
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::GetResponseBodyForInterception(task)),
+            });
         }
     } 
     warn!("unhandled branch handle_target_method_call");

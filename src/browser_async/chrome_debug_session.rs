@@ -5,7 +5,7 @@ use super::embedded_events::{self, EmbeddedEvent};
 use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
-use crate::protocol::{self, dom, page, runtime, target};
+use crate::protocol::{self, dom, page, runtime, target, network};
 use failure::Error;
 use log::*;
 use std::convert::TryFrom;
@@ -305,6 +305,10 @@ impl ChromeDebugSession {
                     let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
                     get_properties.task_result = Some(get_properties_return_object);
                 }
+                TargetCallMethodTask::GetResponseBodyForInterception(task) => {
+                    let return_object = protocol::parse_response::<network::methods::GetResponseBodyForInterceptionReturnObject>(resp)?;
+                    task.task_result = Some(return_object);
+                }
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
                     let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
                     task.task_result = Some(task_return_object);
@@ -318,6 +322,9 @@ impl ChromeDebugSession {
                 }
                 TargetCallMethodTask::SetRequestInterception(task) => {
                     info!("set_request_interception enabled. {:?}", task);
+                }
+                TargetCallMethodTask::ContinueInterceptedRequest(_task) => {
+                    info!("continue_intercepted_request done.");
                 }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {

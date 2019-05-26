@@ -1,6 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{network};
-use crate::browser_async::{MethodDestination};
 use failure;
 
 #[derive(Debug, Builder, Clone)]

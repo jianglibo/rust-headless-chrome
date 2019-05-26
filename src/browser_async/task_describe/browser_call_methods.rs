@@ -3,7 +3,7 @@ use super::security_task::set_ignore_certificate_errors::SetIgnoreCertificateErr
 use super::security_task::security_enable::SecurityEnableTask;
 use super::target_task::set_discover_target_task::SetDiscoverTargetsTask;
 use super::{HasCallId, HasTaskId};
-use super::super::page_message::{PageResponseWrapper, PageResponse};
+use super::super::page_message::{PageResponseWrapper, PageResponse, MethodCallDone,};
 use crate::protocol::target;
 use failure;
 use log::*;
@@ -43,7 +43,7 @@ pub fn handle_browser_method_call(
                 return Ok(PageResponseWrapper{
                     target_id: maybe_target_id,
                     task_id: Some(task.get_task_id()),
-                    page_response: PageResponse::SetIgnoreCertificateErrorsDone(task.ignore),
+                    page_response: PageResponse::MethodCallDone(MethodCallDone::SetIgnoreCertificateErrors(task.ignore)),
                 });
             }
             BrowserCallMethodTask::SecurityEnable(task) => {

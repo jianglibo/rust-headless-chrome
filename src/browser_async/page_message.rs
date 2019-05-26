@@ -1,6 +1,7 @@
 use crate::protocol::{dom, page, target, runtime, network};
 use crate::browser::tab::element::{BoxModel};
 use super::super::browser_async::{TaskId, embedded_events};
+use super::super::browser_async::task_describe::{GetResponseBodyForInterceptionTask};
 use std::path::Path;
 use std::fs::OpenOptions;
 use log::*;
@@ -44,33 +45,45 @@ impl std::default::Default for PageResponseWrapper {
 
 // pub type PageResponseWithTargetIdTaskId = (Option<target::TargetId>, Option<TaskId>, PageResponse);
 
-// just wait for things happen. don't care who caused happen.
 #[derive(Debug)]
-pub enum PageResponse {
-    ChromeConnected,
-    SecondsElapsed(usize),
+pub enum ReceivedEvent {
     PageCreated(usize),
-    QuerySelectorDone(String, Option<dom::NodeId>),
     PageAttached(target::TargetInfo, target::SessionID),
-    PageEnabled,
-    RuntimeEnabled,
     FrameAttached(page::FrameId),
     FrameStartedLoading(page::FrameId),
     FrameNavigated(page::FrameId),
     FrameStoppedLoading(page::FrameId),
     LoadEventFired(network::MonotonicTime),
-    PrintToPdfDone(Option<String>),
-    DescribeNodeDone(Option<String>, Option<dom::NodeId>),
-    GetBoxModelDone(Option<String>, Option<Box<BoxModel>>),
-    SetChildNodesOccured(dom::NodeId),
-    GetDocumentDone,
-    CaptureScreenshotDone(response_object::CaptureScreenshot),
-    EvaluateDone(Option<runtime::methods::EvaluateReturnObject>),
+    SetChildNodesOccurred(dom::NodeId),
     RuntimeExecutionContextCreated(Option<page::FrameId>),
-    GetPropertiesDone(Option<runtime::methods::GetPropertiesReturnObject>),
-    CallFunctionOnDone(Option<runtime::methods::CallFunctionOnReturnObject>),
-    SetIgnoreCertificateErrorsDone(bool),
     ResponseReceived(embedded_events::ResponseReceivedParams),
+    RequestIntercepted(Option<network::events::RequestInterceptedEventParams>),
+}
+
+#[derive(Debug)]
+pub enum MethodCallDone {
+    PageEnabled,
+    RuntimeEnabled,
+    QuerySelector(String, Option<dom::NodeId>),
+    PrintToPdf(Option<String>),
+    DescribeNode(Option<String>, Option<dom::NodeId>),
+    GetBoxModel(Option<String>, Option<Box<BoxModel>>),
+    GetDocument,
+    CaptureScreenshot(response_object::CaptureScreenshot),
+    Evaluate(Option<runtime::methods::EvaluateReturnObject>),
+    GetProperties(Option<runtime::methods::GetPropertiesReturnObject>),
+    CallFunctionOn(Option<runtime::methods::CallFunctionOnReturnObject>),
+    SetIgnoreCertificateErrors(bool),
+    GetResponseBodyForInterception(GetResponseBodyForInterceptionTask),
+}
+
+// just wait for things happen. don't care who caused happen.
+#[derive(Debug)]
+pub enum PageResponse {
+    ChromeConnected,
+    SecondsElapsed(usize),
+    ReceivedEvent(ReceivedEvent),
+    MethodCallDone(MethodCallDone),
     Fail,
 }
 

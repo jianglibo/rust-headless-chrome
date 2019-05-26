@@ -39,7 +39,8 @@ pub use target_task::{
 };
 
 pub use network_task::{NetworkEnableTask, NetworkEnableTaskBuilder, network_events,
-NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, handle_network_event};
+NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, handle_network_event,
+ ContinueInterceptedRequestTask, ContinueInterceptedRequestTaskBuilder, GetResponseBodyForInterceptionTask, GetResponseBodyForInterceptionTaskBuilder,};
 
 pub use target_call_methods::{TargetCallMethodTask, handle_target_method_call};
 pub use browser_call_methods::{BrowserCallMethodTask, handle_browser_method_call};
@@ -126,6 +127,8 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
                 TargetCallMethodTask::NetworkEnable(task) => task.get_method_str(),
                 TargetCallMethodTask::SetRequestInterception(task) => task.get_method_str(),
+                TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_method_str(),
+                TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),

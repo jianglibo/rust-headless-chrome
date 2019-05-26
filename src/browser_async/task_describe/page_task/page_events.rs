@@ -1,6 +1,6 @@
 use super::PageEvent;
 use super::super::TaskDescribe;
-use crate::browser_async::{embedded_events, page_message::PageResponse};
+use crate::browser_async::{embedded_events, page_message::{PageResponse, ReceivedEvent,}};
 use crate::protocol::{page};
 
 // {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.domContentEventFired\\\",\\\"params\\\":{\\\"timestamp\\\":130939.223244}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}
@@ -63,7 +63,7 @@ wrapper_raw_event!(
 
 impl LoadEventFired {
     pub fn into_page_response(self) -> PageResponse {
-        PageResponse::LoadEventFired(self.raw_event.params.timestamp)
+        PageResponse::ReceivedEvent(ReceivedEvent::LoadEventFired(self.raw_event.params.timestamp))
     }
 }
 

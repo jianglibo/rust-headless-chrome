@@ -1,6 +1,6 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder,};
+use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
 use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events};
 use crate::protocol::{self, dom, page, runtime, target};
 use std::collections::HashMap;
@@ -87,6 +87,25 @@ impl Tab {
             }
             _ => None,
         })
+    }
+
+    pub fn get_response_body_for_interception(&mut self, interception_id: String, manual_task_id: Option<TaskId>) {
+        let task = GetResponseBodyForInterceptionTaskBuilder::default()
+            .common_fields(self.get_common_field(manual_task_id))
+            .interception_id(interception_id)
+            .build()
+            .expect("GetResponseBodyForInterceptionTaskBuilder should work.");
+
+        self.execute_one_task(task.into());
+    }
+
+    pub fn continue_intercepted_request(&mut self, interception_id: String) {
+        let task = ContinueInterceptedRequestTaskBuilder::default()
+        .common_fields(self.get_common_field(None))
+        .interception_id(interception_id)
+        .build()
+        .expect("ContinueInterceptedRequestTaskBuilder should work.");
+        self.execute_one_task(task.into());
     }
 
     pub fn node_arrived(&mut self, parent_node_id: dom::NodeId, mut nodes: Vec<dom::Node>) {

@@ -1,7 +1,7 @@
 use super::TargetEvent;
 use super::super::TaskDescribe;
 use crate::protocol::{self, target};
-use crate::browser_async::page_message::{PageResponse, PageResponseWrapper};
+use crate::browser_async::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent,};
 
 #[derive(Debug)]
 pub struct ReceivedMessageFromTarget {}
@@ -58,7 +58,7 @@ impl AttachedToTarget {
             PageResponseWrapper {
                 target_id: Some(target_info.target_id.clone()),
                 task_id: None,
-                page_response: PageResponse::PageAttached(target_info, session_id),
+                page_response: PageResponse::ReceivedEvent(ReceivedEvent::PageAttached(target_info, session_id)),
             }.into()
         } else {
             None

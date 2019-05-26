@@ -1,6 +1,6 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask,};
+use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder,};
 use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events};
 use crate::protocol::{self, dom, page, runtime, target};
 use std::collections::HashMap;
@@ -56,16 +56,26 @@ impl Tab {
         }
     }
 
+    pub fn get_url<'a>(&'a self) -> &'a str {
+        if let Some(mf) = self.main_frame() {
+            &mf.url
+        } else {
+            &self.target_info.url
+        }
+    }
+
     pub fn navigate_to(&mut self, url: &'static str, manual_task_id: Option<TaskId>) {
+        let task = self.navigate_to_task(url, manual_task_id);
+        self.execute_one_task(task);
+    }
+
+    pub fn navigate_to_task(&self, url: &'static str, manual_task_id: Option<TaskId>) -> TaskDescribe {
         let task = tasks::NavigateToTaskBuilder::default()
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .url(url)
             .build()
             .unwrap();
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![task.into()]);
+        task.into()
     }
 
     pub fn main_frame(&self) -> Option<&page::Frame> {
@@ -255,14 +265,11 @@ impl Tab {
 
     pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<TaskId>) {
         let task = tasks::GetDocumentTaskBuilder::default()
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .depth(depth)
             .build()
             .unwrap();
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![task.into()]);
+        self.execute_one_task(task.into());
     }
 
     pub fn dom_query_selector_by_selector(
@@ -270,10 +277,8 @@ impl Tab {
         selector: &'static str,
         manual_task_id: Option<usize>,
     ) {
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(self.get_query_selector(selector, manual_task_id));
+        let tasks = self.get_query_selector(selector, manual_task_id);
+        self.execute_tasks(tasks);
     }
 
     pub fn describe_node_by_selector(
@@ -284,13 +289,13 @@ impl Tab {
     ) {
         let mut pre_tasks = self.get_query_selector(selector, None);
         let describe_node = tasks::DescribeNodeTaskBuilder::default()
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .selector(selector.to_owned())
             .depth(depth)
             .build()
             .unwrap();
         pre_tasks.push(describe_node.into());
-        self.chrome_session.lock().unwrap().execute_task(pre_tasks);
+        self.execute_tasks(pre_tasks);
     }
 
     pub fn describe_node(
@@ -299,14 +304,10 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) {
         match describe_node_task_builder
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build()
         {
-            Ok(task) => self
-                .chrome_session
-                .lock()
-                .unwrap()
-                .execute_task(vec![task.into()]),
+            Ok(task) => self.execute_one_task(task.into()),
             Err(err) => error!("build describe_node task error: {:?}", err),
         }
     }
@@ -317,14 +318,10 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) {
         match query_selector_task_builder
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build()
         {
-            Ok(task) => self
-                .chrome_session
-                .lock()
-                .unwrap()
-                .execute_task(vec![task.into()]),
+            Ok(task) => self.execute_one_task(task.into()),
             Err(err) => error!("build query_selector task error: {:?}", err),
         }
     }
@@ -335,11 +332,11 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) -> Vec<TaskDescribe> {
         let get_document = tasks::GetDocumentTaskBuilder::default()
-            .common_fields(self.get_c_f(None))
+            .common_fields(self.get_common_field(None))
             .build()
             .unwrap();
         let query_select = tasks::QuerySelectorTaskBuilder::default()
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .selector(selector)
             .build()
             .unwrap();
@@ -353,7 +350,7 @@ impl Tab {
     ) -> Vec<TaskDescribe> {
         let mut pre_tasks = self.get_query_selector(selector, None);
         let get_box_model = tasks::GetBoxModelTaskBuilder::default()
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .selector(selector.to_owned())
             .build()
             .unwrap();
@@ -366,10 +363,8 @@ impl Tab {
         selector: &'static str,
         manual_task_id: Option<TaskId>,
     ) {
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(self.get_box_model(selector, manual_task_id));
+        let tasks = self.get_box_model(selector, manual_task_id);
+        self.execute_tasks(tasks);
     }
     pub fn capture_screenshot_by_selector(
         &mut self,
@@ -379,7 +374,7 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) {
         let screen_shot = tasks::CaptureScreenshotTaskBuilder::default()
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .selector(selector)
             .format(format)
             .from_surface(from_surface)
@@ -387,16 +382,34 @@ impl Tab {
             .unwrap();
         let mut pre_tasks = self.get_box_model(selector, None);
         pre_tasks.push(screen_shot.into());
-        self.chrome_session.lock().unwrap().execute_task(pre_tasks);
+        self.execute_tasks(pre_tasks);
     }
 
-    fn get_c_f(&self, manual_task_id: Option<TaskId>) -> tasks::CommonDescribeFields {
+    pub fn get_common_field(&self, manual_task_id: Option<TaskId>) -> tasks::CommonDescribeFields {
         tasks::CommonDescribeFieldsBuilder::default()
             .target_id(self.target_info.target_id.clone())
             .session_id(self.session_id.clone())
             .task_id(manual_task_id)
             .build()
             .unwrap()
+    }
+
+    pub fn create_set_request_interception_task(&self, manual_task_id: Option<TaskId>) -> SetRequestInterceptionTask {
+        SetRequestInterceptionTaskBuilder::default().common_fields(self.get_common_field(manual_task_id)).build().expect("SetRequestInterceptionTaskBuilder should work.")
+    }
+
+    pub fn execute_one_task(&mut self, task: TaskDescribe) {
+        self.chrome_session
+            .lock()
+            .unwrap()
+            .execute_task(vec![task]);
+    }
+
+    pub fn execute_tasks(&mut self, tasks: Vec<TaskDescribe>) {
+        self.chrome_session
+            .lock()
+            .unwrap()
+            .execute_task(tasks);
     }
 
     pub fn print_to_pdf(
@@ -410,29 +423,34 @@ impl Tab {
             tasks::PrintToPdfTaskBuilder::default()
         };
         let task = task_builder
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build()
             .unwrap();
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![task.into()]);
+        self.execute_one_task(task.into());
     }
 
     pub fn page_enable(&mut self) {
         let pn = tasks::PageEnableTask {
-            common_fields: self.get_c_f(None),
+            common_fields: self.get_common_field(None),
         };
-        self.chrome_session.lock().unwrap().execute_task(vec![pn.into()]);
+        self.execute_one_task(pn.into());
     }
 
     pub fn runtime_enable(&mut self, manual_task_id: Option<TaskId>) {
-        let common_fields = self.get_c_f(manual_task_id);
+        let common_fields = self.get_common_field(manual_task_id);
         let task = RuntimeEnableTask{common_fields};
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![task.into()]);
+        self.execute_one_task(task.into());
+    }
+
+    pub fn network_enable(&mut self, manual_task_id: Option<TaskId>) {
+        let task = self.network_enable_task(manual_task_id);
+        self.execute_one_task(task.into());
+    }
+
+    pub fn network_enable_task(&mut self, manual_task_id: Option<TaskId>) -> TaskDescribe {
+        let common_fields = self.get_common_field(manual_task_id);
+        let nwe = NetworkEnableTaskBuilder::default().common_fields(common_fields).build().expect("NetworkEnableTaskBuilder should work.");
+        nwe.into()
     }
 
     pub fn runtime_evaluate_expression(
@@ -442,13 +460,10 @@ impl Tab {
     ) {
         let task = tasks::RuntimeEvaluateTaskBuilder::default()
             .expression(expression.to_string())
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build()
             .unwrap();
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![task.into()]);
+        self.execute_one_task(task.into());
     }
 
     pub fn runtime_evaluate(
@@ -457,14 +472,10 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) {
         let task = evaluate_task_builder
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build();
         match task {
-            Ok(task) => self
-                .chrome_session
-                .lock()
-                .unwrap()
-                .execute_task(vec![task.into()]),
+            Ok(task) => self.execute_one_task(task.into()),
             Err(err) => error!("build evaluate task error: {:?}", err),
         }
     }
@@ -475,14 +486,10 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) {
         let task = call_function_on_task_builder
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build();
         match task {
-            Ok(task) => self
-                .chrome_session
-                .lock()
-                .unwrap()
-                .execute_task(vec![task.into()]),
+            Ok(task) => self.execute_one_task(task.into()),
             Err(err) => error!("build call_function_on task error: {:?}", err),
         }
     }
@@ -494,13 +501,10 @@ impl Tab {
     ) {
         let task = tasks::RuntimeGetPropertiesTaskBuilder::default()
             .object_id(object_id)
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build()
             .unwrap();
-        self.chrome_session
-            .lock()
-            .unwrap()
-            .execute_task(vec![task.into()]);
+        self.execute_one_task(task.into());
     }
 
     pub fn runtime_get_properties(
@@ -509,14 +513,10 @@ impl Tab {
         manual_task_id: Option<TaskId>,
     ) {
         let task = get_properties_task_builder
-            .common_fields(self.get_c_f(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id))
             .build();
         match task {
-            Ok(task) => self
-                .chrome_session
-                .lock()
-                .unwrap()
-                .execute_task(vec![task.into()]),
+            Ok(task) => self.execute_one_task(task.into()),
             Err(err) => error!("build get_properties_task_builder error: {:?}", err),
         }
     }

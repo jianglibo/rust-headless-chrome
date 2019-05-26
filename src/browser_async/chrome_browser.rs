@@ -129,7 +129,12 @@ impl Stream for ChromeBrowser {
                     match self.ws_client.as_mut().unwrap().poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
-                                trace!("got message (***every message***): {:?}", msg);
+                                if msg.len() > 200 {
+                                    let (short, _) = msg.split_at(200);
+                                    trace!("got message (***every message***): {:?}", short);
+                                } else {
+                                    trace!("got message (***every message***): {:?}", msg);
+                                }
                                 let parsed_message = protocol::parse_raw_message(&msg);
                                 match parsed_message {
                                     Ok(success_parsed_message) => {

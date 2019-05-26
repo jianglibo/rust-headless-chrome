@@ -1,5 +1,9 @@
 use serde::Deserialize;
-use crate::protocol::{dom as protocol_dom, runtime, network};
+use crate::protocol::{dom as protocol_dom, runtime, network, page};
+
+mod network_raw_event;
+
+pub use network_raw_event::{RequestWillBeSent, ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +83,8 @@ pub struct ConsoleAPICalledParams {
     pub context: Option<String>,
 }
 
+
+
 // https://serde.rs/enum-representations.html
 
 #[derive(Deserialize, Debug, Clone)]
@@ -97,6 +103,14 @@ pub enum EmbeddedEvent {
     ConsoleAPICalled(ConsoleAPICalled),
     #[serde(rename = "Page.domContentEventFired")]
     DomContentEventFired(DomContentEventFired),
+    #[serde(rename = "Network.requestWillBeSent")]
+    RequestWillBeSent(RequestWillBeSent),
+    #[serde(rename = "Network.responseReceived")]
+    ResponseReceived(ResponseReceived),
+    #[serde(rename = "Network.dataReceived")]
+    DataReceived(DataReceived),
+    #[serde(rename = "Network.loadingFinished")]
+    LoadingFinished(LoadingFinished),
 }
 
 #[derive(Deserialize, Debug, Clone)]

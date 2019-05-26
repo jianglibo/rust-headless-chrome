@@ -13,6 +13,7 @@ pub mod target_task;
 pub mod security_task;
 pub mod target_call_methods;
 pub mod browser_call_methods;
+pub mod network_task;
 
 pub use dom_task::{
     DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
@@ -36,6 +37,9 @@ pub use target_task::{
     CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
     SetDiscoverTargetsTaskBuilder, target_events, TargetEvent,
 };
+
+pub use network_task::{NetworkEnableTask, NetworkEnableTaskBuilder, network_events,
+NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, handle_network_event};
 
 pub use target_call_methods::{TargetCallMethodTask, handle_target_method_call};
 pub use browser_call_methods::{BrowserCallMethodTask, handle_browser_method_call};
@@ -97,6 +101,7 @@ pub enum TaskDescribe {
     RuntimeEvent(RuntimeEvent),
     TargetEvent(TargetEvent),
     DomEvent(DomEvent),
+    NetworkEvent(NetworkEvent),
     Interval,
     ChromeConnected,
 }
@@ -119,12 +124,14 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::RuntimeEvaluate(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeGetProperties(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
-                TargetCallMethodTask::SecurityEnable(task) => task.get_method_str(),
+                TargetCallMethodTask::NetworkEnable(task) => task.get_method_str(),
+                TargetCallMethodTask::SetRequestInterception(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
+                BrowserCallMethodTask::SecurityEnable(task) => task.get_method_str(),
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);

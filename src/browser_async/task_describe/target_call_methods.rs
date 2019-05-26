@@ -1,10 +1,7 @@
-use super::SecurityEnableTask;
 use super::{CaptureScreenshotTask, NavigateToTask, PageEnableTask, PrintToPdfTask};
-use super::{DescribeNodeTask, GetBoxModelTask, GetDocumentTask, QuerySelectorTask,
-    RuntimeCallFunctionOnTask, RuntimeEnableTask, RuntimeEvaluateTask, RuntimeGetPropertiesTask,
+use super::{DescribeNodeTask, GetBoxModelTask, GetDocumentTask, QuerySelectorTask, NetworkEnableTask,
+    RuntimeCallFunctionOnTask, RuntimeEnableTask, RuntimeEvaluateTask, RuntimeGetPropertiesTask, SetRequestInterceptionTask,
 };
-
-
 
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{response_object, PageResponse, PageResponseWrapper};
@@ -27,7 +24,8 @@ pub enum TargetCallMethodTask {
     RuntimeEvaluate(RuntimeEvaluateTask),
     RuntimeGetProperties(RuntimeGetPropertiesTask),
     RuntimeCallFunctionOn(RuntimeCallFunctionOnTask),
-    SecurityEnable(SecurityEnableTask),
+    NetworkEnable(NetworkEnableTask),
+    SetRequestInterception(SetRequestInterceptionTask),
 }
 
 impl HasCallId for TargetCallMethodTask {
@@ -45,7 +43,8 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::RuntimeEvaluate(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeGetProperties(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_call_id(),
-            TargetCallMethodTask::SecurityEnable(task) => task.get_call_id(),
+            TargetCallMethodTask::NetworkEnable(task) => task.get_call_id(),
+            TargetCallMethodTask::SetRequestInterception(task) => task.get_call_id(),
         }
     }
 }
@@ -155,9 +154,13 @@ pub fn handle_target_method_call(
                 page_response: PageResponse::CallFunctionOnDone(task.task_result),
             });
         }
-        _ => {
-            info!("ignored method return. {:?}", target_call_method_task);
+        TargetCallMethodTask::SetRequestInterception(task) => {
+            warn!("ignored method return SetRequestInterception");
         }
-    }    warn!("unhandled branch handle_target_method_call");
+        TargetCallMethodTask::NetworkEnable(task) => {
+            warn!("ignored method return. NetworkEnable");
+        }
+    } 
+    warn!("unhandled branch handle_target_method_call");
     Ok(PageResponseWrapper::default())
 }

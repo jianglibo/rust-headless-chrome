@@ -1,6 +1,6 @@
 use crate::protocol::{dom, page, target, runtime, network};
 use crate::browser::tab::element::{BoxModel};
-use super::super::browser_async::{TaskId};
+use super::super::browser_async::{TaskId, embedded_events};
 use std::path::Path;
 use std::fs::OpenOptions;
 use log::*;
@@ -70,6 +70,7 @@ pub enum PageResponse {
     GetPropertiesDone(Option<runtime::methods::GetPropertiesReturnObject>),
     CallFunctionOnDone(Option<runtime::methods::CallFunctionOnReturnObject>),
     SetIgnoreCertificateErrorsDone(bool),
+    ResponseReceived(embedded_events::ResponseReceivedParams),
     Fail,
 }
 

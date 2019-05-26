@@ -1,13 +1,13 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{response_object, PageResponse, PageResponseWrapper};
+use super::page_message::{PageResponse, PageResponseWrapper};
 use super::tab::Tab;
 use super::task_describe::{
-    self as tasks, handle_browser_method_call, handle_target_method_call, BrowserCallMethodTask,
-    DomEvent, HasTaskId, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
-    SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask, TargetCallMethodTask, TargetEvent,
-    TaskDescribe,
+    self as tasks, handle_browser_method_call, handle_target_method_call, 
+    DomEvent, HasTaskId, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask, NetworkEnableTask, NetworkEnableTaskBuilder,
+    SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask,  TargetEvent,
+    TaskDescribe, handle_network_event,
 };
 
 use crate::browser_async::{ChromePageError, TaskId};
@@ -183,18 +183,29 @@ impl DebugSession {
         RuntimeEnableTask { common_fields }.into()
     }
 
-    pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
-            .build()
-            .unwrap();
-        let task = self.set_ignore_certificate_errors_task(ignore);
+    pub fn execute_one_task(&mut self, task: TaskDescribe) {
         self.chrome_debug_session
             .lock()
             .unwrap()
             .execute_task(vec![task]);
     }
 
-    pub fn set_ignore_certificate_errors_task(&mut self, ignore: bool) -> TaskDescribe{
+    pub fn execute_tasks(&mut self, tasks: Vec<TaskDescribe>) {
+        self.chrome_debug_session
+            .lock()
+            .unwrap()
+            .execute_task(tasks);
+    }
+
+    pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
+        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+            .build()
+            .unwrap();
+        let task = self.set_ignore_certificate_errors_task(ignore);
+        self.execute_one_task(task);
+    }
+
+    pub fn set_ignore_certificate_errors_task(&mut self, ignore: bool) -> TaskDescribe {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
             .unwrap();
@@ -478,11 +489,15 @@ impl DebugSession {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));
                 Ok(resp.into())
             }
-            TaskDescribe::BrowserCallMethod(task) => {
+            TaskDescribe::BrowserCallMethod(task) => 
                 Ok(handle_browser_method_call(task, session_id, target_id)
                     .ok()
-                    .into())
-            }
+                    .into()),
+            
+            TaskDescribe::NetworkEvent(network_event) => 
+                Ok(handle_network_event(self, network_event, session_id, target_id)
+                .ok()
+                .into()),
             _ => {
                 warn!("debug_session got unknown task. {:?}", item);
                 self.send_fail(None, None)

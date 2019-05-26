@@ -1,10 +1,160 @@
 type Headers = HashMap<String, String>;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::protocol::{runtime, page, security};
 
     pub type LoaderId = String;
     pub type MonotonicTime = f32;
+    pub type RequestId = String;
+    pub type TimeSinceEpoch = f32;
 
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+    pub enum InterceptionStage {
+        Request,
+        HeadersReceived,
+    }
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+    pub enum ResourceType {
+        Document,
+         Stylesheet,
+          Image, Media,
+           Font, 
+           Script, 
+           TextTrack, 
+           XHR, 
+           Fetch, 
+           EventSource, 
+           WebSocket,
+            Manifest, 
+            SignedExchange, 
+            Ping,
+             CSPViolationReport,
+              Other
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+    #[serde(rename_all = "camelCase")]
+    pub enum InitiatorType {
+        Parser,
+        Script, 
+        Preload, 
+        #[serde(rename = "SignedExchange")]
+        SignedExchange,
+        Other,
+    }
+
+// \"initiator\":{\"type\":\"script\",\"stack\":{\"callFrames\":[{\"functionName\":\"send\",\"scriptId\":\"42\",\"url\":\"https://59.202.58.131/assets/scripts/vendor-daf58f8629.js\",\"lineNumber\":84,\"columnNumber\":3511}]}},
+    #[derive(Deserialize, Clone, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Initiator {
+        #[serde(rename = "type")]
+        pub initiator_type: InitiatorType,
+        pub stack: Option<runtime::StackTrace>,
+        pub url: Option<String>,
+        pub line_number: Option<u32>,
+    }
+
+// {\"requestTime\":656873.862454,\"proxyStart\":-1,\"proxyEnd\":-1,\"dnsStart\":3.705,\"dnsEnd\":21.607,
+// \"connectStart\":21.607,\"connectEnd\":108.254,\"sslStart\":39.61,\"sslEnd\":108.248,\"workerStart\":-1,
+// \"workerReady\":-1,\"sendStart\":108.602,\"sendEnd\":109.147,\"pushStart\":0,\"pushEnd\":0,\"receiveHeadersEnd\":129.336}
+    #[derive(Deserialize, Clone, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ResourceTiming {
+        pub request_time: f32,
+        pub proxy_start: f32,
+        pub proxy_end: f32,
+        pub dns_start: f32,
+        pub dns_end: f32,
+        pub connect_start: f32,
+        pub connect_end: f32,
+        pub ssl_start: f32,
+        pub ssl_end: f32,
+        pub worker_start: f32,
+        pub worker_ready: f32,
+        pub send_start: f32,
+        pub send_end: f32,
+        pub push_start: f32,
+        pub push_end: f32,
+        pub receive_headers_end: f32,
+    }
+
+    #[derive(Deserialize, Clone, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SignedCertificateTimestamp {
+        pub status: String,
+        pub origin: String,
+        pub log_description: String,
+        pub log_id: String,
+        pub timestamp: TimeSinceEpoch,
+        pub has_algorithm: String,
+        pub signature_algorithm: String,
+        pub signature_data: String,
+    }
+
+// \"securityDetails\":{\"protocol\":\"TLS 1.2\",\"keyExchange\":\"ECDHE_RSA\",\"keyExchangeGroup\":\"P-256\",
+// \"cipher\":\"AES_128_GCM\",\"certificateId\":0,\"subjectName\":\"\",\"sanList\":[],\"issuer\":\"\",
+// \"validFrom\":1481188811,\"validTo\":1796548811,\"signedCertificateTimestampList\":[],
+// \"certificateTransparencyCompliance\":\"unknown\"}},
+    #[derive(Deserialize, Clone, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SecurityDetails {
+        pub protocol: String,
+        pub key_exchange: String,
+        pub key_exchange_group: Option<String>,
+        pub cipher: String,
+        pub mac: Option<String>,
+        pub certificate_id: security::CertificateId,
+        pub subject_name: String,
+        pub san_list: Vec<String>,
+        pub issuer: String,
+        pub valid_from: TimeSinceEpoch,
+        pub valid_to: TimeSinceEpoch,
+        pub signed_certificate_timestamp_list: Vec<SignedCertificateTimestamp>,
+        // Allow value: unknown, not-compliant, compliant
+        pub certificate_transparency_compliance: String,
+    }
+
+// \"response\":{\"url\":\"https://59.202.58.131/api/assess/getAssessDataOfFirstIndex?curDate=2019%2F05%2F24&orgId=1&_=1558775437908\",
+// \"status\":200,\"statusText\":\"OK\",
+// \"headers\":{\"Date\":\"Sat, 25 May 2019 09:18:22 GMT\",\"Server\":\"nginx/1.6.3\",\"Connection\":\"keep-alive\",\"Content-Length\":\"1325\",\"X-Application-Context\":\"dingplus-user-web-dubbo:localtest,menu,privilege\",\"Content-Type\":\"application/json;charset=utf-8\"},
+// \"mimeType\":\"application/json\",
+// \"connectionReused\":true,\"connectionId\":395,\"remoteIPAddress\":\"59.202.58.131\",
+// \"remotePort\":443,\"fromDiskCache\":false,\"fromServiceWorker\":false,
+// \"encodedDataLength\":242,
+// \"timing\":{\"requestTime\":602980.457097,\"proxyStart\":-1,\"proxyEnd\":-1,\"dnsStart\":-1,\"dnsEnd\":-1,\"connectStart\":-1,\"connectEnd\":-1,\"sslStart\":-1,\"sslEnd\":-1,\"workerStart\":-1,\"workerReady\":-1,\"sendStart\":0.436,\"sendEnd\":0.494,\"pushStart\":0,\"pushEnd\":0,\"receiveHeadersEnd\":89.751},
+// \"protocol\":\"http/1.1\",\"securityState\":\"insecure\",
+// \"securityDetails\":{\"protocol\":\"TLS 1.2\",\"keyExchange\":\"ECDHE_RSA\",\"keyExchangeGroup\":\"P-256\",\"cipher\":\"AES_128_GCM\",\"certificateId\":0,\"subjectName\":\"\",\"sanList\":[],\"issuer\":\"\",\"validFrom\":1481188811,\"validTo\":1796548811,\"signedCertificateTimestampList\":[],\"certificateTransparencyCompliance\":\"unknown\"}},
+    #[derive(Deserialize, Clone, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Response {
+        pub url: String,
+        pub status: u32,
+        pub status_text: String,
+        pub headers: Headers,
+        pub headers_text: Option<String>,
+        pub mime_type: String,
+        pub request_headers: Option<Headers>,
+        pub request_headers_text: Option<String>,
+        pub connection_reused: bool,
+        pub connection_id: u32,
+        #[serde(rename = "remoteIPAddress")]
+        pub remote_ip_address: Option<String>,
+        pub remote_port: Option<u32>,
+        pub from_disk_cache: Option<bool>,
+        pub from_service_worker: Option<bool>,
+        pub from_prefetch_cache: Option<bool>,
+        pub encoded_data_length: u32,
+        pub timing: Option<ResourceTiming>,
+        pub protocol: Option<String>,
+        pub security_state: security::SecurityState,
+        pub security_details: Option<SecurityDetails>,
+    }
+
+
+// \"request\":{\"url\":\"https://59.202.58.131/api/league/manager/list?_=1558774807951\",
+// \"method\":\"GET\",\"headers\":{\"Accept\":\"*/*\",\"Referer\":\"https://59.202.58.131/home\",\"X-Requested-With\":\"XMLHttpRequest\",\"csrftoken\":\"d6422cb0-3f0f-4019-a73c-582a0b09ee15\",\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/74.0.3729.169 Safari/537.36\",\"Content-Type\":\"application/json;charset:utf-8\"},
+// \"mixedContentType\":\"none\",\"initialPriority\":\"High\",
+// \"referrerPolicy\":\"no-referrer-when-downgrade\"},
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Request {
@@ -101,10 +251,18 @@ pub mod methods {
 
     use crate::protocol::Method;
     use std::collections::HashMap;
+    use super::*;
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
-    pub struct Enable {}
+    pub struct Enable {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub max_total_buffer_size: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub max_resource_buffer_size: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub max_post_data_size: Option<u32>,
+    }
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct EnableReturnObject {}
@@ -113,19 +271,19 @@ pub mod methods {
         type ReturnObject = EnableReturnObject;
     }
 
-    #[derive(Serialize, Debug)]
+    #[derive(Serialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
-    pub struct RequestPattern<'a> {
+    pub struct RequestPattern {
         /// Wildcards ('*' -> zero or more, '?' -> exactly one) are allowed.
         /// Escape character is backslash. Omitting is equivalent to "*".
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub url_pattern: Option<&'a str>,
+        pub url_pattern: Option<String>,
         /// Resource type as it was perceived by the rendering engine.
         ///
         /// Allowed values:
         /// Document, Stylesheet, Image, Media, Font, Script, TextTrack, XHR, Fetch, EventSource, WebSocket, Manifest, SignedExchange, Ping, CSPViolationReport, Other
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub resource_type: Option<&'a str>,
+        pub resource_type: Option<ResourceType>,
 
         /// Stages of the interception to begin intercepting. Request will intercept before the
         /// request is sent. Response will intercept after the response is received.
@@ -133,13 +291,13 @@ pub mod methods {
         /// Allowed values:
         /// Request, HeadersReceived
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub interception_stage: Option<&'a str>,
+        pub interception_stage: Option<InterceptionStage>,
     }
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct SetRequestInterception<'a> {
-        pub patterns: &'a [RequestPattern<'a>],
+        pub patterns: &'a [RequestPattern],
     }
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]

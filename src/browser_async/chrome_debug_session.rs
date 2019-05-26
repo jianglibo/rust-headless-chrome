@@ -1,4 +1,5 @@
-use super::task_describe::{TaskDescribe, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, page_events, target_events, dom_events, runtime_events};
+use super::task_describe::{TaskDescribe, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, 
+page_events, target_events, dom_events, runtime_events, network_events};
 
 use super::embedded_events::{self, EmbeddedEvent};
 use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
@@ -87,6 +88,19 @@ impl ChromeDebugSession {
             EmbeddedEvent::DomContentEventFired(embedded_event) => {
                 let event = page_events::DomContentEventFired::new(embedded_event);
                 return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::ResponseReceived(embedded_event) => {
+                let event = network_events::ResponseReceived::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::DataReceived(embedded_event) => {
+                warn!("ignore DataReceived inner event.");
+            }
+            EmbeddedEvent::LoadingFinished(embedded_event) => {
+                warn!("ignore LoadingFinished inner event.");
+            }
+            EmbeddedEvent::RequestWillBeSent(embedded_event) => {
+                warn!("ignore RequestWillBeSent inner event.");
             }
             _ => {
                 warn!("discard inner event: {:?}", target_message_event);
@@ -226,7 +240,8 @@ impl ChromeDebugSession {
                 }
             }
             _ => {
-                error!("unknown pair: {:?}, {:?}", current_task, next_task);
+                warn!("unknown pair: {:?}, {:?}", current_task, next_task);
+                self.execute_next_and_return_remains(tasks);
             }
         }
         Ok(())
@@ -298,8 +313,11 @@ impl ChromeDebugSession {
                     let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
                     task.task_result = Some(task_return_object.data);
                 }
-                TargetCallMethodTask::SecurityEnable(_task) => {
-                    info!("security enabled.");
+                TargetCallMethodTask::NetworkEnable(_task) => {
+                    info!("network enabled.");
+                }
+                TargetCallMethodTask::SetRequestInterception(task) => {
+                    info!("set_request_interception enabled. {:?}", task);
                 }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
@@ -310,6 +328,9 @@ impl ChromeDebugSession {
                     info!("nothing to full fill:: {:?}", task);
                 }
                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => {
+                    info!("nothing to full fill:: {:?}", task);
+                }
+                BrowserCallMethodTask::SecurityEnable(task) => {
                     info!("nothing to full fill:: {:?}", task);
                 }
             }
@@ -324,8 +345,8 @@ impl ChromeDebugSession {
     fn handle_protocol_event(
         &mut self,
         protocol_event: protocol::Event,
-        session_id: Option<String>,
-        target_id: Option<String>,
+        _maybe_session_id: Option<String>,
+        _maybe_target_id: Option<String>,
     ) -> Option<TaskDescribe> {
         match protocol_event {
             protocol::Event::FrameNavigated(raw_event) => {
@@ -335,92 +356,34 @@ impl ChromeDebugSession {
             protocol::Event::TargetInfoChanged(raw_event) => {
                 let event = target_events::TargetInfoChanged::new(raw_event);
                 return Some(event.into());
-                // let te = target_events::TargetInfoChanged {
-                //     target_info: target_info_changed.params.target_info,
-                //     session_id,
-                //     target_id,
-                // };
-                // return Some(te.into());
             }
             protocol::Event::TargetCreated(raw_event) => {
                 let event = target_events::TargetCreated::new(raw_event);
                 return Some(event.into());
-                // let target_type = &(target_created_event.params.target_info.target_type);
-                // match target_type {
-                //     protocol::target::TargetType::Page => {
-                //         trace!(
-                //             "receive page create event. {:?}",
-                //             target_created_event.params.target_info
-                //         );
-                //         let pe = page_events::PageCreated {
-                //             target_info: target_created_event.params.target_info,
-                //         };
-                //         return Some(pe.into());
-                //     }
-                //     _ => (),
-                // }
             }
             protocol::Event::AttachedToTarget(raw_event) => {
                 let event = target_events::AttachedToTarget::new(raw_event);
                 return Some(event.into());
-                // return TaskDescribe::from(target_events::AttachedToTarget::new(event.params)).into();
-                // let attach_to_target_params: protocol::target::events::AttachedToTargetParams =
-                //     event.params;
-                // let target_info: protocol::target::TargetInfo = attach_to_target_params.target_info;
-
-                // match target_info.target_type {
-                //     protocol::target::TargetType::Page => {
-                //         trace!(
-                //             "got attach to page event and sessionId: {}",
-                //             attach_to_target_params.session_id
-                //         );
-                //         return Some(TaskDescribe::PageAttached(
-                //             target_info,
-                //             attach_to_target_params.session_id.into(),
-                //         ));
-                //         // return Some((attach_to_target_params.session_id, target_info));
-                //     }
-                //     _ => (),
-                // }
             }
             protocol::Event::FrameAttached(raw_event) => {
                 let event = page_events::FrameAttached::new(raw_event);
                 return Some(event.into());
-                // return TaskDescribe::from(page_events::FrameAttached::new(event.params)).into();
-                // return Some(TaskDescribe::FrameAttached(
-                //     evt.params,
-                //     (session_id, target_id).into(),
-                // ));
             }
             protocol::Event::FrameStoppedLoading(raw_event) => {
                 let event = page_events::FrameStoppedLoading::new(raw_event);
                 return Some(event.into());
-                // let frame_id = evt.params.frame_id;
-                // return TaskDescribe::from(page_events::FrameStoppedLoading{frame_id}).into();
-                // return Some(TaskDescribe::FrameStoppedLoading(
-                //     frame_id,
-                //     (session_id, target_id).into(),
-                // ));
             }
             protocol::Event::FrameStartedLoading(raw_event) => {
                 let event = page_events::FrameStartedLoading::new(raw_event);
                 return Some(event.into());
-                // let frame_id = evt.params.frame_id;
-                // return TaskDescribe::from(page_events::FrameStartedLoading{frame_id}).into();
-                // return Some(TaskDescribe::FrameStartedLoading(
-                //     frame_id,
-                //     (session_id, target_id).into(),
-                // ));
             }
             protocol::Event::FrameDetached(raw_event) => {
                 let event = page_events::FrameDetached::new(raw_event);
                 return Some(event.into());
-                // let frame_id = evt.params.frame_id;
-                // return TaskDescribe::from(page_events::FrameDetached{frame_id}).into();
-                // return Some(TaskDescribe::FrameDetached(
-                //     frame_id,
-                //     (session_id, target_id).into(),
-                // ));
+            }
+            protocol::Event::RequestIntercepted(raw_event) => {
+                let event = network_events::RequestIntercepted::new(raw_event);
+                return Some(event.into());
             }
             _ => {
                 warn!("unprocessed inner event: {:?}", protocol_event);
@@ -468,7 +431,7 @@ fn process_message(&mut self, value: protocol::Message) -> Option<(Option<target
                             }
                             _ => match parse_raw_message(&message_field) {
                                 Ok(embedded_events::EmbeddedEventWrapper::EmbeddedEvent(target_message_event)) => {
-                                    trace!("got inner event: {:?}", target_message_event);
+                                    // trace!("got inner event: {:?}", target_message_event);
                                     if let Some(page_message) = self.handle_inner_target_events(
                                         target_message_event,
                                         Some(session_id.clone()),
@@ -481,7 +444,7 @@ fn process_message(&mut self, value: protocol::Message) -> Option<(Option<target
                                 }
                                 Err(_error) => {
                                     error!(
-                                        "parse_raw_message failed ** {:?}",
+                                        "parse_raw_message failed ** this is message_field aka inner event: {:?}",
                                         message_field
                                     );
                                     None

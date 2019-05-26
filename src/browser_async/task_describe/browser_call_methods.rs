@@ -1,5 +1,6 @@
 use super::target_task::create_target::CreateTargetTask;
 use super::security_task::set_ignore_certificate_errors::SetIgnoreCertificateErrorsTask;
+use super::security_task::security_enable::SecurityEnableTask;
 use super::target_task::set_discover_target_task::SetDiscoverTargetsTask;
 use super::{HasCallId, HasTaskId};
 use super::super::page_message::{PageResponseWrapper, PageResponse};
@@ -12,6 +13,7 @@ pub enum BrowserCallMethodTask {
     CreateTarget(CreateTargetTask),
     SetDiscoverTargets(SetDiscoverTargetsTask),
     SetIgnoreCertificateErrors(SetIgnoreCertificateErrorsTask),
+    SecurityEnable(SecurityEnableTask),
 }
 
 impl HasCallId for BrowserCallMethodTask {
@@ -20,6 +22,7 @@ impl HasCallId for BrowserCallMethodTask {
             BrowserCallMethodTask::CreateTarget(task) => task.get_call_id(),
             BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_call_id(),
             BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_call_id(),
+            BrowserCallMethodTask::SecurityEnable(task) => task.get_call_id(),
         }
     }
 }
@@ -34,7 +37,7 @@ pub fn handle_browser_method_call(
                 trace!("TargetSetDiscoverTargets returned. {:?}", task);
             }
             BrowserCallMethodTask::CreateTarget(task) => {
-                trace!("TargetSetDiscoverTargets returned. {:?}", task);
+                trace!("CreateTarget returned. {:?}", task);
             }
             BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => {
                 return Ok(PageResponseWrapper{
@@ -42,6 +45,9 @@ pub fn handle_browser_method_call(
                     task_id: Some(task.get_task_id()),
                     page_response: PageResponse::SetIgnoreCertificateErrorsDone(task.ignore),
                 });
+            }
+            BrowserCallMethodTask::SecurityEnable(task) => {
+                trace!("SecurityEnable returned. {:?}", task);
             }
         }
         Ok(PageResponseWrapper::default())

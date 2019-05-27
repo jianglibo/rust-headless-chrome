@@ -1,7 +1,4 @@
-use super::target_task::create_target::CreateTargetTask;
-use super::security_task::set_ignore_certificate_errors::SetIgnoreCertificateErrorsTask;
-use super::security_task::security_enable::SecurityEnableTask;
-use super::target_task::set_discover_target_task::SetDiscoverTargetsTask;
+use super::{target_tasks, security_tasks};
 use super::{HasCallId, HasTaskId};
 use super::super::page_message::{PageResponseWrapper, PageResponse, MethodCallDone,};
 use crate::protocol::target;
@@ -10,10 +7,10 @@ use log::*;
 
 #[derive(Debug)]
 pub enum BrowserCallMethodTask {
-    CreateTarget(CreateTargetTask),
-    SetDiscoverTargets(SetDiscoverTargetsTask),
-    SetIgnoreCertificateErrors(SetIgnoreCertificateErrorsTask),
-    SecurityEnable(SecurityEnableTask),
+    CreateTarget(target_tasks::CreateTargetTask),
+    SetDiscoverTargets(target_tasks::SetDiscoverTargetsTask),
+    SetIgnoreCertificateErrors(security_tasks::SetIgnoreCertificateErrorsTask),
+    SecurityEnable(security_tasks::SecurityEnableTask),
 }
 
 impl HasCallId for BrowserCallMethodTask {

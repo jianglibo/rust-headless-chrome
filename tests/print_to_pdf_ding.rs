@@ -9,6 +9,7 @@ extern crate tokio_timer;
 use headless_chrome::browser_async::debug_session::DebugSession;
 
 use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
+use headless_chrome::browser_async::task_describe::{TaskDescribe};
 use headless_chrome::protocol::network::{InterceptionStage, ResourceType};
 use log::*;
 use std::default::Default;
@@ -24,7 +25,7 @@ struct PrintToPdfDing {
 
 impl PrintToPdfDing {
     fn assert_result(&self) {
-        assert_eq!(self.load_event_fired_count, 1);
+        assert_eq!(self.load_event_fired_count, 2);
     }
 }
 
@@ -41,6 +42,18 @@ impl Future for PrintToPdfDing {
                     .ok();
                 let task_id = page_response_wrapper.task_id;
                 match page_response_wrapper.page_response {
+                    PageResponse::ChromeConnected => {
+                        self.debug_session.set_discover_targets(true);
+                        self.debug_session.security_enable();
+                        self.debug_session.set_ignore_certificate_errors(true);
+                    }
+                    PageResponse::SecondsElapsed(seconds) => {
+                        trace!("seconds elapsed: {} ", seconds);
+                        if seconds > 20 {
+                            self.assert_result();
+                            break Ok(().into());
+                        }
+                    }
                     PageResponse::ReceivedEvent(event) => match event {
                         ReceivedEvent::PageCreated(_page_idx) => {
                             let tab = tab.expect("tab should exists.");
@@ -48,63 +61,45 @@ impl Future for PrintToPdfDing {
                         }
                         ReceivedEvent::PageAttached(_page_info, _session_id) => {
                             let tab = tab.expect("tab should exists. PageAttached");
-                            tab.page_enable();
-                            tab.network_enable(Some(999));
-                            let mut task = tab.create_set_request_interception_task(Some(1000));
+                            let t1 = tab.page_enable_task();
+                            let t2 = tab.network_enable_task(None);
+                            
+                            let mut task = tab.create_set_request_interception_task(Some("1000".into()));
                             task.add_request_pattern(
                                 None,
                                 Some(ResourceType::XHR),
-                                Some(InterceptionStage::Request),
+                                Some(InterceptionStage::HeadersReceived),
                             );
-                            tab.execute_one_task(task.into());
-                            tab.navigate_to(self.url, None);
+
+                            let t3: TaskDescribe = task.into();
+                            let t4 = tab.navigate_to_task(self.url, None);
+                            tab.execute_tasks(vec![t1, t2, t3, t4]);
                         }
                         ReceivedEvent::LoadEventFired(_monotonic_time) => {
                             self.load_event_fired_count += 1;
                             let tab = tab.expect("tab should exists. LoadEventFired");
                             error!("load_event_fired: {:?}", tab);
-                            if tab.is_chrome_error_chromewebdata() {
-                                // tab.runtime_evaluate_expression("document.getElementById('proceed-link').click();", Some(200));
-                                tab.runtime_evaluate_expression(
-                                    "document.getElementById('details-button')",
-                                    Some(200),
-                                );
+                            let url = tab.get_url();
+                            if url.contains("8888/login") {
+                                tab.evaluate_expression_named("document.getElementsByClassName('login-tab').item(1).click(); document.getElementById('login-by').value='13777272378';document.getElementById('password').value='00000132abc';document.getElementById('btn-submit-login').click();",
+                                 "login");
+                            } else if url.contains("131/") {
+                                tab.evaluate_expression_named("document.getElementById('100016626')", "get-root");
                             } else {
-                                let url = tab.get_url();
-                                if url.contains("8888/login") {
-                                    tab.runtime_evaluate_expression("document.getElementsByClassName('login-tab').item(1).click(); document.getElementById('login-by').value='13777272378';document.getElementById('password').value='00000132abc';document.getElementById('btn-submit-login').click();", Some(201));
-                                } else if url.contains("131/") {
-                                    let _ajax_fn = r##"
-                                let tmp_ajax_function = function(URL) {
-                                    return new Promise(function (resolve, reject) {
-                                        var req = new XMLHttpRequest(); 
-                                        req.open('GET', URL, true);
-                                        req.onload = function () {
-                                        if (req.status === 200) { 
-                                                resolve(req.responseText);
-                                            } else {
-                                                reject(new Error(req.statusText));
-                                            } 
-                                        };
-                                        req.onerror = function () {
-                                            reject(new Error(req.statusText));
-                                        };
-                                        req.send(); 
-                                    });
-                                };
-
-                                "##;
-                                } else {
-                                    error!("unknown page loaded: {:?}", url);
-                                }
+                                error!("unknown page loaded: {:?}", url);
                             }
+                            // if tab.is_chrome_error_chromewebdata() {
+                            //     tab.runtime_evaluate_expression(
+                            //         "document.getElementById('details-button')",
+                            //         Some(200),
+                            //     );
+                            // } else {
+                            // }
                         }
                         ReceivedEvent::RequestIntercepted(interception_event) => {
                             let tab = tab.expect("tab should exists. RequestIntercepted");
                             tab.get_response_body_for_interception(
-                                interception_event
-                                    .expect("interception_event should have some.")
-                                    .interception_id,
+                                interception_event.get_interception_id(),
                                 None,
                             );
                         }
@@ -115,45 +110,25 @@ impl Future for PrintToPdfDing {
                             info!("got unused page event {:?}", event);
                         }
                     },
-                    PageResponse::ChromeConnected => {
-                        self.debug_session.set_discover_targets(true);
-                        self.debug_session.security_enable();
-                    }
                     PageResponse::MethodCallDone(method_call_done) => match method_call_done {
                         MethodCallDone::GetResponseBodyForInterception(task) => {
-                            error!("data: {:?}", task.task_result);
+                            error!("data: {:?}", task.get_body_string());
                             let tab = tab.expect("tab should exists. RequestIntercepted");
                             tab.continue_intercepted_request(task.interception_id);
                         }
-                        MethodCallDone::Evaluate(evaluate_return_object) => {
-                            if task_id == Some(200) {
+                        MethodCallDone::Evaluate(task) => {
+                            if task_id == Some("200".into()) {
                                 let tab = self
                                     .debug_session
                                     .first_page_mut()
                                     .expect("main tab should exists.");
-                                info!("evaluate_return_object: {:?}", evaluate_return_object);
-                                let task2 = tab.navigate_to_task(self.url, None);
-                                let task1 =
-                                    self.debug_session.set_ignore_certificate_errors_task(true);
-                                self.debug_session.execute_tasks(vec![task1, task2]);
+                                info!("evaluate_return_object: {:?}", task);
                             }
                         }
                         _ => {
                             info!("got unused method return: {:?}", method_call_done);
                         }
                     },
-                    // PageResponse::SetIgnoreCertificateErrorsDone(_ignore) => {
-                    //     // let tab = tab.expect("tab should exists. SetIgnoreCertificateErrorsDone");
-                    //     let tab = self.debug_session.first_page_mut().expect("main tab should exists.");
-                    //     tab.navigate_to(self.url, None); // this time should success.
-                    // }
-                    PageResponse::SecondsElapsed(seconds) => {
-                        trace!("seconds elapsed: {} ", seconds);
-                        if seconds > 20 {
-                            self.assert_result();
-                            break Ok(().into());
-                        }
-                    }
                     PageResponse::Fail => {
                         info!("got fail.");
                     }
@@ -173,8 +148,8 @@ fn test_print_pdf_ding() {
         "headless_chrome=trace,print_to_pdf_ding=trace,derive_builder=trace",
     );
     env_logger::init();
-    let url = "https://59.202.58.131";
-
+    // let url = "https://59.202.58.131";
+    let url = "https://59.202.58.131/orgstructure/orgstructure-manage?orgId=100016626";
     let my_page = PrintToPdfDing {
         url,
         ..PrintToPdfDing::default()

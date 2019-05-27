@@ -45,3 +45,13 @@ wrapper_raw_event!(
     RequestIntercepted,
     network::events::RequestInterceptedEvent
 );
+
+impl RequestIntercepted {
+    pub fn get_raw_parameters(&self) -> &network::events::RequestInterceptedEventParams {
+        &self.raw_event.params
+    }
+
+    pub fn get_interception_id(&self) -> String {
+        self.raw_event.params.interception_id.clone()
+    }
+}

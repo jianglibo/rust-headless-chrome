@@ -22,4 +22,17 @@ impl AsMethodCallString for GetResponseBodyForInterceptionTask {
         Ok(self.create_method_str(method))
     }
 }
+
+impl GetResponseBodyForInterceptionTask {
+    pub fn get_body_string(&self) -> Result<String, failure::Error> {
+        let task_result = self.task_result.as_ref().expect("GetResponseBodyForInterceptionTask task_result should exists.");
+        if task_result.base64_encoded {
+            let v8 = base64::decode(&task_result.body)?;
+            Ok(String::from_utf8(v8)?)
+        } else {
+            Ok(task_result.body.clone())
+        }
+    }
+}
+
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::GetResponseBodyForInterception, GetResponseBodyForInterceptionTask);

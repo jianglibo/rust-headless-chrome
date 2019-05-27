@@ -41,14 +41,13 @@ pub fn handle_network_event(
                 });
         }
         NetworkEvent::RequestIntercepted(event) => {
-                // let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                // let response_details = event.into_raw_parameters();
-                // return Ok(PageResponseWrapper {
-                //     target_id: maybe_target_id,
-                //     task_id: None,
-                //     page_response: PageResponse::ReceivedEvent(ReceivedEvent::ResponseReceived(response_details)),
-                // });,
-            warn!("unhandled network_events RequestIntercepted");
+            let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: None,
+                page_response: PageResponse::ReceivedEvent(ReceivedEvent::RequestIntercepted(event)),
+            });
+            // warn!("unhandled network_events RequestIntercepted");
         }
         NetworkEvent::RequestWillBeSent(event) => {
             warn!("unhandled network_events RequestWillBeSent");

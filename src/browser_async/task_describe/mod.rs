@@ -1,44 +1,44 @@
 // use super::target_message_event::target_message_events;
 use crate::browser_async::{
-    create_msg_to_send_with_session_id, create_unique_usize, next_call_id, TaskId,
+    create_msg_to_send_with_session_id, next_call_id, TaskId, create_unique_task_id,
 };
 use crate::protocol::{self, target};
 use log::*;
 
-pub mod dom_task;
-pub mod other_task;
-pub mod page_task;
-pub mod runtime_task;
-pub mod target_task;
-pub mod security_task;
+pub mod dom_tasks;
+pub mod other_tasks;
+pub mod page_tasks;
+pub mod runtime_tasks;
+pub mod target_tasks;
+pub mod security_tasks;
 pub mod target_call_methods;
 pub mod browser_call_methods;
-pub mod network_task;
+pub mod network_tasks;
 
-pub use dom_task::{
+pub use dom_tasks::{
     DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
     GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events, DomEvent,
 };
-pub use page_task::{
+pub use page_tasks::{
     CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder,
     PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent,
 };
-pub use runtime_task::{
+pub use runtime_tasks::{
     RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
     RuntimeEnableTaskBuilder, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder,
     RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events, RuntimeEvent,
 };
-pub use security_task::{
+pub use security_tasks::{
     SecurityEnableTask, SecurityEnableTaskBuilder,
     SetIgnoreCertificateErrorsTask, SetIgnoreCertificateErrorsTaskBuilder,
 };
 
-pub use target_task::{
+pub use target_tasks::{
     CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
     SetDiscoverTargetsTaskBuilder, target_events, TargetEvent,
 };
 
-pub use network_task::{NetworkEnableTask, NetworkEnableTaskBuilder, network_events,
+pub use network_tasks::{NetworkEnableTask, NetworkEnableTaskBuilder, network_events,
 NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, handle_network_event,
  ContinueInterceptedRequestTask, ContinueInterceptedRequestTaskBuilder, GetResponseBodyForInterceptionTask, GetResponseBodyForInterceptionTaskBuilder,};
 
@@ -55,6 +55,7 @@ pub trait HasCallId {
 
 pub trait HasTaskId {
     fn get_task_id(&self) -> TaskId;
+    // fn set_task_id(&mut self) -> &mut Self;
 }
 
 pub trait HasCommonField {
@@ -69,9 +70,14 @@ impl<T> HasCallId for T where T: HasCommonField {
 
 impl<T> HasTaskId for T where T: HasCommonField {
     fn get_task_id(&self) -> TaskId {
-        self.get_common_fields().task_id
+        self.get_common_fields().task_id.clone()
     }
+    // fn set_task_id(&mut self) -> &mut Self {
+    //     self
+    // }
 }
+
+
 
 pub trait CanCreateMethodString {
     fn create_method_str<C>(&self, method: C) -> String where
@@ -161,7 +167,7 @@ pub struct CommonDescribeFields {
     pub target_id: Option<target::TargetId>,
     #[builder(default = "None")]
     pub session_id: Option<target::SessionID>,
-    #[builder(default = "create_unique_usize()")]
+    #[builder(default = "create_unique_task_id()")]
     #[builder(setter(prefix = "_abc"))]
     pub task_id: TaskId,
     #[builder(default = "next_call_id()")]

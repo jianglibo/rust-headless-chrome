@@ -1,7 +1,7 @@
 use crate::protocol::{dom, page, target, runtime, network};
 use crate::browser::tab::element::{BoxModel};
 use super::super::browser_async::{TaskId, embedded_events};
-use super::super::browser_async::task_describe::{GetResponseBodyForInterceptionTask};
+use super::super::browser_async::task_describe::{network_tasks, network_events, runtime_tasks, dom_tasks, page_tasks};
 use std::path::Path;
 use std::fs::OpenOptions;
 use log::*;
@@ -57,24 +57,24 @@ pub enum ReceivedEvent {
     SetChildNodesOccurred(dom::NodeId),
     RuntimeExecutionContextCreated(Option<page::FrameId>),
     ResponseReceived(embedded_events::ResponseReceivedParams),
-    RequestIntercepted(Option<network::events::RequestInterceptedEventParams>),
+    RequestIntercepted(network_events::RequestIntercepted),
 }
 
 #[derive(Debug)]
 pub enum MethodCallDone {
-    PageEnabled,
-    RuntimeEnabled,
-    QuerySelector(String, Option<dom::NodeId>),
-    PrintToPdf(Option<String>),
-    DescribeNode(Option<String>, Option<dom::NodeId>),
-    GetBoxModel(Option<String>, Option<Box<BoxModel>>),
-    GetDocument,
+    PageEnabled(page_tasks::PageEnableTask),
+    RuntimeEnabled(runtime_tasks::RuntimeEnableTask),
+    QuerySelector(dom_tasks::QuerySelectorTask),
+    PrintToPdf(page_tasks::PrintToPdfTask),
+    DescribeNode(dom_tasks::DescribeNodeTask),
+    GetBoxModel(dom_tasks::GetBoxModelTask),
+    GetDocument(dom_tasks::GetDocumentTask),
     CaptureScreenshot(response_object::CaptureScreenshot),
-    Evaluate(Option<runtime::methods::EvaluateReturnObject>),
-    GetProperties(Option<runtime::methods::GetPropertiesReturnObject>),
-    CallFunctionOn(Option<runtime::methods::CallFunctionOnReturnObject>),
+    Evaluate(runtime_tasks::RuntimeEvaluateTask),
+    GetProperties(runtime_tasks::RuntimeGetPropertiesTask),
+    CallFunctionOn(runtime_tasks::RuntimeCallFunctionOnTask),
     SetIgnoreCertificateErrors(bool),
-    GetResponseBodyForInterception(GetResponseBodyForInterceptionTask),
+    GetResponseBodyForInterception(network_tasks::GetResponseBodyForInterceptionTask),
 }
 
 // just wait for things happen. don't care who caused happen.

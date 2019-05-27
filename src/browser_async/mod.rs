@@ -17,7 +17,7 @@ use crate::protocol::{self, target};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
 
-pub type TaskId = usize;
+pub type TaskId = String;
 
 pub enum MethodDestination {
     Target(target::SessionID),
@@ -32,6 +32,16 @@ pub fn create_unique_if_no_manual_input(manual: Option<usize>) -> (usize, bool) 
 
 pub fn create_unique_usize() -> usize {
     METHOD_ID_ABOVE_10000.fetch_add(1, Ordering::SeqCst)
+}
+
+pub fn create_unique_task_id() -> String {
+    let u = create_unique_usize();
+    format!("task-id-{}", u)
+}
+
+pub fn create_unique_prefixed_id(prefix: &str) -> String {
+    let u = create_unique_usize();
+    format!("{}{}", prefix, u)
 }
 
 #[derive(Debug, failure::Fail)]

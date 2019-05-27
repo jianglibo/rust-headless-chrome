@@ -1,7 +1,7 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::page_message::ChangingFrame;
 use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
-use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events};
+use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events, create_unique_prefixed_id};
 use crate::protocol::{self, dom, page, runtime, target};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -294,7 +294,7 @@ impl Tab {
     pub fn dom_query_selector_by_selector(
         &mut self,
         selector: &'static str,
-        manual_task_id: Option<usize>,
+        manual_task_id: Option<TaskId>,
     ) {
         let tasks = self.get_query_selector(selector, manual_task_id);
         self.execute_tasks(tasks);
@@ -449,10 +449,14 @@ impl Tab {
     }
 
     pub fn page_enable(&mut self) {
-        let pn = tasks::PageEnableTask {
+        let task = self.page_enable_task();
+        self.execute_one_task(task);
+    }
+
+    pub fn page_enable_task(&self) -> TaskDescribe {
+        tasks::PageEnableTask {
             common_fields: self.get_common_field(None),
-        };
-        self.execute_one_task(pn.into());
+        }.into()
     }
 
     pub fn runtime_enable(&mut self, manual_task_id: Option<TaskId>) {
@@ -472,7 +476,20 @@ impl Tab {
         nwe.into()
     }
 
-    pub fn runtime_evaluate_expression(
+    pub fn evaluate_expression(&mut self, expression: &str) {
+        self.runtime_evaluate_expression_impl(expression, None);
+    }
+
+    pub fn evaluate_expression_prefixed(&mut self, expression: &str, prefix: &str) {
+        let name = create_unique_prefixed_id(prefix);
+        self.evaluate_expression_named(expression, name.as_str());
+    }
+
+    pub fn evaluate_expression_named(&mut self, expression: &str, name: &str) {
+        self.runtime_evaluate_expression_impl(expression, Some(name.to_owned()));
+    }
+
+    fn runtime_evaluate_expression_impl(
         &mut self,
         expression: &str,
         manual_task_id: Option<TaskId>,

@@ -27,11 +27,11 @@ impl AsMethodCallString for QuerySelectorTask {
     }
 }
 
-impl QuerySelectorTask {
-    pub fn into_page_response(self) -> PageResponse {
-        PageResponse::MethodCallDone(MethodCallDone::QuerySelector(self.selector.to_string(), self.task_result))
-    }
-}
+// impl QuerySelectorTask {
+//     pub fn into_page_response(self) -> PageResponse {
+//         PageResponse::MethodCallDone(MethodCallDone::QuerySelector(self.selector.to_string(), self.task_result))
+//     }
+// }
 
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::QuerySelector, QuerySelectorTask);
 

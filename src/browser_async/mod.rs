@@ -17,6 +17,8 @@ use crate::protocol::{self, target};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
 
+pub use tab::{Tab};
+
 pub type TaskId = String;
 
 pub enum MethodDestination {

@@ -48,8 +48,18 @@ wrapper_raw_event!(
 );
 
 impl FrameNavigated {
-    pub fn into_frame(self) -> page::Frame {
-        self.raw_event.params.frame
+    pub fn get_frame(&self) -> &page::Frame {
+        &self.raw_event.params.frame
+    }
+    pub fn clone_frame(&self) -> page::Frame {
+        self.raw_event.params.frame.clone()
+    }
+
+    pub fn url_contains(&self, url_part: &str) -> bool {
+        self.raw_event.params.frame.url.contains(url_part)
+    }
+    pub fn url_starts_with(&self, url_part: &str) -> bool {
+        self.raw_event.params.frame.url.starts_with(url_part)
     }
 }
 

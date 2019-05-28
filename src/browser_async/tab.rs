@@ -1,8 +1,8 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
+use super::task_describe::{self as tasks, network_events, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
 use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events, create_unique_prefixed_id};
-use crate::protocol::{self, dom, page, runtime, target};
+use crate::protocol::{self, dom, page, runtime, target, network};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::*;
@@ -18,6 +18,8 @@ pub struct Tab {
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
     pub execution_context_descriptions:
         HashMap<page::FrameId, runtime::ExecutionContextDescription>,
+    pub ongoing_request: HashMap<network::RequestId, network_events::RequestWillBeSent>,
+    pub load_event_fired_count: u16,
 }
 
 impl Tab {
@@ -34,6 +36,8 @@ impl Tab {
             changing_frames: HashMap::new(),
             temporary_node_holder: HashMap::new(),
             execution_context_descriptions: HashMap::new(),
+            ongoing_request: HashMap::new(),
+            load_event_fired_count: 0,
         }
     }
 
@@ -43,6 +47,14 @@ impl Tab {
 
     pub fn is_chrome_error_chromewebdata(&self) -> bool {
         self.is_at_url("chrome-error://chromewebdata/")
+    }
+
+    pub fn request_will_be_sent(&mut self, event: network_events::RequestWillBeSent) {
+        self.ongoing_request.insert(event.get_request_id(), event);
+    }
+
+    pub fn take_request(&mut self, request_id: &network::RequestId) -> network_events::RequestWillBeSent {
+        self.ongoing_request.remove(request_id).expect("cannot find the request by request_id!")
     }
 
     /// where does page's url attribute live? The page target_info holds the url you intent navigate to,
@@ -64,8 +76,13 @@ impl Tab {
         }
     }
 
-    pub fn navigate_to(&mut self, url: &'static str, manual_task_id: Option<TaskId>) {
-        let task = self.navigate_to_task(url, manual_task_id);
+    pub fn navigate_to_named(&mut self, url: &'static str, name: &str) {
+        let task = self.navigate_to_task(url, Some(name.to_owned()));
+        self.execute_one_task(task);
+    }
+
+    pub fn navigate_to(&mut self, url: &'static str) {
+        let task = self.navigate_to_task(url, None);
         self.execute_one_task(task);
     }
 
@@ -89,9 +106,9 @@ impl Tab {
         })
     }
 
-    pub fn get_response_body_for_interception(&mut self, interception_id: String, manual_task_id: Option<TaskId>) {
+    pub fn get_response_body_for_interception(&mut self, interception_id: String) {
         let task = GetResponseBodyForInterceptionTaskBuilder::default()
-            .common_fields(self.get_common_field(manual_task_id))
+            .common_fields(self.get_common_field(None))
             .interception_id(interception_id)
             .build()
             .expect("GetResponseBodyForInterceptionTaskBuilder should work.");
@@ -99,12 +116,22 @@ impl Tab {
         self.execute_one_task(task.into());
     }
 
-    pub fn continue_intercepted_request(&mut self, interception_id: String) {
-        let task = ContinueInterceptedRequestTaskBuilder::default()
+    pub fn continue_intercepted_request_with_raw_response(&mut self, interception_id: String, raw_response: Option<String>) {
+        let task = if let Some(rr) = raw_response {
+            ContinueInterceptedRequestTaskBuilder::default()
         .common_fields(self.get_common_field(None))
         .interception_id(interception_id)
+        .raw_response(rr)
         .build()
-        .expect("ContinueInterceptedRequestTaskBuilder should work.");
+        .expect("ContinueInterceptedRequestTaskBuilder should work.")
+        } else {
+            error!("intercept got empty body.");
+            ContinueInterceptedRequestTaskBuilder::default()
+        .common_fields(self.get_common_field(None))
+        .error_reason("Failed".to_owned())
+        .build()
+        .expect("ContinueInterceptedRequestTaskBuilder should work.")
+        };
         self.execute_one_task(task.into());
     }
 
@@ -282,7 +309,15 @@ impl Tab {
         self.changing_frames.remove(frame_id);
     }
 
-    pub fn get_document(&mut self, depth: Option<u8>, manual_task_id: Option<TaskId>) {
+    pub fn get_document(&mut self, depth: Option<u8>) {
+        self.get_document_impl(depth, None);
+    }
+
+    pub fn get_document_named(&mut self, depth: Option<u8>, name: &str) {
+        self.get_document_impl(depth, Some(name.into()));
+    }
+
+    fn get_document_impl(&mut self, depth: Option<u8>, manual_task_id: Option<TaskId>) {
         let task = tasks::GetDocumentTaskBuilder::default()
             .common_fields(self.get_common_field(manual_task_id))
             .depth(depth)
@@ -291,9 +326,17 @@ impl Tab {
         self.execute_one_task(task.into());
     }
 
-    pub fn dom_query_selector_by_selector(
+    pub fn query_selector_by_selector(&mut self, selector: &str) {
+        self.query_selector_by_selector_impl(selector, None);
+    }
+
+    pub fn query_selector_by_selector_named(&mut self, selector: &str, name: &str) {
+        self.query_selector_by_selector_impl(selector, Some(name.into()));
+    }
+
+    fn query_selector_by_selector_impl(
         &mut self,
-        selector: &'static str,
+        selector: &str,
         manual_task_id: Option<TaskId>,
     ) {
         let tasks = self.get_query_selector(selector, manual_task_id);
@@ -302,7 +345,7 @@ impl Tab {
 
     pub fn describe_node_by_selector(
         &mut self,
-        selector: &'static str,
+        selector: &str,
         depth: Option<i8>,
         manual_task_id: Option<TaskId>,
     ) {
@@ -347,7 +390,7 @@ impl Tab {
 
     fn get_query_selector(
         &self,
-        selector: &'static str,
+        selector: &str,
         manual_task_id: Option<TaskId>,
     ) -> Vec<TaskDescribe> {
         let get_document = tasks::GetDocumentTaskBuilder::default()
@@ -413,8 +456,8 @@ impl Tab {
             .unwrap()
     }
 
-    pub fn create_set_request_interception_task(&self, manual_task_id: Option<TaskId>) -> SetRequestInterceptionTask {
-        SetRequestInterceptionTaskBuilder::default().common_fields(self.get_common_field(manual_task_id)).build().expect("SetRequestInterceptionTaskBuilder should work.")
+    pub fn set_request_interception_task_named(&self, name: &str) -> SetRequestInterceptionTask {
+        SetRequestInterceptionTaskBuilder::default().common_fields(self.get_common_field(Some(name.into()))).build().expect("SetRequestInterceptionTaskBuilder should work.")
     }
 
     pub fn execute_one_task(&mut self, task: TaskDescribe) {

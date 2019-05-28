@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use crate::protocol::{network, page};
 
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestWillBeSent {
@@ -56,6 +57,25 @@ pub struct ResponseReceivedParams {
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct LoadingFailed {
+    pub params: LoadingFailedParams,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LoadingFailedParams {
+    pub request_id: network::RequestId,
+    pub timestamp: network::MonotonicTime,
+    #[serde(rename = "type")]
+    pub resource_type: network::ResourceType,
+    pub error_text: String,
+    pub canceled: Option<bool>,
+    pub blocked_reason: Option<network::BlockedReason>,
+}
+
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DataReceived {
     pub params: DataReceivedParams,
 }
@@ -82,4 +102,16 @@ pub struct LoadingFinishedParams {
     pub timestamp: network::MonotonicTime,
     pub encoded_data_length: u32,
     pub should_report_corb_blocking: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestServedFromCache {
+    pub params: RequestServedFromCacheParams,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestServedFromCacheParams {
+    pub request_id: network::RequestId,
 }

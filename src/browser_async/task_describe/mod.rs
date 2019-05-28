@@ -21,7 +21,7 @@ pub use dom_tasks::{
 };
 pub use page_tasks::{
     CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder,
-    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent,
+    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent, handle_page_event,
 };
 pub use runtime_tasks::{
     RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
@@ -45,6 +45,7 @@ NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, han
 pub use target_call_methods::{TargetCallMethodTask, handle_target_method_call};
 pub use browser_call_methods::{BrowserCallMethodTask, handle_browser_method_call};
 
+
 pub trait HasSessionId {
     fn get_session_id(&self) -> target::SessionID;
 }
@@ -55,6 +56,8 @@ pub trait HasCallId {
 
 pub trait HasTaskId {
     fn get_task_id(&self) -> TaskId;
+    fn task_id_equal(&self, pattern: &str) -> bool;
+    fn task_id_starts_with(&self, pattern: &str) -> bool;
     // fn set_task_id(&mut self) -> &mut Self;
 }
 
@@ -71,6 +74,14 @@ impl<T> HasCallId for T where T: HasCommonField {
 impl<T> HasTaskId for T where T: HasCommonField {
     fn get_task_id(&self) -> TaskId {
         self.get_common_fields().task_id.clone()
+    }
+
+    fn task_id_equal(&self, pattern: &str) -> bool {
+        &self.get_common_fields().task_id == pattern
+    }
+
+    fn task_id_starts_with(&self, pattern: &str) -> bool {
+        self.get_common_fields().task_id.starts_with(pattern)
     }
     // fn set_task_id(&mut self) -> &mut Self {
     //     self
@@ -172,6 +183,10 @@ pub struct CommonDescribeFields {
     pub task_id: TaskId,
     #[builder(default = "next_call_id()")]
     pub call_id: usize,
+    #[builder(default = "0")]
+    pub max_retry: u16,
+    #[builder(default = "0")]
+    pub retried: u16,
 }
 
 impl From<(Option<String>, Option<String>)> for CommonDescribeFields {

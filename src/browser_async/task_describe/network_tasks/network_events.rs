@@ -11,6 +11,16 @@ wrapper_raw_event!(
     embedded_events::RequestWillBeSent
 );
 
+impl RequestWillBeSent {
+    pub fn get_request_id(&self) -> network::RequestId {
+        self.raw_event.params.request_id.clone()
+    }
+
+    pub fn get_request_object(&self) -> &network::Request {
+        &self.raw_event.params.request
+    }
+}
+
 wrapper_raw_event!(
     TaskDescribe::NetworkEvent,
     NetworkEvent::ResponseReceived,
@@ -21,6 +31,19 @@ wrapper_raw_event!(
 impl ResponseReceived {
     pub fn into_raw_parameters(self) -> embedded_events::ResponseReceivedParams {
         self.raw_event.params
+    }
+}
+
+wrapper_raw_event!(
+    TaskDescribe::NetworkEvent,
+    NetworkEvent::LoadingFailed,
+    LoadingFailed,
+    embedded_events::LoadingFailed
+);
+
+impl LoadingFailed {
+    pub fn get_request_id(&self) -> network::RequestId {
+        self.raw_event.params.request_id.clone()
     }
 }
 
@@ -37,6 +60,12 @@ wrapper_raw_event!(
     LoadingFinished,
     embedded_events::LoadingFinished
 );
+
+impl LoadingFinished {
+    pub fn get_request_id(&self) -> network::RequestId {
+        self.raw_event.params.request_id.clone()
+    }
+}
 
 
 wrapper_raw_event!(

@@ -77,7 +77,11 @@ impl ChromeBrowser {
         }
     }
     pub fn send_message(&mut self, method_str: String) {
-        trace!("**sending** : {:?}", method_str);
+        if method_str.len() > 400 {
+            info!("**sending** : {:?}", method_str.split_at(400).0);
+        } else {
+            info!("**sending** : {:?}", method_str);
+        }
         match self.state {
             BrowserState::StartSend(_) | BrowserState::Sending => {
                 self.waiting_to_send.push_back(method_str);
@@ -126,10 +130,11 @@ impl Stream for ChromeBrowser {
                     return Ok(Some(protocol::Message::Connected).into());
                 }
                 BrowserState::Receiving => {
+                    // info!("try receiving..........");
                     match self.ws_client.as_mut().unwrap().poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
-                                if msg.len() > 200 {
+                                if msg.len() > 400 {
                                     let (short, _) = msg.split_at(200);
                                     trace!("got message (***every message***): {:?}", short);
                                 } else {
@@ -164,7 +169,8 @@ impl Stream for ChromeBrowser {
                     }
                 }
                 BrowserState::StartSend(message_to_send) => {
-                    trace!("enter start send.");
+                    trace!("enter start send");
+                    // trace!("enter start send. {:?}", message_to_send);
                     match self
                         .ws_client
                         .as_mut()

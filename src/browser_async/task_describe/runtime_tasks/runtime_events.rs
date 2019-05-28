@@ -29,8 +29,8 @@ wrapper_raw_event!(
 );
 
 impl ExecutionContextCreated {
-    pub fn into_exection_context_description(self) -> runtime::ExecutionContextDescription {
-        self.raw_event.params.context
+    pub fn get_execution_context_description(&self) -> runtime::ExecutionContextDescription {
+        self.raw_event.params.context.clone()
     }
 }
 
@@ -42,7 +42,7 @@ wrapper_raw_event!(
 );
 
 impl ExecutionContextDestroyed {
-    pub fn into_exection_context_id(self) -> runtime::ExecutionContextId {
+    pub fn into_execution_context_id(self) -> runtime::ExecutionContextId {
         self.raw_event.params.execution_context_id
     }
 }

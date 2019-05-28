@@ -1,7 +1,6 @@
 use crate::protocol::{dom, page, target, runtime, network};
-use crate::browser::tab::element::{BoxModel};
-use super::super::browser_async::{TaskId, embedded_events};
-use super::super::browser_async::task_describe::{network_tasks, network_events, runtime_tasks, dom_tasks, page_tasks};
+use super::super::browser_async::{TaskId};
+use super::super::browser_async::task_describe::{network_tasks, network_events, runtime_tasks, runtime_events, dom_tasks, page_tasks, page_events};
 use std::path::Path;
 use std::fs::OpenOptions;
 use log::*;
@@ -51,13 +50,19 @@ pub enum ReceivedEvent {
     PageAttached(target::TargetInfo, target::SessionID),
     FrameAttached(page::FrameId),
     FrameStartedLoading(page::FrameId),
-    FrameNavigated(page::FrameId),
+    FrameNavigated(page_events::FrameNavigated),
     FrameStoppedLoading(page::FrameId),
     LoadEventFired(network::MonotonicTime),
     SetChildNodesOccurred(dom::NodeId),
-    RuntimeExecutionContextCreated(Option<page::FrameId>),
-    ResponseReceived(embedded_events::ResponseReceivedParams),
+    ExecutionContextCreated(runtime_events::ExecutionContextCreated),
+    // RuntimeExecutionContextCreated(Option<page::FrameId>),
+    ResponseReceived(network_events::ResponseReceived),
+    // ResponseReceived(embedded_events::ResponseReceivedParams),
     RequestIntercepted(network_events::RequestIntercepted),
+    RequestWillBeSent(network::RequestId),
+    LoadingFinished(network_events::LoadingFinished),
+    DataReceived(network_events::DataReceived),
+    LoadingFailed(network_events::LoadingFailed),
 }
 
 #[derive(Debug)]

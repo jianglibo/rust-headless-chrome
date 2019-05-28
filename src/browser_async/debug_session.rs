@@ -1,13 +1,13 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent, MethodCallDone};
+use super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
 use super::tab::Tab;
 use super::task_describe::{
     self as tasks, handle_browser_method_call, handle_target_method_call, 
-    DomEvent, HasTaskId, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask, NetworkEnableTask, NetworkEnableTaskBuilder,
+    DomEvent, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
     SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask,  TargetEvent,
-    TaskDescribe, handle_network_event,
+    TaskDescribe, handle_network_event, handle_page_event,
 };
 
 use crate::browser_async::{ChromePageError, TaskId};
@@ -59,7 +59,7 @@ pub struct DebugSession {
     pub chrome_debug_session: Arc<Mutex<ChromeDebugSession>>,
     seconds_from_start: usize,
     flag: bool,
-    tabs: Vec<Tab>, // early created at front.
+    pub tabs: Vec<Tab>, // early created at front.
     wrapper: Wrapper,
 }
 
@@ -348,14 +348,14 @@ impl DebugSession {
             RuntimeEvent::ExecutionContextCreated(event) => {
                 let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let frame_id = tab
-                    .runtime_execution_context_created(event.into_exection_context_description());
+                    .runtime_execution_context_created(event.get_execution_context_description());
                 return handle_event_return(
                     maybe_target_id,
-                    PageResponse::ReceivedEvent(ReceivedEvent::RuntimeExecutionContextCreated(frame_id)),
+                    PageResponse::ReceivedEvent(ReceivedEvent::ExecutionContextCreated(event)),
                 );
             }
             RuntimeEvent::ExecutionContextDestroyed(event) => {
-                let execution_context_id = event.into_exection_context_id();
+                let execution_context_id = event.into_execution_context_id();
                 let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.runtime_execution_context_destroyed(execution_context_id);
             }
@@ -366,85 +366,14 @@ impl DebugSession {
         Ok(PageResponseWrapper::default())
     }
 
-    fn handle_page_event(
-        &mut self,
-        page_event: PageEvent,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match page_event {
-            PageEvent::DomContentEventFired(event) => {}
-            // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
-            PageEvent::FrameAttached(event) => {
-                let raw_parameters = event.into_raw_parameters();
-                let frame_id = raw_parameters.frame_id.clone();
-                info!(
-                    "-----------------frame_attached-----------------{:?}",
-                    frame_id
-                );
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab._frame_attached(raw_parameters);
-                return handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)));
-            }
-            PageEvent::FrameDetached(event) => {
-                let frame_id = event.into_frame_id();
-                info!(
-                    "-----------------frame_detached-----------------{:?}",
-                    frame_id.clone()
-                );
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab._frame_detached(&frame_id);
-            }
-            PageEvent::FrameStartedLoading(event) => {
-                let frame_id = event.into_frame_id();
-                // started loading is first, then attached.
-                info!(
-                    "-----------------frame_started_loading-----------------{:?}",
-                    frame_id
-                );
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab._frame_started_loading(frame_id.clone());
-                return handle_event_return(
-                    maybe_target_id,
-                    PageResponse::ReceivedEvent(ReceivedEvent::FrameStartedLoading(frame_id)),
-                );
-            }
-            PageEvent::FrameNavigated(event) => {
-                info!(
-                    "-----------------frame_navigated-----------------{:?}",
-                    event
-                );
-                let frame = event.into_frame();
-                let frame_id = frame.id.clone();
-                self.get_tab_by_id_mut(maybe_target_id.as_ref())
-                    .expect("FrameNavigated event should have target_id.")
-                    ._frame_navigated(frame);
-                return handle_event_return(
-                    maybe_target_id,
-                    PageResponse::ReceivedEvent(ReceivedEvent::FrameNavigated(frame_id)),
-                );
-            }
-            PageEvent::FrameStoppedLoading(event) => {
-                // TaskDescribe::FrameStoppedLoading(frame_id, common_fields) => {
-                info!(
-                    "-----------------frame_stopped_loading-----------------{:?}",
-                    event
-                );
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                let frame_id = event.into_frame_id();
-                tab._frame_stopped_loading(frame_id.clone());
-                return handle_event_return(
-                    maybe_target_id,
-                    PageResponse::ReceivedEvent(ReceivedEvent::FrameStoppedLoading(frame_id)),
-                );
-            }
-            PageEvent::LoadEventFired(event) => {
-                return handle_event_return(maybe_target_id, event.into_page_response());
-            }
-        }
-        warn!("unhandled branch handle_page_event");
-        Ok(PageResponseWrapper::default())
-    }
+    // fn handle_page_event(
+    //     &mut self,
+    //     page_event: PageEvent,
+    //     maybe_session_id: Option<target::SessionID>,
+    //     maybe_target_id: Option<target::TargetId>,
+    // ) -> Result<PageResponseWrapper, failure::Error> {
+
+    // }
 
 
     pub fn send_page_message(
@@ -469,8 +398,7 @@ impl DebugSession {
                     .ok()
                     .into())
             }
-            TaskDescribe::PageEvent(page_event) => Ok(self
-                .handle_page_event(page_event, session_id, target_id)
+            TaskDescribe::PageEvent(page_event) => Ok(handle_page_event(self, page_event, session_id, target_id)
                 .ok()
                 .into()),
             TaskDescribe::RuntimeEvent(runtime_event) => Ok(self
@@ -524,7 +452,7 @@ impl Stream for DebugSession {
         };
         self.flag = !self.flag;
         let a_done = match a.poll()? {
-            Async::Ready(Some(item)) => return self.send_page_message(item),
+            Async::Ready(Some(item)) => {return self.send_page_message(item);}
             Async::Ready(None) => true,
             Async::NotReady => false,
         };
@@ -536,7 +464,7 @@ impl Stream for DebugSession {
                 if !a_done {
                     self.flag = !self.flag;
                 }
-                self.send_page_message(item)
+                return self.send_page_message(item);
             }
             Async::Ready(None) if a_done => Ok(None.into()),
             Async::Ready(None) | Async::NotReady => Ok(Async::NotReady),

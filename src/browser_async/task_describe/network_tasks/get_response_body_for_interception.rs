@@ -33,6 +33,10 @@ impl GetResponseBodyForInterceptionTask {
             Ok(task_result.body.clone())
         }
     }
+
+    pub fn get_raw_response_string(&self) -> Option<String> {
+        self.task_result.as_ref().cloned().map(|it|it.body.clone())
+    }
 }
 
 impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::GetResponseBodyForInterception, GetResponseBodyForInterceptionTask);

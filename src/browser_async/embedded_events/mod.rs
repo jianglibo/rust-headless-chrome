@@ -3,7 +3,7 @@ use crate::protocol::{dom as protocol_dom, runtime, network, page};
 
 mod network_raw_event;
 
-pub use network_raw_event::{RequestWillBeSent, ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams};
+pub use network_raw_event::{RequestWillBeSent, ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -111,6 +111,11 @@ pub enum EmbeddedEvent {
     DataReceived(DataReceived),
     #[serde(rename = "Network.loadingFinished")]
     LoadingFinished(LoadingFinished),
+    #[serde(rename = "Network.loadingFailed")]
+    LoadingFailed(LoadingFailed),
+    #[serde(rename = "Network.requestServedFromCache")]
+    RequestServedFromCache(RequestServedFromCache),
+    
 }
 
 #[derive(Deserialize, Debug, Clone)]

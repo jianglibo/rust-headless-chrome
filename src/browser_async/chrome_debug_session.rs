@@ -94,13 +94,19 @@ impl ChromeDebugSession {
                 return TaskDescribe::from(event).into();
             }
             EmbeddedEvent::DataReceived(embedded_event) => {
-                warn!("ignore DataReceived inner event.");
+                let event = network_events::DataReceived::new(embedded_event);
+                return TaskDescribe::from(event).into();
+                // warn!("ignore DataReceived inner event.");
             }
             EmbeddedEvent::LoadingFinished(embedded_event) => {
-                warn!("ignore LoadingFinished inner event.");
+                let event = network_events::LoadingFinished::new(embedded_event);
+                return TaskDescribe::from(event).into();
+                // warn!("ignore LoadingFinished inner event.");
             }
             EmbeddedEvent::RequestWillBeSent(embedded_event) => {
-                warn!("ignore RequestWillBeSent inner event.");
+                // warn!("ignore RequestWillBeSent inner event. {:?}", embedded_event);
+                let event = network_events::RequestWillBeSent::new(embedded_event);
+                return TaskDescribe::from(event).into();
             }
             _ => {
                 warn!("discard inner event: {:?}", target_message_event);
@@ -123,12 +129,13 @@ impl ChromeDebugSession {
         _session_id: Option<String>,
         _target_id: Option<String>,
     ) -> Option<TaskDescribe> {
-        // trace!("got **response**. {:?}", resp);
+        let s = format!("got **response**. {:?}", resp);
+        if s.len() > 400 {
+            info!("{:?}", s.split_at(400).0);
+        } else {
+            info!("{:?}", s);
+        }
         let call_id = resp.call_id;
-        // trace!(
-        //     "tasks_waiting_for_response: {:?}",
-        //     self.tasks_waiting_for_response
-        // );
         if let Some(idx) = self.tasks_waiting_for_response.iter().position(|tasks| {
             if let Some(task) = tasks.get(0) {
                 match task {
@@ -167,7 +174,7 @@ impl ChromeDebugSession {
             if tasks.is_empty() {
                 return Some(current_task);
             }
-            if let Err(mut err) = self.handle_next_task(current_task, tasks) {
+            if let Err(mut err) = self.handle_next_task(&current_task, tasks) {
                 if let Some(ChromePageError::NextTaskExecution { tasks, error }) =
                     err.downcast_mut::<ChromePageError>()
                 {
@@ -177,6 +184,7 @@ impl ChromeDebugSession {
                     panic!("handle next task fail. {:?}", err);
                 }
             }
+            return Some(current_task); // always popup task.
         } else {
             trace!("no matching task for call_id: {:?}", call_id);
         }
@@ -198,11 +206,11 @@ impl ChromeDebugSession {
 
     fn handle_next_task(
         &mut self,
-        current_task: TaskDescribe,
+        current_task: &TaskDescribe,
         mut tasks: Vec<TaskDescribe>,
     ) -> Result<(), failure::Error> {
         let mut next_task = tasks.get_mut(0).expect("handle_next_task received empty tasks.");
-        match (&current_task, &mut next_task) {
+        match (current_task, &mut next_task) {
             (
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetDocument(get_document)),
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
@@ -240,7 +248,7 @@ impl ChromeDebugSession {
                 }
             }
             _ => {
-                warn!("unknown pair: {:?}, {:?}", current_task, next_task);
+                // warn!("unknown pair: {:?}, {:?}", current_task, next_task);
                 self.execute_next_and_return_remains(tasks);
             }
         }
@@ -261,9 +269,9 @@ impl ChromeDebugSession {
                 }
                 TargetCallMethodTask::PageEnable(_common_fields) => {}
                 TargetCallMethodTask::QuerySelector(query_selector) => {
-                    let query_select_return_object =
+                    let return_object =
                         protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
-                    query_selector.task_result= Some(query_select_return_object.node_id);
+                    query_selector.task_result= Some(return_object.node_id);
                 }
                 TargetCallMethodTask::DescribeNode(describe_node) => {
                     let describe_node_return_object =

@@ -13,6 +13,19 @@ use crate::protocol::{runtime, page, security};
         Request,
         HeadersReceived,
     }
+
+    
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum BlockedReason {
+    Other, Csp,
+     MixedContent,
+     Origin,
+     Inspector,
+     SubresourceFilter,
+     ContentYype,
+     CollapsedByClient,
+}
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub enum ResourceType {
         Document,

@@ -10,7 +10,6 @@ use headless_chrome::browser_async::debug_session::DebugSession;
 
 use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
 use headless_chrome::browser_async::task_describe::{HasTaskId, TaskDescribe};
-use headless_chrome::browser_async::Tab;
 use headless_chrome::protocol::network::{InterceptionStage, ResourceType};
 use log::*;
 use std::default::Default;
@@ -22,6 +21,7 @@ struct PrintToPdfDing {
     debug_session: DebugSession,
     url: &'static str,
     intercept_counter: u16,
+    intercepted_requests: Vec<String>,
     // waiting_load_event_fired: std::collections::VecDeque<Vec<TaskDescribe>>,
 }
 
@@ -32,7 +32,8 @@ impl PrintToPdfDing {
             .first_page()
             .expect("first tab should exists.");
         assert_eq!(tab.load_event_fired_count, 2);
-        assert_eq!(self.intercept_counter, 2);
+        // assert_eq!(self.intercepted_requests, vec![""]);
+        assert_eq!(self.intercept_counter, 7);
     }
 }
 
@@ -73,22 +74,7 @@ impl Future for PrintToPdfDing {
                                 let t2 = tab.network_enable_task(None);
                                 tab.execute_tasks(vec![t1, t2]);
                             }
-                            ReceivedEvent::FrameNavigated(_event) => {
-                                // let tab = tab.expect("tab should exists. PageAttached");
-                                // let mut tk = tab.set_request_interception_task_named("a");
-                                // // vec!["*/api/user/pagingValidUsers*", "*/api/user/getUserInfo*", "*/api/org/getTreeOrg*"].iter().for_each(|url| {
-                                // vec!["*/api/*"].iter().for_each(|url| {
-                                //     tk.add_request_pattern(
-                                //         // Some(url),
-                                //         None,
-                                //         Some(ResourceType::XHR),
-                                //         Some(InterceptionStage::HeadersReceived),
-                                //     );
-                                // });
-                                // let t3: TaskDescribe = tk.into();
-                                // let t4 = tab.navigate_to_task(self.url, None);
-                                // self.waiting_load_event_fired.push_back(vec![t3, t4]);
-                            }
+                            ReceivedEvent::FrameNavigated(_event) => {}
                             // Page navigating, page reload will cause this event to be fired.
                             // But interception may stop this event from firing. So we wait this page to be steady. when it fired 2 times, we enable interception and reload the page.
                             // But reload will cause this event to fire again, so be careful to distinct from each fire.
@@ -102,8 +88,8 @@ impl Future for PrintToPdfDing {
                                         document.getElementById('login-by').value='13777272378';
                                         document.getElementById('password').value='00000132abc';
                                         document.getElementById('btn-submit-login').click();"##;
-                                    tab.evaluate_expression_named(expression, "login");
-                                } else if tab.load_event_fired_count == 2 {
+                                    let t1 =
+                                        tab.evaluate_expression_task_named(expression, "login");
                                     let mut tk = tab.set_request_interception_task_named("a");
                                     // vec!["*/api/user/pagingValidUsers*", "*/api/user/getUserInfo*", "*/api/org/getTreeOrg*"].iter().for_each(|url| {
                                     vec!["*/api/*"].iter().for_each(|url| {
@@ -114,36 +100,28 @@ impl Future for PrintToPdfDing {
                                         );
                                     });
                                     let t3: TaskDescribe = tk.into();
-                                    let t4 = tab.reload_task(true, None);
-                                    tab.execute_tasks(vec![t3, t4]);
+                                    // let t4 = tab.reload_task(true, None);
+                                    tab.execute_tasks(vec![t3, t1]);
+                                } else if tab.load_event_fired_count == 2 {
+                                    info!("second event fired.");
                                 } else {
                                     info!("******************************************************");
                                 }
-                                // if url.contains("8888/login") {
-                                //     let expression = "document.getElementsByClassName('login-tab').item(1).click(); document.getElementById('login-by').value='13777272378';document.getElementById('password').value='00000132abc';document.getElementById('btn-submit-login').click();";
-                                //     tab.evaluate_expression_named(expression, "login");
-                                // } else if let Some(next_tasks) =
-                                //     self.waiting_load_event_fired.pop_front()
-                                // {
-                                //     tab.execute_tasks(next_tasks);
-                                // } else {
-                                //     error!("got 3 times??????????????????????????");
-                                // }
-                                // if tab.is_chrome_error_chromewebdata() {
-                                //     tab.runtime_evaluate_expression(
-                                //         "document.getElementById('details-button')",
-                                //         Some(200),
-                                //     );
-                                // } else {
-                                // }
                             }
                             ReceivedEvent::RequestIntercepted(interception_id) => {
                                 self.intercept_counter += 1;
                                 let tab = tab.expect("tab should exists. RequestIntercepted");
                                 // tab.continue_intercepted_request(task.get_interception_id());
-                                let event = tab.request_intercepted.get(&interception_id).expect("RequestIntercepted should exists.");
-                                info!("----------------------------------------------------------------------{:?}", event);
-                                let request_id = event.get_raw_parameters().request_id.clone();
+                                let intercepted_reqeust = tab
+                                    .request_intercepted
+                                    .get(&interception_id)
+                                    .expect("RequestIntercepted should exists.");
+                                info!("----------------------------------------------------------------------{:?}", intercepted_reqeust);
+                                self.intercepted_requests.push(
+                                    intercepted_reqeust.get_raw_parameters().request.url.clone(),
+                                );
+                                let request_id =
+                                    intercepted_reqeust.get_raw_parameters().request_id.clone();
                                 tab.get_response_body_for_interception(interception_id, request_id);
                             }
                             ReceivedEvent::ResponseReceived(_event) => {}
@@ -160,10 +138,18 @@ impl Future for PrintToPdfDing {
                             let readable = task.get_body_string();
                             info!("************* body string: {:?}", readable);
                             let decoded_body_string = task.get_body_string();
-                            let intercepted = tab.request_intercepted.remove(&task.interception_id).expect("should find intercepted request.");
-                            let saved_response = task.request_id.and_then(|rid| tab.response_received.remove(&rid));
-                            
-                            let raw_response = intercepted.construct_raw_response_from_response(saved_response.as_ref(), decoded_body_string.as_ref().map(String::as_str));
+                            let intercepted = tab
+                                .request_intercepted
+                                .remove(&task.interception_id)
+                                .expect("should find intercepted request.");
+                            let saved_response = task
+                                .request_id
+                                .and_then(|rid| tab.response_received.remove(&rid));
+
+                            let raw_response = intercepted.construct_raw_response_from_response(
+                                saved_response.as_ref(),
+                                decoded_body_string.as_ref().map(String::as_str),
+                            );
                             tab.continue_intercepted_request_with_raw_response(
                                 task.interception_id,
                                 Some(raw_response),
@@ -212,13 +198,14 @@ fn test_print_pdf_ding() {
         "RUST_LOG",
         "headless_chrome=info,print_to_pdf_ding=trace,derive_builder=trace",
     );
-        // "headless_chrome=info,headless_chrome::browser_async::chrome_browser=trace,print_to_pdf_ding=trace,derive_builder=trace",
+    // "headless_chrome=info,headless_chrome::browser_async::chrome_browser=trace,print_to_pdf_ding=trace,derive_builder=trace",
     env_logger::init();
     // let url = "https://59.202.58.131";
     let url = "https://59.202.58.131/orgstructure/orgstructure-manage?orgId=100016626";
     let my_page = PrintToPdfDing {
         url,
         // waiting_load_event_fired: std::collections::VecDeque::new(),
+        intercepted_requests: Vec::new(),
         ..PrintToPdfDing::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");

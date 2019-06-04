@@ -532,7 +532,7 @@ impl Tab {
 
     pub fn network_enable(&mut self, manual_task_id: Option<TaskId>) {
         let task = self.network_enable_task(manual_task_id);
-        self.execute_one_task(task.into());
+        self.execute_one_task(task);
     }
 
     pub fn network_enable_task(&mut self, manual_task_id: Option<TaskId>) -> TaskDescribe {
@@ -542,7 +542,8 @@ impl Tab {
     }
 
     pub fn evaluate_expression(&mut self, expression: &str) {
-        self.runtime_evaluate_expression_impl(expression, None);
+        let task = self.evaluate_expression_task(expression);
+        self.execute_one_task(task);
     }
 
     pub fn evaluate_expression_prefixed(&mut self, expression: &str, prefix: &str) {
@@ -551,21 +552,31 @@ impl Tab {
     }
 
     pub fn evaluate_expression_named(&mut self, expression: &str, name: &str) {
-        self.runtime_evaluate_expression_impl(expression, Some(name.to_owned()));
+        let task = self.evaluate_expression_task_named(expression, name);
+        self.execute_one_task(task);
     }
 
-    fn runtime_evaluate_expression_impl(
+    pub fn evaluate_expression_task_named(&mut self, expression: &str, task_id: &str) -> TaskDescribe {
+        self.evaluate_expression_task_impl(expression, Some(task_id.to_owned()))
+    }
+
+    pub fn evaluate_expression_task(&mut self, expression: &str) -> TaskDescribe {
+        self.evaluate_expression_task_impl(expression, None)
+    }
+
+    fn evaluate_expression_task_impl(
         &mut self,
         expression: &str,
         manual_task_id: Option<TaskId>,
-    ) {
-        let task = tasks::RuntimeEvaluateTaskBuilder::default()
+    ) -> TaskDescribe {
+        tasks::RuntimeEvaluateTaskBuilder::default()
             .expression(expression.to_string())
             .common_fields(self.get_common_field(manual_task_id))
             .build()
-            .expect("build RuntimeEvaluateTaskBuilder should success.");
-        self.execute_one_task(task.into());
+            .expect("build RuntimeEvaluateTaskBuilder should success.").into()
     }
+
+    
 
     pub fn runtime_evaluate(
         &mut self,

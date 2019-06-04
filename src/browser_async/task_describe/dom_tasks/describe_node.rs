@@ -61,17 +61,18 @@ mod tests {
         ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
         {
-            let common_fields = CommonDescribeFieldsBuilder::default().build().unwrap();
+            let common_fields = CommonDescribeFieldsBuilder::default().build().expect("default common_fields should success");
             let task = DescribeNodeTaskBuilder::default()
                 .common_fields(common_fields)
                 .build()
-                .unwrap();
+                .expect("build DescribeNodeTask should success.");
+                
             
-            let serialized = serde_json::to_string(&task).unwrap();
+            let serialized = serde_json::to_string(&task).expect("serialized should success.");
             info!("{:?}", serialized);
 
             // let ss = "{\"nodeId\":null,\"backendNodeId\":null,\"selector\":null,\"depth\":0,\"objectId\":null,\"pierce\":false}";
-            let deserialized: DescribeNodeTask = serde_json::from_str(&serialized).unwrap();
+            let deserialized: DescribeNodeTask = serde_json::from_str(&serialized).expect("deserialized should success");
             println!("deserialized = {:?}", deserialized);
         }
     }

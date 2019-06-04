@@ -37,7 +37,7 @@ impl<'a> Context<'a> {
 
     /// Any tabs created in this context
     pub fn get_tabs(&self) -> Result<Vec<Arc<Tab>>, failure::Error> {
-        let browser_tabs = self.browser.get_tabs().lock().unwrap();
+        let browser_tabs = self.browser.get_tabs().lock().expect("tabs");
         let mut tabs = vec![];
         for tab in browser_tabs.iter() {
             if let Some(context_id) = tab.get_browser_context_id()? {

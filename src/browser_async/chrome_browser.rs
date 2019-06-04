@@ -78,7 +78,7 @@ impl ChromeBrowser {
     }
     pub fn send_message(&mut self, method_str: String) {
         if method_str.len() > 400 {
-            info!("**sending** : {:?}", method_str.split_at(400).0);
+            info!("**sending** : {:?} ..............", method_str.split_at(400).0);
         } else {
             info!("**sending** : {:?}", method_str);
         }
@@ -111,12 +111,12 @@ impl Stream for ChromeBrowser {
                     let options = LaunchOptionsBuilder::default()
                         .build()
                         .expect("Failed to find chrome");
-                    let chrome_process = Process::new(options).unwrap();
+                    let chrome_process = Process::new(options).expect("process should created.");
                     let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
                     self.process = Some(chrome_process);
                     self.state = BrowserState::Connecting(
                         ClientBuilder::new(&web_socket_debugger_url)
-                            .unwrap()
+                            .expect("client build should work.")
                             .add_protocol("rust-websocket")
                             .async_connect_insecure(),
                     );
@@ -131,15 +131,15 @@ impl Stream for ChromeBrowser {
                 }
                 BrowserState::Receiving => {
                     // info!("try receiving..........");
-                    match self.ws_client.as_mut().unwrap().poll() {
+                    match self.ws_client.as_mut().expect("obtain ws_client should success.").poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
-                                if msg.len() > 400 {
+                                if msg.contains("Network.requestIntercepted") || msg.len() < 400 {
+                                    trace!("got message (***every message***): {:?}", msg);
+                                } else {
                                     let (short, _) = msg.split_at(200);
                                     trace!("got message (***every message***): {:?}", short);
-                                } else {
-                                    trace!("got message (***every message***): {:?}", msg);
-                                }
+                                } 
                                 let parsed_message = protocol::parse_raw_message(&msg);
                                 match parsed_message {
                                     Ok(success_parsed_message) => {
@@ -174,7 +174,7 @@ impl Stream for ChromeBrowser {
                     match self
                         .ws_client
                         .as_mut()
-                        .unwrap()
+                        .expect("obtain ws_client should success.")
                         .start_send(OwnedMessage::Text(message_to_send.clone()))
                     {
                         Ok(AsyncSink::Ready) => {
@@ -190,7 +190,7 @@ impl Stream for ChromeBrowser {
                 }
                 BrowserState::Sending => {
                     trace!("enter sending.");
-                    match self.ws_client.as_mut().unwrap().poll_complete() {
+                    match self.ws_client.as_mut().expect("obtain ws_client should success.").poll_complete() {
                         Ok(Async::Ready(_)) => {
                             trace!("switch to receiving state.");
                             if let Some(first) = self.waiting_to_send.pop_front() {

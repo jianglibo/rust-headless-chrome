@@ -141,7 +141,7 @@ pub enum BlockedReason {
     #[serde(rename_all = "camelCase")]
     pub struct Response {
         pub url: String,
-        pub status: u32,
+        pub status: i32,
         pub status_text: String,
         pub headers: Headers,
         pub headers_text: Option<String>,
@@ -218,6 +218,7 @@ pub mod events {
         pub response_error_reason: Option<String>,
         pub response_status_code: Option<i32>,
         pub response_headers: Option<super::Headers>,
+        pub request_id: Option<super::RequestId>,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

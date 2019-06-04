@@ -32,7 +32,7 @@ impl Stream for Wrapper {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.chrome_debug_session.lock().unwrap().poll()
+        self.chrome_debug_session.lock().expect("obtain chrome_debug_session should success.").poll()
     }
 }
 
@@ -172,35 +172,35 @@ impl DebugSession {
         let task = self.runtime_enable_task();
         self.chrome_debug_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_debug_session should success.")
             .execute_task(vec![task]);
     }
 
     pub fn runtime_enable_task(&mut self) -> TaskDescribe {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
-            .unwrap();
+            .expect("build common_fields should success.");
         RuntimeEnableTask { common_fields }.into()
     }
 
     pub fn execute_one_task(&mut self, task: TaskDescribe) {
         self.chrome_debug_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_debug_session should success.")
             .execute_task(vec![task]);
     }
 
     pub fn execute_tasks(&mut self, tasks: Vec<TaskDescribe>) {
         self.chrome_debug_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_debug_session should success.")
             .execute_task(tasks);
     }
 
     pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
-            .unwrap();
+            .expect("build common_fields should success.");
         let task = self.set_ignore_certificate_errors_task(ignore);
         self.execute_one_task(task);
     }
@@ -208,7 +208,7 @@ impl DebugSession {
     pub fn set_ignore_certificate_errors_task(&mut self, ignore: bool) -> TaskDescribe {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
-            .unwrap();
+            .expect("build common_fields should success.");
         SetIgnoreCertificateErrorsTask {
             common_fields,
             ignore,
@@ -219,14 +219,14 @@ impl DebugSession {
         let task = self.set_discover_targets_task(enable);
         self.chrome_debug_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_debug_session should success.")
             .execute_task(vec![task.into()]);
     }
 
     pub fn set_discover_targets_task(&mut self, enable: bool) -> TaskDescribe {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
-            .unwrap();
+            .expect("build common_fields should success.");
         SetDiscoverTargetsTask {
             common_fields,
             discover: enable,
@@ -237,14 +237,14 @@ impl DebugSession {
         let task = self.security_enable_task();
         self.chrome_debug_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_debug_session should success.")
             .execute_task(vec![task.into()]);
     }
 
     pub fn security_enable_task(&mut self) -> TaskDescribe {
         let common_fields = tasks::CommonDescribeFieldsBuilder::default()
             .build()
-            .unwrap();
+            .expect("build common_fields should success.");
         SecurityEnableTask { common_fields }.into()
     }
 

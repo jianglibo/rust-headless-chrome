@@ -4,12 +4,14 @@ pub mod navigate_to;
 pub mod capture_screenshot;
 pub mod page_enable;
 pub mod page_events;
+pub mod page_reload;
 
 use crate::browser_async::page_message::{PageResponseWrapper, PageResponse, ReceivedEvent,};
 pub use print_to_pdf::{PrintToPdfTask, PrintToPdfTaskBuilder};
 pub use navigate_to::{NavigateToTask, NavigateToTaskBuilder};
 pub use capture_screenshot::{CaptureScreenshotTask, CaptureScreenshotTaskBuilder};
 pub use page_enable::{PageEnableTask, PageEnableTaskBuilder};
+pub use page_reload::{PageReloadTask, PageReloadTaskBuilder};
 use super::super::protocol::{target};
 use crate::browser_async::debug_session::DebugSession;
 use log::*;
@@ -109,6 +111,8 @@ pub fn handle_page_event(
                 );
             }
             PageEvent::LoadEventFired(event) => {
+                let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab.load_event_fired_count += 1;
                 return handle_event_return(maybe_target_id, event.into_page_response());
             }
         }

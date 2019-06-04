@@ -1,6 +1,6 @@
 use super::chrome_debug_session::ChromeDebugSession;
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, network_events, TaskDescribe, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
+use super::task_describe::{self as tasks, network_events, TaskDescribe, PageReloadTask, PageReloadTaskBuilder, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
 use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events, create_unique_prefixed_id};
 use crate::protocol::{self, dom, page, runtime, target, network};
 use std::collections::HashMap;
@@ -20,6 +20,9 @@ pub struct Tab {
         HashMap<page::FrameId, runtime::ExecutionContextDescription>,
     pub ongoing_request: HashMap<network::RequestId, network_events::RequestWillBeSent>,
     pub load_event_fired_count: u16,
+    pub frame_navigated_fired_count: u16,
+    pub request_intercepted: HashMap<network::RequestId, network_events::RequestIntercepted>,
+    pub response_received: HashMap<network::RequestId, network_events::ResponseReceived>,
 }
 
 impl Tab {
@@ -38,6 +41,9 @@ impl Tab {
             execution_context_descriptions: HashMap::new(),
             ongoing_request: HashMap::new(),
             load_event_fired_count: 0,
+            frame_navigated_fired_count: 0,
+            request_intercepted: HashMap::new(),
+            response_received: HashMap::new(),
         }
     }
 
@@ -91,7 +97,21 @@ impl Tab {
             .common_fields(self.get_common_field(manual_task_id))
             .url(url)
             .build()
-            .unwrap();
+            .expect("build NavigateToTaskBuilder should success.");
+        task.into()
+    }
+
+    pub fn reload(&mut self, ignore_cache: bool) {
+        let task = self.reload_task(ignore_cache, None);
+        self.execute_one_task(task);
+    }
+
+    pub fn reload_task(&self, ignore_cache: bool, manual_task_id: Option<TaskId>) -> TaskDescribe {
+        let task = PageReloadTaskBuilder::default()
+            .common_fields(self.get_common_field(manual_task_id))
+            .ignore_cache(ignore_cache)
+            .build()
+            .expect("build PageReloadTaskBuilder should success.");
         task.into()
     }
 
@@ -106,10 +126,11 @@ impl Tab {
         })
     }
 
-    pub fn get_response_body_for_interception(&mut self, interception_id: String) {
+    pub fn get_response_body_for_interception(&mut self, interception_id: String, request_id: Option<network::RequestId>) {
         let task = GetResponseBodyForInterceptionTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .interception_id(interception_id)
+            .request_id(request_id)
             .build()
             .expect("GetResponseBodyForInterceptionTaskBuilder should work.");
 
@@ -257,6 +278,7 @@ impl Tab {
     }
 
     pub fn _frame_navigated(&mut self, frame: page::Frame) {
+        self.frame_navigated_fired_count += 1;
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame.id) {
             *changing_frame = ChangingFrame::Navigated(frame);
         } else {
@@ -322,7 +344,7 @@ impl Tab {
             .common_fields(self.get_common_field(manual_task_id))
             .depth(depth)
             .build()
-            .unwrap();
+            .expect("build GetDocumentTaskBuilder should success.");
         self.execute_one_task(task.into());
     }
 
@@ -355,7 +377,7 @@ impl Tab {
             .selector(selector.to_owned())
             .depth(depth)
             .build()
-            .unwrap();
+            .expect("build DescribeNodeTaskBuilder should success.");
         pre_tasks.push(describe_node.into());
         self.execute_tasks(pre_tasks);
     }
@@ -396,12 +418,12 @@ impl Tab {
         let get_document = tasks::GetDocumentTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .build()
-            .unwrap();
+            .expect("build GetDocumentTaskBuilder should success.");
         let query_select = tasks::QuerySelectorTaskBuilder::default()
             .common_fields(self.get_common_field(manual_task_id))
             .selector(selector)
             .build()
-            .unwrap();
+            .expect("build QuerySelectorTaskBuilder should success.");
         vec![get_document.into(), query_select.into()]
     }
 
@@ -415,7 +437,7 @@ impl Tab {
             .common_fields(self.get_common_field(manual_task_id))
             .selector(selector.to_owned())
             .build()
-            .unwrap();
+            .expect("build GetBoxModelTaskBuilder should success.");
         pre_tasks.push(get_box_model.into());
         pre_tasks
     }
@@ -441,7 +463,7 @@ impl Tab {
             .format(format)
             .from_surface(from_surface)
             .build()
-            .unwrap();
+            .expect("build CaptureScreenshotTaskBuilder should success.");
         let mut pre_tasks = self.get_box_model(selector, None);
         pre_tasks.push(screen_shot.into());
         self.execute_tasks(pre_tasks);
@@ -453,7 +475,7 @@ impl Tab {
             .session_id(self.session_id.clone())
             .task_id(manual_task_id)
             .build()
-            .unwrap()
+            .expect("build common_fields should success.")
     }
 
     pub fn set_request_interception_task_named(&self, name: &str) -> SetRequestInterceptionTask {
@@ -463,14 +485,14 @@ impl Tab {
     pub fn execute_one_task(&mut self, task: TaskDescribe) {
         self.chrome_session
             .lock()
-            .unwrap()
+            .expect("ob  chrome_session should success.")
             .execute_task(vec![task]);
     }
 
     pub fn execute_tasks(&mut self, tasks: Vec<TaskDescribe>) {
         self.chrome_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_session should success.")
             .execute_task(tasks);
     }
 
@@ -487,7 +509,7 @@ impl Tab {
         let task = task_builder
             .common_fields(self.get_common_field(manual_task_id))
             .build()
-            .unwrap();
+            .expect("build PrintToPdfTaskBuilder should success.");
         self.execute_one_task(task.into());
     }
 
@@ -541,7 +563,7 @@ impl Tab {
             .expression(expression.to_string())
             .common_fields(self.get_common_field(manual_task_id))
             .build()
-            .unwrap();
+            .expect("build RuntimeEvaluateTaskBuilder should success.");
         self.execute_one_task(task.into());
     }
 
@@ -582,7 +604,7 @@ impl Tab {
             .object_id(object_id)
             .common_fields(self.get_common_field(manual_task_id))
             .build()
-            .unwrap();
+            .expect("build RuntimeGetPropertiesTaskBuilder should success.");
         self.execute_one_task(task.into());
     }
 
@@ -615,7 +637,7 @@ impl Tab {
         );
         self.chrome_session
             .lock()
-            .unwrap()
+            .expect("obtain chrome_session should success.")
             .send_message_direct(method_str);
     }
 }

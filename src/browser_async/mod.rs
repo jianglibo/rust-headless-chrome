@@ -129,7 +129,7 @@ pub fn next_call_id() -> protocol::CallId {
         match destination {
             MethodDestination::Target(session_id) => {
                 let call = method.to_method_call(call_id);
-                let message_text = serde_json::to_string(&call).unwrap();
+                let message_text = serde_json::to_string(&call).expect("message_text should created.");
                 let target_method = target::methods::SendMessageToTarget {
                     target_id: None,
                     session_id: Some(session_id.as_str()),
@@ -139,7 +139,7 @@ pub fn next_call_id() -> protocol::CallId {
             }
             MethodDestination::Browser => {
                 let call = method.to_method_call(call_id);
-                serde_json::to_string(&call).unwrap()
+                serde_json::to_string(&call).expect("message_text should created.")
             }
         }
     }
@@ -153,5 +153,5 @@ pub fn get_common_fields_by_task_id(manual_task_id: Option<TaskId>) -> tasks::Co
         tasks::CommonDescribeFieldsBuilder::default()
             .task_id(manual_task_id)
             .build()
-            .unwrap()
+            .expect("build common_fields should success.")
     }

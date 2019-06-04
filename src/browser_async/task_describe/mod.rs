@@ -20,7 +20,7 @@ pub use dom_tasks::{
     GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events, DomEvent,
 };
 pub use page_tasks::{
-    CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder,
+    CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder, PageReloadTask, PageReloadTaskBuilder,
     PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent, handle_page_event,
 };
 pub use runtime_tasks::{
@@ -129,7 +129,8 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
 
     fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
         match task_describe {
-            TaskDescribe::TargetCallMethod(target_call) => match target_call {
+            TaskDescribe::TargetCallMethod(target_call) => 
+                match target_call {
                 TargetCallMethodTask::QuerySelector(task) => task.get_method_str(),
                 TargetCallMethodTask::DescribeNode(task) => task.get_method_str(),
                 TargetCallMethodTask::PrintToPDF(task) => task.get_method_str(),
@@ -146,6 +147,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::SetRequestInterception(task) => task.get_method_str(),
                 TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_method_str(),
                 TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_method_str(),
+                TargetCallMethodTask::PageReload(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
@@ -195,7 +197,7 @@ impl From<(Option<String>, Option<String>)> for CommonDescribeFields {
             .target_id(session_id_target_id.1)
             .session_id(session_id_target_id.0.map(Into::into))
             .build()
-            .unwrap()
+            .expect("tuple to common_fields should work.")
     }
 }
 

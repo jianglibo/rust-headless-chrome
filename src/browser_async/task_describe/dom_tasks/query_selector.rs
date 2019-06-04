@@ -20,7 +20,7 @@ impl AsMethodCallString for QuerySelectorTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {
         failure::ensure!(self.node_id.is_some(), "node_id is a must for QuerySelectorTask.");
         let method = dom::methods::QuerySelector {
-            node_id: self.node_id.unwrap(),
+            node_id: self.node_id.expect("node_id should exists."),
             selector: self.selector.as_str(),
         };
         Ok(self.create_method_str(method))

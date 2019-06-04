@@ -25,6 +25,7 @@ pub enum TargetCallMethodTask {
     SetRequestInterception(network_tasks::SetRequestInterceptionTask),
     ContinueInterceptedRequest(network_tasks::ContinueInterceptedRequestTask),
     GetResponseBodyForInterception(network_tasks::GetResponseBodyForInterceptionTask),
+    PageReload(page_tasks::PageReloadTask),
 }
 
 impl HasCallId for TargetCallMethodTask {
@@ -46,6 +47,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::SetRequestInterception(task) => task.get_call_id(),
             TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_call_id(),
             TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_call_id(),
+            TargetCallMethodTask::PageReload(task) => task.get_call_id(),
         }
     }
 }
@@ -163,6 +165,9 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::ContinueInterceptedRequest(task) => {
             warn!("ignored method return. ContinueInterceptedRequest");
+        }
+        TargetCallMethodTask::PageReload(task) => {
+            warn!("ignored method return. PageReload");
         }
         TargetCallMethodTask::GetResponseBodyForInterception(task) => {
             return Ok(PageResponseWrapper {

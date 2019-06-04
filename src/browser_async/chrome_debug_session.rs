@@ -131,7 +131,7 @@ impl ChromeDebugSession {
     ) -> Option<TaskDescribe> {
         let s = format!("got **response**. {:?}", resp);
         if s.len() > 400 {
-            info!("{:?}", s.split_at(400).0);
+            info!("{:?} ......................", s.split_at(400).0);
         } else {
             info!("{:?}", s);
         }
@@ -268,6 +268,7 @@ impl ChromeDebugSession {
                     get_document.task_result = Some(get_document_return_object.root);
                 }
                 TargetCallMethodTask::PageEnable(_common_fields) => {}
+                TargetCallMethodTask::PageReload(_page_reload) => {}
                 TargetCallMethodTask::QuerySelector(query_selector) => {
                     let return_object =
                         protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;

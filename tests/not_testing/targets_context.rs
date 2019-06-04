@@ -43,7 +43,7 @@ impl Future for TargetsContext {
                         self.debug_session.set_discover_targets(true);
                     }
                     PageResponse::PageCreated(page_idx) => {
-                        let tab = tab.unwrap();
+                        let tab = tab.expect("abc");
                         tab.attach_to_page();
                         if page_idx == 1 {
                             tab.name_the_page("abc");
@@ -51,7 +51,7 @@ impl Future for TargetsContext {
                         }
                     }
                     PageResponse::PageAttached(_page_info, _session_id) => {
-                        let tab = tab.unwrap();
+                        let tab = tab.expect("abc1");
                         tab.page_enable();
                         if tab.page_name == Some("abc") {
                             tab.navigate_to(self.url, None);
@@ -66,7 +66,7 @@ impl Future for TargetsContext {
                         let file_name = "target/qrcode.png";
                         let path = Path::new(file_name);
                         if path.exists() && path.is_file() {
-                            fs::remove_file(file_name).unwrap();
+                            fs::remove_file(file_name).expect("filename");
                         }
                         let base64_data = result
                             .as_ref()
@@ -80,7 +80,7 @@ impl Future for TargetsContext {
                                 ss.next()
                             });
 
-                        write_base64_str_to(file_name, base64_data).unwrap();
+                        write_base64_str_to(file_name, base64_data).expect("write result.");
                         assert!(path.exists());
                     }
                     PageResponse::EvaluateDone(evaluate_result) => {},
@@ -128,5 +128,5 @@ fn t_target_context() {
         ..Default::default()
     };
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-    runtime.block_on(my_page.into_future()).unwrap();
+    runtime.block_on(my_page.into_future()).expect("tokio should success.");
 }

@@ -1,6 +1,7 @@
 use super::chrome_debug_session::ChromeDebugSession;
+use super::{EventStatistics, EventName, TaskQueue};
 use super::page_message::ChangingFrame;
-use super::task_describe::{self as tasks, network_events, TaskDescribe, PageReloadTask, PageReloadTaskBuilder, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder};
+use super::task_describe::{self as tasks, network_events, TaskDescribe, PageReloadTaskBuilder, RuntimeEnableTask, NetworkEnableTaskBuilder, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, GetResponseBodyForInterceptionTaskBuilder, ContinueInterceptedRequestTaskBuilder, RuntimeEvaluateTaskBuilder};
 use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send, next_call_id, embedded_events, create_unique_prefixed_id};
 use crate::protocol::{self, dom, page, runtime, target, network};
 use std::collections::HashMap;
@@ -19,10 +20,11 @@ pub struct Tab {
     pub execution_context_descriptions:
         HashMap<page::FrameId, runtime::ExecutionContextDescription>,
     pub ongoing_request: HashMap<network::RequestId, network_events::RequestWillBeSent>,
-    pub load_event_fired_count: u16,
-    pub frame_navigated_fired_count: u16,
     pub request_intercepted: HashMap<network::RequestId, network_events::RequestIntercepted>,
     pub response_received: HashMap<network::RequestId, network_events::ResponseReceived>,
+    pub event_statistics: EventStatistics,
+    pub task_queue: TaskQueue,
+
 }
 
 impl Tab {
@@ -40,10 +42,17 @@ impl Tab {
             temporary_node_holder: HashMap::new(),
             execution_context_descriptions: HashMap::new(),
             ongoing_request: HashMap::new(),
-            load_event_fired_count: 0,
-            frame_navigated_fired_count: 0,
             request_intercepted: HashMap::new(),
             response_received: HashMap::new(),
+            event_statistics: EventStatistics::new(),
+            task_queue: TaskQueue::new(),
+        }
+    }
+
+    pub fn run_task_queue(&mut self) {
+        let tasks = self.task_queue.retrieve_task_to_run();
+        if !tasks.is_empty() {
+            self.execute_tasks(tasks);
         }
     }
 
@@ -254,6 +263,7 @@ impl Tab {
         &mut self,
         execution_context: runtime::ExecutionContextDescription,
     ) -> Option<page::FrameId> {
+        self.event_statistics.event_happened(EventName::ExecutionContextCreated);
         let aux_data = execution_context.aux_data.clone();
         if let Some(frame_id_str) = aux_data["frameId"].as_str() {
             let frame_id = frame_id_str.to_string();
@@ -278,7 +288,7 @@ impl Tab {
     }
 
     pub fn _frame_navigated(&mut self, frame: page::Frame) {
-        self.frame_navigated_fired_count += 1;
+        self.event_statistics.event_happened(EventName::FrameNavigated);
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame.id) {
             *changing_frame = ChangingFrame::Navigated(frame);
         } else {
@@ -382,7 +392,21 @@ impl Tab {
         self.execute_tasks(pre_tasks);
     }
 
+    pub fn describe_node_named(
+        &mut self,
+        mut describe_node_task_builder: tasks::DescribeNodeTaskBuilder,
+        name: &str,
+    ) {
+        self.describe_node_impl(describe_node_task_builder, Some(name.into()));
+    }
     pub fn describe_node(
+        &mut self,
+        mut describe_node_task_builder: tasks::DescribeNodeTaskBuilder,
+    ) {
+        self.describe_node_impl(describe_node_task_builder, None);
+    }
+
+    fn describe_node_impl(
         &mut self,
         mut describe_node_task_builder: tasks::DescribeNodeTaskBuilder,
         manual_task_id: Option<TaskId>,
@@ -524,7 +548,15 @@ impl Tab {
         }.into()
     }
 
-    pub fn runtime_enable(&mut self, manual_task_id: Option<TaskId>) {
+    pub fn runtime_enable_named(&mut self, name: &str) {
+        self.runtime_enable_impl(Some(name.into()));
+    }
+
+    pub fn runtime_enable(&mut self) {
+        self.runtime_enable_impl(None);
+    }
+
+    fn runtime_enable_impl(&mut self, manual_task_id: Option<TaskId>) {
         let common_fields = self.get_common_field(manual_task_id);
         let task = RuntimeEnableTask{common_fields};
         self.execute_one_task(task.into());
@@ -560,6 +592,11 @@ impl Tab {
         self.evaluate_expression_task_impl(expression, Some(task_id.to_owned()))
     }
 
+    pub fn evaluate_expression_task_prefixed(&mut self, expression: &str, prefix: &str) -> TaskDescribe {
+        let name = create_unique_prefixed_id(prefix);
+        self.evaluate_expression_task_named(expression, name.as_str())
+    }
+
     pub fn evaluate_expression_task(&mut self, expression: &str) -> TaskDescribe {
         self.evaluate_expression_task_impl(expression, None)
     }
@@ -576,23 +613,65 @@ impl Tab {
             .expect("build RuntimeEvaluateTaskBuilder should success.").into()
     }
 
-    
+    pub  fn evaluate_task(&self, evaluate_task_builder: RuntimeEvaluateTaskBuilder) -> TaskDescribe {
+        self.evaluate_task_impl(evaluate_task_builder, None)
+    }
 
-    pub fn runtime_evaluate(
-        &mut self,
+    pub fn evaluate_task_named(&self, evaluate_task_builder: RuntimeEvaluateTaskBuilder, name: &str) -> TaskDescribe {
+        self.evaluate_task_impl(evaluate_task_builder, Some(name))
+    }
+
+    fn evaluate_task_impl(
+        &self,
         mut evaluate_task_builder: tasks::RuntimeEvaluateTaskBuilder,
-        manual_task_id: Option<TaskId>,
-    ) {
+        manual_task_id: Option<&str>,
+    ) -> TaskDescribe {
         let task = evaluate_task_builder
-            .common_fields(self.get_common_field(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id.map(Into::into)))
             .build();
         match task {
-            Ok(task) => self.execute_one_task(task.into()),
-            Err(err) => error!("build evaluate task error: {:?}", err),
+            Ok(task) => task.into(),
+            Err(err) => {
+                error!("build evaluate task error: {:?}", err);
+                panic!("build evaluate task error: {:?}");
+            },
         }
     }
 
-    pub fn runtime_call_function_on(
+    pub fn evaluate(&mut self, evaluate_task_builder: RuntimeEvaluateTaskBuilder) {
+        self.evaluate_impl(evaluate_task_builder, None)
+    }
+
+    pub fn evaluate_named(&mut self, evaluate_task_builder: RuntimeEvaluateTaskBuilder, name: &str) {
+        self.evaluate_impl(evaluate_task_builder, Some(name))
+    }
+
+    fn evaluate_impl(
+        &mut self,
+        evaluate_task_builder: tasks::RuntimeEvaluateTaskBuilder,
+        manual_task_id: Option<&str>,
+    ) {
+        let task = self.evaluate_task_impl(evaluate_task_builder, manual_task_id);
+        self.execute_one_task(task);
+    }
+
+    /// let fnd = "function() {return this.getAttribute('src');}";
+    pub fn call_function_on_named(
+        &mut self,
+        call_function_on_task_builder: tasks::RuntimeCallFunctionOnTaskBuilder,
+        name: &str,
+    ) {
+        self.call_function_on_impl(call_function_on_task_builder, Some(name.into()));
+    }
+
+    pub fn call_function_on(
+        &mut self,
+        call_function_on_task_builder: tasks::RuntimeCallFunctionOnTaskBuilder,
+    ) {
+        self.call_function_on_impl(call_function_on_task_builder, None);
+    }
+
+    fn call_function_on_impl(
         &mut self,
         mut call_function_on_task_builder: tasks::RuntimeCallFunctionOnTaskBuilder,
         manual_task_id: Option<TaskId>,

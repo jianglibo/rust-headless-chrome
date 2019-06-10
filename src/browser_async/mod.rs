@@ -10,6 +10,11 @@ pub mod json_assistor;
 pub mod task_describe;
 pub mod tab;
 pub mod embedded_events;
+pub mod event_statistics;
+pub mod task_queue;
+
+pub use event_statistics::{EventStatistics, EventName};
+pub use task_queue::{TaskQueue};
 
 use failure;
 use task_describe::{self as tasks, TaskDescribe};

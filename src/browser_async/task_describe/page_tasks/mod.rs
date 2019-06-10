@@ -13,6 +13,7 @@ pub use capture_screenshot::{CaptureScreenshotTask, CaptureScreenshotTaskBuilder
 pub use page_enable::{PageEnableTask, PageEnableTaskBuilder};
 pub use page_reload::{PageReloadTask, PageReloadTaskBuilder};
 use super::super::protocol::{target};
+use super::super::EventName;
 use crate::browser_async::debug_session::DebugSession;
 use log::*;
 
@@ -112,7 +113,7 @@ pub fn handle_page_event(
             }
             PageEvent::LoadEventFired(event) => {
                 let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab.load_event_fired_count += 1;
+                tab.event_statistics.event_happened(EventName::LoadEventFired);
                 return handle_event_return(maybe_target_id, event.into_page_response());
             }
         }

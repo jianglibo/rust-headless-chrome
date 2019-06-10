@@ -1,7 +1,8 @@
 {
     "cSpell.words": [
         "Lifecycle",
-        "Mutex"
+        "Mutex",
+        "jstree"
     ],
     "python.testing.pyTestArgs": [
         "."

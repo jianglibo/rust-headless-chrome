@@ -2,7 +2,7 @@ use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
-use super::tab::Tab;
+use super::Tab;
 use super::task_describe::{
     self as tasks, handle_browser_method_call, handle_target_method_call, 
     DomEvent, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
@@ -388,6 +388,7 @@ impl DebugSession {
         match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
+                self.tabs.iter_mut().for_each(Tab::run_task_queue);
                 Ok(Some(PageResponseWrapper::new(PageResponse::SecondsElapsed(
                     self.seconds_from_start,
                 )))

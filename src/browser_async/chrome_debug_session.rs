@@ -200,7 +200,7 @@ impl ChromeDebugSession {
             self.tasks_waiting_for_response.push(tasks);
             self.send_message_direct(method_str);
         } else {
-            error!("execute_next_and_return_remains to_methd_str failed. {:?}", next_task);
+            error!("execute_next_and_return_remains to_method_str failed. {:?}", next_task);
         }
      }
 

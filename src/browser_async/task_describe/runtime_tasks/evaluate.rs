@@ -1,6 +1,7 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{runtime, target};
 use failure;
+use log::*;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
@@ -29,6 +30,33 @@ pub struct RuntimeEvaluateTask {
     pub time_out: Option<runtime::TimeDelta>,
     #[builder(default = "None")]
     pub task_result: Option<runtime::methods::EvaluateReturnObject>,
+}
+
+impl RuntimeEvaluateTask {
+    pub fn get_string_result(&self) -> Option<&String> {
+        if let Some(ero) = self.task_result.as_ref() {
+            if let Some(serde_json::Value::String(jv)) = ero.result.value.as_ref() {
+                return Some(jv);
+            } else {
+                error!("evaluate_result has empty value field. {:?}", self);
+            }
+        } else {
+            error!("evaluate_result has empty result. {:?}", self);
+        }
+        None
+    }
+    pub fn get_u64_result(&self) -> Option<u64> {
+        if let Some(ero) = self.task_result.as_ref() {
+            if let Some(serde_json::Value::Number(jv)) = ero.result.value.as_ref() {
+                return jv.as_u64();
+            } else {
+                error!("evaluate_result has empty value field. {:?}", self);
+            }
+        } else {
+            error!("evaluate_result has empty result. {:?}", self);
+        }
+        None
+    }
 }
 
 impl_has_common_fields!(RuntimeEvaluateTask);

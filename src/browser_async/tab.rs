@@ -6,11 +6,13 @@ use super::super::browser_async::{MethodDestination, TaskId, create_msg_to_send,
 use crate::protocol::{self, dom, page, runtime, target, network};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::{Instant};
 use log::*;
 
 #[derive(Debug)]
 pub struct Tab {
     chrome_session: Arc<Mutex<ChromeDebugSession>>,
+    pub created_at: Instant,
     pub target_info: protocol::target::TargetInfo,
     pub session_id: Option<target::SessionID>,
     pub root_node: Option<dom::Node>,
@@ -46,6 +48,7 @@ impl Tab {
             response_received: HashMap::new(),
             event_statistics: EventStatistics::new(),
             task_queue: TaskQueue::new(),
+            created_at: Instant::now(),
         }
     }
 
@@ -89,6 +92,10 @@ impl Tab {
         } else {
             &self.target_info.url
         }
+    }
+
+    pub fn url_in(&self, urls: Vec<&str>) -> bool {
+        urls.contains(&self.get_url())
     }
 
     pub fn navigate_to_named(&mut self, url: &'static str, name: &str) {
@@ -562,13 +569,18 @@ impl Tab {
         self.execute_one_task(task.into());
     }
 
-    pub fn network_enable(&mut self, manual_task_id: Option<TaskId>) {
-        let task = self.network_enable_task(manual_task_id);
+    pub fn network_enable(&mut self) {
+        let task = self.network_enable_task_impl(None);
         self.execute_one_task(task);
     }
 
-    pub fn network_enable_task(&mut self, manual_task_id: Option<TaskId>) -> TaskDescribe {
-        let common_fields = self.get_common_field(manual_task_id);
+    pub fn network_enable_named(&mut self, name: &str) {
+        let task = self.network_enable_task_impl(Some(name));
+        self.execute_one_task(task);
+    }
+
+    fn network_enable_task_impl(&mut self, manual_task_id: Option<&str>) -> TaskDescribe {
+        let common_fields = self.get_common_field(manual_task_id.map(Into::into));
         let nwe = NetworkEnableTaskBuilder::default().common_fields(common_fields).build().expect("NetworkEnableTaskBuilder should work.");
         nwe.into()
     }

@@ -8,22 +8,22 @@ extern crate tokio_timer;
 
 use headless_chrome::browser_async::{debug_session::DebugSession, EventName, Tab};
 
-use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
-use headless_chrome::browser_async::task_describe::{
-    runtime_tasks, HasTaskId, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder, TaskDescribe,
+use headless_chrome::browser_async::page_message::{
+    write_base64_str_to, MethodCallDone, PageResponse, ReceivedEvent,
 };
-use headless_chrome::protocol::{
-    network::{InterceptionStage, ResourceType},
-    target,
-};
+use headless_chrome::browser_async::task_describe::{RuntimeEvaluateTaskBuilder, HasTaskId};
+use headless_chrome::protocol::target;
 use log::*;
 use std::default::Default;
-use tokio;
+
+use std::fs;
+use std::path::Path;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 enum PageState {
     WaitingBlankPage,
-    TargetPageDisplayed,
+    LoginPageDisplayed,
+    WaitingForQrcodeScan,
 }
 
 
@@ -38,8 +38,6 @@ impl Default for PageState {
 struct GetContentInIframe {
     debug_session: DebugSession,
     url: &'static str,
-    task_100_called: bool,
-    task_101_called: bool,
     ddlogin_frame_stopped_loading: bool,
     state: PageState,
 }
@@ -71,9 +69,8 @@ impl GetContentInIframe {
                         let tab = self
                             .get_tab(target_id)
                             .expect("tab should exists. PageAttached");
-                        let t1 = tab.page_enable_task();
-                        let t2 = tab.network_enable_task(None);
-                        tab.execute_tasks(vec![t1, t2]);
+                        tab.runtime_enable();
+                        tab.page_enable();
                     }
                     _ => {
                         // info!("got unused page event {:?}", received_event);
@@ -82,7 +79,7 @@ impl GetContentInIframe {
             }
             PageResponse::MethodCallDone(method_call_done) => {
                 if let MethodCallDone::PageEnabled(_task) = method_call_done {
-                    self.state = PageState::TargetPageDisplayed;
+                    self.state = PageState::LoginPageDisplayed;
                     let url = self.url;
                     let tab = self
                         .get_tab(target_id)
@@ -97,7 +94,7 @@ impl GetContentInIframe {
 
 
 impl GetContentInIframe {
-    fn page_displayed(
+    fn login_page_displayed(
         &mut self,
         maybe_target_id: Option<&target::TargetId>,
         page_response: PageResponse,
@@ -118,10 +115,12 @@ impl GetContentInIframe {
                             {
                                 info!("execution_context_description: {:?}", context);
                                 let mut tb = RuntimeEvaluateTaskBuilder::default();
-                                tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.id);
+                                tb.expression(r#"document.querySelector('div#qrcode.login_qrcode_content img').getAttribute('src')"#).context_id(context.id);
                                 let t1 = tab.evaluate_task_named(tb, "get-img-object");
                                 tab.execute_one_task(t1);
                                 self.ddlogin_frame_stopped_loading = true;
+                            } else {
+                                error!("cannot find execution_context_description");
                             }
                         }
                     }
@@ -135,7 +134,28 @@ impl GetContentInIframe {
             }
             PageResponse::MethodCallDone(method_call_done) => {
                 if let MethodCallDone::Evaluate(task) = method_call_done {
-                    // self.handle_expand_node(target_id.cloned(), task);
+                    let file_name = "target/qrcode.png";
+                    let path = Path::new(file_name);
+                    if path.exists() && path.is_file() {
+                        fs::remove_file(file_name).unwrap();
+                    }
+
+                    let base64_data = task.get_string_result().and_then(|v| {
+                        let mut ss = v.splitn(2, ',').fuse();
+                        ss.next();
+                        ss.next()
+                    });
+
+                    write_base64_str_to(file_name, base64_data)
+                        .expect("write_base64_str_to success.");
+                    assert!(path.exists());
+                    self.state = PageState::WaitingForQrcodeScan;
+                    let exe = std::fs::canonicalize("./target/qrcode.png").expect("exists.");
+                    error!("{:?}", exe);
+                    std::process::Command::new("cmd")
+                        .args(&["/C", "C:/Program Files/internet explorer/iexplore.exe", exe.to_str().expect("should convert to string.")])
+                        .output()
+                        .expect("failed to execute process");
                 }
             }
             _ => {}
@@ -144,9 +164,76 @@ impl GetContentInIframe {
 }
 
 impl GetContentInIframe {
+    fn waiting_for_qrcode_scan(
+        &mut self,
+        maybe_target_id: Option<&target::TargetId>,
+        page_response: PageResponse,
+    ) {
+        let expression = r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text').length"##;
+        let get_children_number = "get-children-number";
+        match page_response {
+            PageResponse::ReceivedEvent(received_event) => {
+                match received_event {
+                    ReceivedEvent::FrameStoppedLoading(_frame_id) => {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. FrameStoppedLoading");
+                        info!("url current: {:?}", tab.get_url());
+                        if tab.get_url() == "https://www.xuexi.cn/" {
+                            tab.evaluate_expression_named(expression, get_children_number);
+                        }
+                    }
+                    ReceivedEvent::ResponseReceived(_event) => {}
+                    _ => {
+                        // info!("got unused page event {:?}", received_event);
+                    }
+            }
+            }
+            PageResponse::MethodCallDone(method_call_done) => {
+                match method_call_done {
+                    MethodCallDone::Evaluate(task) => {
+                        info!("{:?}", task);
+                        if task.task_id_equal(get_children_number) {
+                        if let Some(v) = task.get_u64_result() {
+                            if v < 16 {
+                                let tab = self
+                                    .get_tab(maybe_target_id)
+                                    .expect("tab should exists. FrameStoppedLoading");
+                                tab.evaluate_expression_named(expression, get_children_number);
+                            } else {
+                                info!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ready.............");
+                                let tab = self
+                                    .get_tab(maybe_target_id)
+                                    .expect("tab should exists. FrameStoppedLoading");
+                                let fm = |i: u64| {
+                                    format!(r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text').item({}).click()"##, i)
+                                };
+                                for i in 0..6 {
+                                    let exp = fm(i);
+                                    let slice = exp.as_str();
+                                    let t1 = tab.evaluate_expression_task(slice);
+                                    tab.task_queue.add(t1, i + 2);
+                                }
+                            }
+                        } else {
+                            panic!("unexpected call return.");
+                        }
+                    } else {
+                        info!("{:?}", task);
+                    }
+                    } 
+                    MethodCallDone::GetResponseBodyForInterception(_task) => {}
+                    _ => {}
+                }
+                // info!("{:?}", method_call_done);
+            }
+            _ => {}
+        }
+    }
+}
+
+impl GetContentInIframe {
     fn assert_result(&self) {
-        assert!(self.task_100_called);
-        assert!(self.task_101_called);
         assert!(self.ddlogin_frame_stopped_loading);
     }
 }
@@ -162,15 +249,19 @@ impl Future for GetContentInIframe {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
                     trace!("seconds elapsed: {} ", seconds);
-                    if seconds > 20 {
+                    if seconds > 100 {
+                        assert_eq!(self.debug_session.tabs.len(), 8);
+                        let m = self.debug_session.tabs.iter().filter(|tb|tb.get_url() == "https://pc.xuexi.cn/").count();
+                        assert_eq!(m, 1);
+
                         let tab = self
                             .debug_session
                             .first_page_mut()
                             .expect("tab should exists.");
-                        assert_eq!(
+                        assert!(
                             tab.event_statistics
-                                .happened_count(EventName::ExecutionContextCreated),
-                            7
+                                .happened_count(EventName::ExecutionContextCreated)
+                                > 7
                         );
                         self.assert_result();
                         break Ok(().into());
@@ -183,11 +274,17 @@ impl Future for GetContentInIframe {
                                 page_response_wrapper.page_response,
                             );
                         }
-                        PageState::TargetPageDisplayed => {
-                            self.page_displayed(
+                        PageState::LoginPageDisplayed => {
+                            self.login_page_displayed(
                                 maybe_target_id.as_ref(),
                                 page_response_wrapper.page_response,
                             );
+                        }
+                        PageState::WaitingForQrcodeScan => {
+                            self.waiting_for_qrcode_scan(
+                                maybe_target_id.as_ref(),
+                                page_response_wrapper.page_response,
+                            );                            
                         }
                     }
                 }
@@ -217,152 +314,3 @@ fn t_get_content_in_iframe() {
         .block_on(my_page.into_future())
         .expect("tokio should success.");
 }
-
-//     if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
-//         let tab = self.debug_session.get_tab_by_resp_mut(&page_response_wrapper).ok();
-//         let target_id = page_response_wrapper.target_id.clone();
-//         let task_id = page_response_wrapper.task_id;
-//         match page_response_wrapper.page_response {
-//             PageResponse::ChromeConnected => {
-//                 self.debug_session.set_discover_targets(true);
-//             }
-//             PageResponse::PageCreated(page_idx) => {
-//                 let tab = tab.expect("tab should exists.");
-//                 tab.attach_to_page();
-//             }
-//             PageResponse::PageAttached(_page_info, _session_id) => {
-//                 let tab = tab.expect("tab should exists. PageAttached");
-//                 tab.page_enable();
-//                 tab.navigate_to(self.url, None);
-//             }
-//             PageResponse::PageEnabled => {}
-//             PageResponse::FrameNavigated(frame_id) => {
-//                 let tab = tab.expect("tab should exists. FrameNavigated");
-//                 let frame =
-//                     tab.find_frame_by_id(&frame_id)
-//                         .and_then(|frame| {
-//                             if frame.name == Some("ddlogin-iframe".into()) {
-//                                 Some(frame)
-//                             } else {
-//                                 None
-//                             }
-//                         });
-
-//                 if frame.is_some() {
-//                     let mtab = self.debug_session.first_page_mut().expect("main tab should exists.");
-//                     mtab.runtime_evaluate_expression("3+3", Some(100));
-//                     mtab.runtime_evaluate_expression("3::0", Some(101));
-//                     mtab.runtime_enable(Some(102));
-//                     mtab.runtime_evaluate_expression(r#"var iframe = document.getElementById("ddlogin-iframe");iframe.contentDocument;"#, Some(103));
-//                 }
-//             }
-//             PageResponse::CallFunctionOnDone(result) => {
-//                 info!("got call result: {:?}", result);
-//                 let file_name = "target/qrcode.png";
-//                 let path = Path::new(file_name);
-//                 if path.exists() && path.is_file() {
-//                     fs::remove_file(file_name).unwrap();
-//                 }
-//                 let base64_data = result
-//                     .as_ref()
-//                     .map(|rn| &rn.result)
-//                     .map(|ro| &ro.value)
-//                     .and_then(Option::as_ref)
-//                     .and_then(serde_json::value::Value::as_str)
-//                     .and_then(|v| {
-//                         let mut ss = v.splitn(2, ',').fuse();
-//                         ss.next();
-//                         ss.next()
-//                     });
-
-//                 write_base64_str_to(file_name, base64_data).expect("write_base64_str_to success.");
-//                 assert!(path.exists());
-//             }
-//             PageResponse::EvaluateDone(evaluate_result) => match task_id {
-//                 Some(100) => {
-//                     self.task_100_called = true;
-//                     let evaluate_result = evaluate_result.expect("evaluate_result should exists.");
-//                     let ro = evaluate_result.result;
-//                     assert_eq!(ro.object_type, "number");
-//                     assert_eq!(ro.value, Some(6.into()));
-//                     assert_eq!(ro.description, Some("6".into()));
-//                     assert!(evaluate_result.exception_details.is_none());
-//                 }
-//                 Some(101) => {
-//                     self.task_101_called = true;
-//                     let evaluate_result = evaluate_result.expect("evaluate_result should exists. 101");
-//                     let ro = evaluate_result.result;
-//                     assert_eq!(ro.object_type, "object");
-//                     assert_eq!(ro.subtype, Some("error".into()));
-//                     assert_eq!(ro.class_name, Some("SyntaxError".into()));
-//                     assert_eq!(
-//                         ro.description,
-//                         Some("SyntaxError: Unexpected token :".into())
-//                     );
-//                     assert!(evaluate_result.exception_details.is_some());
-//                 }
-//                 Some(102) | Some(103) => {
-//                     info!("task id:{:?}, {:?}", task_id, evaluate_result);
-//                 }
-//                 Some(110) => {
-//                     info!("task id: {:?}, {:?}", task_id, evaluate_result);
-//                     let result = evaluate_result.expect("evaluate_result should exists. 110").result;
-//                     let tab = tab.expect("tab should exists. EvaluateDone");
-//                     let object_id = result.object_id.expect("object_id should exists.");
-//                     tab.runtime_get_properties_by_object_id(object_id.clone(), Some(111));
-
-//                     let mut task = tasks::RuntimeCallFunctionOnTaskBuilder::default();
-//                     let fnd = "function() {return this.getAttribute('src');}";
-//                     task.object_id(object_id.clone()).function_declaration(fnd);
-//                     tab.runtime_call_function_on(task, Some(112));
-//                 }
-//                 _ => unreachable!(),
-//             },
-//             PageResponse::GetPropertiesDone(return_object) => {
-//                 let get_properties_return_object =
-//                     return_object.expect("should return get_properties_return_object");
-//                 info!(
-//                     "property count: {:?}",
-//                     get_properties_return_object.result.len()
-//                 );
-//                 // let src: std::collections::HashSet<String> = ["src", "currentSrc", "outerHTML"].iter().map(|&v|v.to_string()).collect();
-//                 // get_properties_return_object.result.iter().filter(|pd|src.contains(&pd.name)).for_each(|pd| info!("property name: {:?}, value: {:?}", pd.name, pd.value));
-//             }
-//             PageResponse::RuntimeExecutionContextCreated(frame_id) => {
-//                 info!(
-//                     "execution context created, frame_id: <<<<<<<<{:?}",
-//                     frame_id
-//                 );
-//                 self.runtime_execution_context_created_count += 1;
-//             }
-//             PageResponse::FrameStoppedLoading(frame_id) => {
-//                 let tab = tab.expect("tab should exists. FrameStoppedLoading");
-//                 let frame = tab.find_frame_by_id(&frame_id)
-//                     .filter(|f| f.name == Some("ddlogin-iframe".into()));
-
-//                 if frame.is_some() {
-//                     let context = tab.find_execution_context_id_by_frame_name("ddlogin-iframe");
-//                     if context.is_some() {
-//                         info!("execution_context_description: {:?}", context);
-//                         self.ddlogin_frame_stopped_loading = true;
-//                         let mut tb = tasks::GetContentInIframeTaskBuilder::default();
-//                         tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.unwrap().id);
-//                         tab.runtime_evaluate(tb, Some(110));
-//                     }
-//                 }
-//             }
-//             PageResponse::SecondsElapsed(seconds) => {
-//                 trace!("seconds elapsed: {} ", seconds);
-//                 if seconds > 20 {
-//                     self.assert_result();
-//                     break Ok(().into());
-//                 }
-//             }
-//             _ => {
-//                 warn!("got unused page message {:?}", page_response_wrapper);
-//             }
-//         }
-//     } else {
-//         error!("got None, was stream ended?");
-//     }
-// }

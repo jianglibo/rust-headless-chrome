@@ -6,7 +6,7 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
-use headless_chrome::browser_async::{debug_session::DebugSession, EventName, Tab};
+use headless_chrome::browser_async::{debug_session::DebugSession, EventName, Tab, WaitingForPageAttachTaskName};
 
 use headless_chrome::browser_async::page_message::{
     write_base64_str_to, MethodCallDone, PageResponse, ReceivedEvent,
@@ -51,7 +51,7 @@ impl GetContentInIframe {
 
     fn waiting_blank_page(
         &mut self,
-        target_id: Option<&target::TargetId>,
+        maybe_target_id: Option<&target::TargetId>,
         page_response: PageResponse,
     ) {
         match page_response {
@@ -62,15 +62,19 @@ impl GetContentInIframe {
             PageResponse::ReceivedEvent(received_event) => {
                 match received_event {
                     ReceivedEvent::PageCreated(_page_idx) => {
-                        let tab = self.get_tab(target_id).expect("tab should exists.");
-                        tab.attach_to_page();
+                        let tab = self.get_tab(maybe_target_id).expect("tab should exists.");
+                        let tasks = vec![
+                            WaitingForPageAttachTaskName::PageEnable,
+                            WaitingForPageAttachTaskName::RuntimeEnable,
+                            WaitingForPageAttachTaskName::NetworkEnable];
+                        tab.attach_to_page_and_then(tasks);
                     }
                     ReceivedEvent::PageAttached(_page_info, _session_id) => {
-                        let tab = self
-                            .get_tab(target_id)
-                            .expect("tab should exists. PageAttached");
-                        tab.runtime_enable();
-                        tab.page_enable();
+                        // let tab = self
+                        //     .get_tab(target_id)
+                        //     .expect("tab should exists. PageAttached");
+                        // tab.runtime_enable();
+                        // tab.page_enable();
                     }
                     _ => {
                         // info!("got unused page event {:?}", received_event);
@@ -82,7 +86,7 @@ impl GetContentInIframe {
                     self.state = PageState::LoginPageDisplayed;
                     let url = self.url;
                     let tab = self
-                        .get_tab(target_id)
+                        .get_tab(maybe_target_id)
                         .expect("tab should exists. RequestIntercepted");
                     tab.navigate_to(url);
                 }
@@ -154,7 +158,7 @@ impl GetContentInIframe {
                     error!("{:?}", exe);
                     std::process::Command::new("cmd")
                         .args(&["/C", "C:/Program Files/internet explorer/iexplore.exe", exe.to_str().expect("should convert to string.")])
-                        .output()
+                        .spawn()
                         .expect("failed to execute process");
                 }
             }
@@ -174,6 +178,14 @@ impl GetContentInIframe {
         match page_response {
             PageResponse::ReceivedEvent(received_event) => {
                 match received_event {
+                    ReceivedEvent::PageCreated(_page_idx) => {
+                        let tab = self.get_tab(maybe_target_id).expect("tab should exists.");
+                        let tasks = vec![
+                            WaitingForPageAttachTaskName::PageEnable,
+                            WaitingForPageAttachTaskName::RuntimeEnable,
+                            WaitingForPageAttachTaskName::NetworkEnable];
+                        tab.attach_to_page_and_then(tasks);
+                    }
                     ReceivedEvent::FrameStoppedLoading(_frame_id) => {
                         let tab = self
                             .get_tab(maybe_target_id)
@@ -208,7 +220,7 @@ impl GetContentInIframe {
                                 let fm = |i: u64| {
                                     format!(r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text').item({}).click()"##, i)
                                 };
-                                for i in 0..6 {
+                                for i in 0..15 {
                                     let exp = fm(i);
                                     let slice = exp.as_str();
                                     let t1 = tab.evaluate_expression_task(slice);
@@ -249,9 +261,11 @@ impl Future for GetContentInIframe {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
                     trace!("seconds elapsed: {} ", seconds);
-                    if seconds > 100 {
-                        assert_eq!(self.debug_session.tabs.len(), 8);
-                        let m = self.debug_session.tabs.iter().filter(|tb|tb.get_url() == "https://pc.xuexi.cn/").count();
+                    self.debug_session.activates_next_in_interval(180);
+                    if seconds > 12000 {
+                        self.debug_session.tabs.iter().for_each(|tb|info!("{:?}", tb));
+                        assert_eq!(self.debug_session.tabs.len(), 19);
+                        let m = self.debug_session.tabs.iter().filter(|tb|tb.get_url() == "https://www.xuexi.cn/").count();
                         assert_eq!(m, 1);
 
                         let tab = self
@@ -295,12 +309,14 @@ impl Future for GetContentInIframe {
     }
 }
 
+// the tabs were unattached when created by clicking the link. but the browser_context_id are same. the open_id are same too.
 
+// post to: https://iflow-api.xuexi.cn/logflow/api/v1/pclog
 #[test]
 fn t_get_content_in_iframe() {
     ::std::env::set_var(
         "RUST_LOG",
-        "headless_chrome=info,get_content_in_iframe=trace",
+        "headless_chrome=trace,get_content_in_iframe=trace",
     );
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";

@@ -55,6 +55,27 @@ pub struct Viewport {
     pub scale: f64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LayoutViewport {
+    pub page_x: f64,
+    pub page_y: f64,
+    pub client_width: f64,
+    pub client_height: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisualViewport {
+    pub offset_x: u64,
+    pub offset_y: u64,
+    pub page_x: u64,
+    pub page_y: u64,
+    pub client_width: u64,
+    pub client_height: u64,
+    pub scale: u64,
+    pub zoom: Option<u64>,
+}
 /// The format a screenshot will be captured in
 #[derive(Debug, Clone)]
 pub enum ScreenshotFormat {
@@ -170,7 +191,7 @@ pub mod events {
 pub mod methods {
     use super::PrintToPdfOptions;
     use super::*;
-    use crate::protocol::Method;
+    use crate::protocol::{Method, dom};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Debug)]
@@ -222,6 +243,24 @@ pub mod methods {
     impl<'a> Method for Reload<'a> {
         const NAME: &'static str = "Page.reload";
         type ReturnObject = ReloadReturnObject;
+    }
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetLayoutMetrics {
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GetLayoutMetricsObject {
+        layout_viewport: LayoutViewport,
+        visual_viewport: VisualViewport,
+        content_size: dom::Rect,
+    }
+
+    impl Method for GetLayoutMetrics {
+        const NAME: &'static str = "Page.getLayoutMetrics";
+        type ReturnObject = GetLayoutMetricsObject;
     }
 
     #[derive(Serialize, Debug)]
@@ -291,18 +330,48 @@ pub mod methods {
         const NAME: &'static str = "Page.enable";
         type ReturnObject = EnableReturnObject;
     }
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct BringToFront {}
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct BringToFrontReturnObject {}
+    impl Method for BringToFront {
+        const NAME: &'static str = "Page.bringToFront";
+        type ReturnObject = BringToFrontReturnObject;
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use log::*;
     use serde_json::json;
-
     use super::*;
 
     #[test]
     fn test_parse_frame_attached_event() {
         let message = "{\"method\":\"Page.frameAttached\",\"params\":{\"frameId\":\"100FD572BD64BB38EB2CAEE354C93F52\",\"parentFrameId\":\"2D0E2292FC393BB4953C7629AF041862\",\"stack\":{\"callFrames\":[{\"functionName\":\"Ho\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":445965},{\"functionName\":\"_i\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":466041},{\"functionName\":\"Oi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":463515},{\"functionName\":\"Ei\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":462867},{\"functionName\":\"Ci\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":461888},{\"functionName\":\"$o\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":460808},{\"functionName\":\"Ii\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":469592},{\"functionName\":\"Fi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":469646},{\"functionName\":\"Bi.render\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":473435},{\"functionName\":\"\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":471293},{\"functionName\":\"Ni\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":468914},{\"functionName\":\"qi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":471226},{\"functionName\":\"render\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":474407},{\"functionName\":\"SurW\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":13244},{\"functionName\":\"a\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":517},{\"functionName\":\"u\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":386},{\"functionName\":\"\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":1469},{\"functionName\":\"\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":1473}]}}}";
         serde_json::from_str::<events::FrameAttachedEvent>(message.as_ref()).unwrap();
+
+        let vp = json!({
+            "pageX": 0,
+            "pageY": 0,
+            "clientWidth": 100,
+            "clientHeight": 100,
+        });
+
+        let vpv = serde_json::from_value::<LayoutViewport>(vp).expect("shold deserialize LayoutViewport");
+
+        let vp = json!({
+            "offsetX": 0,
+            "offsetY": 0,
+            "pageX": 0,
+            "pageY": 0,
+            "clientWidth": 99,
+            "clientHeight": 66,
+            "scale": 1,
+        });
+
+        let vpv = serde_json::from_value::<VisualViewport>(vp).expect("shold deserialize visualViewport.");
     }
 }

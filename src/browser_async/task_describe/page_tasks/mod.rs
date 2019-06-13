@@ -5,6 +5,9 @@ pub mod capture_screenshot;
 pub mod page_enable;
 pub mod page_events;
 pub mod page_reload;
+pub mod get_layout_metrics;
+pub mod bring_to_front;
+pub mod attach_to_target;
 
 use crate::browser_async::page_message::{PageResponseWrapper, PageResponse, ReceivedEvent,};
 pub use print_to_pdf::{PrintToPdfTask, PrintToPdfTaskBuilder};
@@ -12,6 +15,10 @@ pub use navigate_to::{NavigateToTask, NavigateToTaskBuilder};
 pub use capture_screenshot::{CaptureScreenshotTask, CaptureScreenshotTaskBuilder};
 pub use page_enable::{PageEnableTask, PageEnableTaskBuilder};
 pub use page_reload::{PageReloadTask, PageReloadTaskBuilder};
+pub use get_layout_metrics::{GetLayoutMetricsTask, GetLayoutMetricsTaskBuilder};
+pub use bring_to_front::{BringToFrontTask, BringToFrontTaskBuilder};
+pub use attach_to_target::{AttachToTargetTask, AttachToTargetTaskBuilder};
+
 use super::super::protocol::{target};
 use super::super::EventName;
 use crate::browser_async::debug_session::DebugSession;

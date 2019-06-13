@@ -150,12 +150,15 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_method_str(),
                 TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_method_str(),
                 TargetCallMethodTask::PageReload(task) => task.get_method_str(),
+                TargetCallMethodTask::GetLayoutMetrics(task) => task.get_method_str(),
+                TargetCallMethodTask::BringToFront(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
                 BrowserCallMethodTask::SecurityEnable(task) => task.get_method_str(),
+                BrowserCallMethodTask::AttachedToTarget(task) => task.get_method_str(),
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);

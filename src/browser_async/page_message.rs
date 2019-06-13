@@ -69,6 +69,8 @@ pub enum MethodCallDone {
     RuntimeEnabled(runtime_tasks::RuntimeEnableTask),
     QuerySelector(dom_tasks::QuerySelectorTask),
     PrintToPdf(page_tasks::PrintToPdfTask),
+    GetLayoutMetrics(page_tasks::GetLayoutMetricsTask),
+    BringToFront(page_tasks::BringToFrontTask),
     DescribeNode(dom_tasks::DescribeNodeTask),
     GetBoxModel(dom_tasks::GetBoxModelTask),
     GetDocument(dom_tasks::GetDocumentTask),
@@ -78,6 +80,7 @@ pub enum MethodCallDone {
     CallFunctionOn(runtime_tasks::RuntimeCallFunctionOnTask),
     SetIgnoreCertificateErrors(bool),
     GetResponseBodyForInterception(network_tasks::GetResponseBodyForInterceptionTask),
+    TargetAttached(page_tasks::AttachToTargetTask),
 }
 
 // just wait for things happen. don't care who caused happen.

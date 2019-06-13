@@ -22,7 +22,7 @@ use crate::protocol::{self, target};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
 
-pub use tab::{Tab};
+pub use tab::{Tab, WaitingForPageAttachTaskName};
 
 pub type TaskId = String;
 

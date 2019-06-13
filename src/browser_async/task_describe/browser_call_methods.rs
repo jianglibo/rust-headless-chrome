@@ -1,4 +1,4 @@
-use super::{target_tasks, security_tasks};
+use super::{target_tasks, security_tasks, page_tasks};
 use super::{HasCallId, HasTaskId};
 use super::super::page_message::{PageResponseWrapper, PageResponse, MethodCallDone,};
 use crate::protocol::target;
@@ -11,6 +11,7 @@ pub enum BrowserCallMethodTask {
     SetDiscoverTargets(target_tasks::SetDiscoverTargetsTask),
     SetIgnoreCertificateErrors(security_tasks::SetIgnoreCertificateErrorsTask),
     SecurityEnable(security_tasks::SecurityEnableTask),
+    AttachedToTarget(page_tasks::AttachToTargetTask),
 }
 
 impl HasCallId for BrowserCallMethodTask {
@@ -20,6 +21,7 @@ impl HasCallId for BrowserCallMethodTask {
             BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_call_id(),
             BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_call_id(),
             BrowserCallMethodTask::SecurityEnable(task) => task.get_call_id(),
+            BrowserCallMethodTask::AttachedToTarget(task) => task.get_call_id(),
         }
     }
 }
@@ -45,6 +47,13 @@ pub fn handle_browser_method_call(
             }
             BrowserCallMethodTask::SecurityEnable(task) => {
                 trace!("SecurityEnable returned. {:?}", task);
+            }
+            BrowserCallMethodTask::AttachedToTarget(task) => {
+                return Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::MethodCallDone(MethodCallDone::TargetAttached(task)),
+                });
             }
         }
         Ok(PageResponseWrapper::default())

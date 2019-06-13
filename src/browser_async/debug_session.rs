@@ -5,7 +5,7 @@ use super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
 use super::Tab;
 use super::task_describe::{
     self as tasks, handle_browser_method_call, handle_target_method_call, 
-    DomEvent, PageEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
+    DomEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
     SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask,  TargetEvent,
     TaskDescribe, handle_network_event, handle_page_event,
 };
@@ -84,6 +84,31 @@ impl DebugSession {
             wrapper: Wrapper {
                 chrome_debug_session: arc_cds,
             },
+        }
+    }
+
+    pub fn activates_next_in_interval(&mut self, secs: u64) {
+        let tab = self.tabs.iter_mut().find(|tb|tb.activated_at.is_some());
+        let mut need_wrapup = false;
+        if let Some(activated_tab) = tab {
+            if let Some(activated_at) = activated_tab.activated_at {
+                if activated_at.elapsed().as_secs() > secs {
+                    let mut tabs = self.tabs.iter_mut().skip_while(|tb|tb.activated_at.is_none());
+                    let __discard = tabs.next();
+                    if let Some(tb) = tabs.next() {
+                        tb.bring_to_front();
+                    } else {
+                        need_wrapup = true;
+                    }
+                }
+            }
+        } else {
+            need_wrapup = true;
+        }
+        if need_wrapup {
+            if let Some(tb) = self.tabs.get_mut(0) {
+                tb.bring_to_front();
+            }
         }
     }
 
@@ -309,7 +334,8 @@ impl DebugSession {
                     let tab = self
                         .get_tab_by_id_mut(Some(&target_id))
                         .expect("when the page attached, tab should have been exists.");
-                    tab.session_id.replace(event.get_session_id());
+                    // tab.session_id.replace(event.get_session_id());
+                    tab.page_attached(event.get_session_id());
                     return Ok(event
                         .try_into_page_attached()
                         .expect("should be a page attached."));

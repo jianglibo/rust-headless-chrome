@@ -7,6 +7,15 @@ pub type NodeAttributes = HashMap<String, String>;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct Rect {
+    x: u64,
+    y: u64,
+    width: u64,
+    height: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Node {
     pub node_id: NodeId,
     pub backend_node_id: NodeId,

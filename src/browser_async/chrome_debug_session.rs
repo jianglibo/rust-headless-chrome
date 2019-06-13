@@ -335,6 +335,12 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::ContinueInterceptedRequest(_task) => {
                     info!("continue_intercepted_request done.");
                 }
+                TargetCallMethodTask::GetLayoutMetrics(task) => {
+                    info!("get_layout_metrics done.");
+                }
+                TargetCallMethodTask::BringToFront(task) => {
+                    info!("bring_to_front done.");
+                }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {
@@ -347,6 +353,9 @@ impl ChromeDebugSession {
                     info!("nothing to full fill:: {:?}", task);
                 }
                 BrowserCallMethodTask::SecurityEnable(task) => {
+                    info!("nothing to full fill:: {:?}", task);
+                }
+                BrowserCallMethodTask::AttachedToTarget(task) => {
                     info!("nothing to full fill:: {:?}", task);
                 }
             }

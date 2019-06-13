@@ -3,6 +3,7 @@ use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks};
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone};
 use crate::protocol::target;
+use std::time::{Instant};
 use log::*;
 
 use super::{HasCallId, HasTaskId};
@@ -16,6 +17,8 @@ pub enum TargetCallMethodTask {
     GetBoxModel(dom_tasks::GetBoxModelTask),
     GetDocument(dom_tasks::GetDocumentTask),
     PageEnable(page_tasks::PageEnableTask),
+    GetLayoutMetrics(page_tasks::GetLayoutMetricsTask),
+    BringToFront(page_tasks::BringToFrontTask),
     RuntimeEnable(runtime_tasks::RuntimeEnableTask),
     CaptureScreenshot(page_tasks::CaptureScreenshotTask),
     RuntimeEvaluate(runtime_tasks::RuntimeEvaluateTask),
@@ -48,6 +51,8 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_call_id(),
             TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_call_id(),
             TargetCallMethodTask::PageReload(task) => task.get_call_id(),
+            TargetCallMethodTask::GetLayoutMetrics(task) => task.get_call_id(),
+            TargetCallMethodTask::BringToFront(task) => task.get_call_id(),
         }
     }
 }
@@ -168,6 +173,19 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::PageReload(task) => {
             warn!("ignored method return. PageReload");
+        }
+        TargetCallMethodTask::GetLayoutMetrics(task) => {
+            warn!("ignored method return. GetLayoutMetrics");
+        }
+        TargetCallMethodTask::BringToFront(task) => {
+            debug_session.tabs.iter_mut().for_each(|tb|{tb.activated_at.take();});
+            let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+            tab.bring_to_front_responed();
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::BringToFront(task)),
+            });
         }
         TargetCallMethodTask::GetResponseBodyForInterception(task) => {
             return Ok(PageResponseWrapper {

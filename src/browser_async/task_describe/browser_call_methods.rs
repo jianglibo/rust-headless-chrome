@@ -11,6 +11,7 @@ pub enum BrowserCallMethodTask {
     SetDiscoverTargets(target_tasks::SetDiscoverTargetsTask),
     SetIgnoreCertificateErrors(security_tasks::SetIgnoreCertificateErrorsTask),
     SecurityEnable(security_tasks::SecurityEnableTask),
+    CloseTarget(target_tasks::CloseTargetTask),
     AttachedToTarget(page_tasks::AttachToTargetTask),
 }
 
@@ -22,6 +23,7 @@ impl HasCallId for BrowserCallMethodTask {
             BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_call_id(),
             BrowserCallMethodTask::SecurityEnable(task) => task.get_call_id(),
             BrowserCallMethodTask::AttachedToTarget(task) => task.get_call_id(),
+            BrowserCallMethodTask::CloseTarget(task) => task.get_call_id(),
         }
     }
 }
@@ -54,6 +56,17 @@ pub fn handle_browser_method_call(
                     task_id: Some(task.get_task_id()),
                     page_response: PageResponse::MethodCallDone(MethodCallDone::TargetAttached(task)),
                 });
+            }
+            BrowserCallMethodTask::CloseTarget(task) => {
+                if let Some(r) = task.task_result {
+                    if r {
+                        info!("tab close method call returned. close successfully.");
+                    } else {
+                        error!("tab close method call returned. close failed.");
+                    }
+                } else {
+                    error!("tab close method call returned. close failed. {:?}", task);
+                }
             }
         }
         Ok(PageResponseWrapper::default())

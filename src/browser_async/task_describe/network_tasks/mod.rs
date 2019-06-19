@@ -39,7 +39,7 @@ pub fn handle_network_event(
 ) -> Result<PageResponseWrapper, failure::Error> {
     match network_event {
         NetworkEvent::ResponseReceived(event) => {
-            let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+            let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_request_id();
             tab.response_received.insert(request_id.clone(), event);
             return Ok(PageResponseWrapper {
@@ -51,7 +51,7 @@ pub fn handle_network_event(
             });
         }
         NetworkEvent::RequestIntercepted(event) => {
-            let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+            let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_interception_id();
             tab.request_intercepted.insert(request_id.clone(), event);
             return Ok(PageResponseWrapper {
@@ -64,7 +64,7 @@ pub fn handle_network_event(
             // warn!("unhandled network_events RequestIntercepted");
         }
         NetworkEvent::RequestWillBeSent(event) => {
-            let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+            let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_request_id();
             tab.request_will_be_sent(event);
             return Ok(PageResponseWrapper {
@@ -93,7 +93,7 @@ pub fn handle_network_event(
             // warn!("unhandled network_events DataReceived");
         }
         NetworkEvent::LoadingFailed(event) => {
-            let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+            let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request = tab.take_request(&event.get_request_id());
             error!("failed request: {:?}", request);
             error!("failed request event: {:?}", event);

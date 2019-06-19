@@ -98,6 +98,8 @@ pub enum Event {
     TargetCreated(target::events::TargetCreatedEvent),
     #[serde(rename = "Target.targetDestroyed")]
     TargetDestroyed(target::events::TargetDestroyedEvent),
+    #[serde(rename = "Target.detachedFromTarget")]
+    DetachedFromTarget(target::events::DetachedFromTarget),
     #[serde(rename = "Page.frameStartedLoading")]
     FrameStartedLoading(page::events::FrameStartedLoadingEvent),
     #[serde(rename = "Page.frameNavigated")]

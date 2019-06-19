@@ -79,3 +79,17 @@ impl TargetInfoChanged {
         self.raw_event.params.target_info
     }
 }
+
+// "{\"method\":\"Target.targetDestroyed\",\"params\":{\"targetId\":\"A3E11248CE3E34F0C972EE4D8CC07610\"}}"
+wrapper_raw_event!(
+    TaskDescribe::TargetEvent,
+    TargetEvent::TargetDestroyed,
+    TargetDestroyed,
+    target::events::TargetDestroyedEvent
+);
+
+impl TargetDestroyed {
+    pub fn get_target_id(&self) -> &target::TargetId {
+        &self.raw_event.params.target_id
+    }
+}

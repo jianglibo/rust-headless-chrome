@@ -97,6 +97,18 @@ pub mod events {
     pub struct TargetDestroyedParams {
         pub target_id: super::TargetId,
     }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct DetachedFromTarget {
+        pub params: DetachedFromTargetParams,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct DetachedFromTargetParams {
+        pub session_id: super::SessionID,
+        pub target_id: super::TargetId,
+    }
 }
 
 pub mod methods {
@@ -182,6 +194,21 @@ pub mod methods {
     impl<'a> Method for AttachToTarget<'a> {
         const NAME: &'static str = "Target.attachToTarget";
         type ReturnObject = AttachToTargetReturnObject;
+    }
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CloseTarget<'a> {
+        pub target_id: &'a str,
+    }
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CloseTargetReturnObject {
+        pub success: bool,
+    }
+    impl<'a> Method for CloseTarget<'a> {
+        const NAME: &'static str = "Target.closeTarget";
+        type ReturnObject = CloseTargetReturnObject;
     }
 
     #[derive(Serialize, Debug)]

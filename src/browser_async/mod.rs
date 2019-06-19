@@ -12,9 +12,12 @@ pub mod tab;
 pub mod embedded_events;
 pub mod event_statistics;
 pub mod task_queue;
+pub mod browser_context;
 
 pub use event_statistics::{EventStatistics, EventName};
+pub use chrome_debug_session::{ChromeDebugSession};
 pub use task_queue::{TaskQueue};
+pub use debug_session::{DebugSession};
 
 use failure;
 use task_describe::{self as tasks, TaskDescribe};
@@ -23,6 +26,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
 
 pub use tab::{Tab, WaitingForPageAttachTaskName};
+pub use browser_context::{BrowserContext, BrowserContexts};
 
 pub type TaskId = String;
 

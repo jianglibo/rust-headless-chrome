@@ -19,7 +19,7 @@ pub mod network_tasks;
 
 pub use dom_tasks::{
     DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
-    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events, DomEvent,
+    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events, DomEvent, handle_dom_event,
 };
 pub use page_tasks::{
     CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder, PageReloadTask, PageReloadTaskBuilder,
@@ -28,7 +28,7 @@ pub use page_tasks::{
 pub use runtime_tasks::{
     RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
     RuntimeEnableTaskBuilder, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder,
-    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events, RuntimeEvent,
+    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events, RuntimeEvent, handle_runtime_event,
 };
 pub use security_tasks::{
     SecurityEnableTask, SecurityEnableTaskBuilder,
@@ -37,7 +37,7 @@ pub use security_tasks::{
 
 pub use target_tasks::{
     CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
-    SetDiscoverTargetsTaskBuilder, target_events, TargetEvent,
+    SetDiscoverTargetsTaskBuilder, target_events, TargetEvent, handle_target_event,
 };
 
 pub use network_tasks::{NetworkEnableTask, NetworkEnableTaskBuilder, network_events,
@@ -152,6 +152,8 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::PageReload(task) => task.get_method_str(),
                 TargetCallMethodTask::GetLayoutMetrics(task) => task.get_method_str(),
                 TargetCallMethodTask::BringToFront(task) => task.get_method_str(),
+                TargetCallMethodTask::PageClose(task) => task.get_method_str(),
+                // TargetCallMethodTask::CloseTarget(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
@@ -159,6 +161,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
                 BrowserCallMethodTask::SecurityEnable(task) => task.get_method_str(),
                 BrowserCallMethodTask::AttachedToTarget(task) => task.get_method_str(),
+                BrowserCallMethodTask::CloseTarget(task) => task.get_method_str(),
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);

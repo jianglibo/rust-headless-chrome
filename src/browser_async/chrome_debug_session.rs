@@ -158,7 +158,7 @@ impl ChromeDebugSession {
                 } else {
                     current_task
                 };
-                error!("return current or last task with unfullfilled result: {:?}", last_task);
+                error!("return current or last task with unfulfilled result: {:?}", last_task);
                 return Some(last_task);
             }
 
@@ -186,7 +186,7 @@ impl ChromeDebugSession {
             }
             return Some(current_task); // always popup task.
         } else {
-            trace!("no matching task for call_id: {:?}", call_id);
+            error!("no matching task for call_id: {:?}", resp);
         }
         None
     }
@@ -329,6 +329,9 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::NetworkEnable(_task) => {
                     info!("network enabled.");
                 }
+                TargetCallMethodTask::PageClose(_task) => {
+                    info!("page closed.");
+                }
                 TargetCallMethodTask::SetRequestInterception(task) => {
                     info!("set_request_interception enabled. {:?}", task);
                 }
@@ -341,6 +344,10 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::BringToFront(task) => {
                     info!("bring_to_front done.");
                 }
+                // TargetCallMethodTask::CloseTarget(task) => {
+                //     let task_return_object = protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;
+                //     task.task_result = Some(task_return_object.success);
+                // }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {
@@ -357,6 +364,20 @@ impl ChromeDebugSession {
                 }
                 BrowserCallMethodTask::AttachedToTarget(task) => {
                     info!("nothing to full fill:: {:?}", task);
+                }
+                BrowserCallMethodTask::CloseTarget(task) => {
+                    let task_return_object = protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;
+                    task.task_result = Some(task_return_object.success);
+                    // if let Some(r) = task.task_result {
+                    //     if r {
+                    //         info!("tab close method call returned. close successfully.");
+                    //     } else {
+                    //         error!("tab close method call returned. close failed.");
+                    //     }
+                    // } else {
+                    //     error!("tab close method call returned. close failed. {:?}", task);
+                    // }
+                    // debug_session.tab_closed(maybe_target_id.as_ref(), task.task_result);
                 }
             }
             task_describe => {
@@ -408,6 +429,10 @@ impl ChromeDebugSession {
             }
             protocol::Event::RequestIntercepted(raw_event) => {
                 let event = network_events::RequestIntercepted::new(raw_event);
+                return Some(event.into());
+            }
+            protocol::Event::TargetDestroyed(raw_event) => {
+                let event = target_events::TargetDestroyed::new(raw_event);
                 return Some(event.into());
             }
             _ => {

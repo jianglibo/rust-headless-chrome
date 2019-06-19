@@ -333,6 +333,17 @@ pub mod methods {
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
+    pub struct Close {}
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CloseReturnObject {}
+    impl Method for Close {
+        const NAME: &'static str = "Page.close";
+        type ReturnObject = CloseReturnObject;
+    }
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub struct BringToFront {}
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -372,6 +383,6 @@ mod tests {
             "scale": 1,
         });
 
-        let vpv = serde_json::from_value::<VisualViewport>(vp).expect("shold deserialize visualViewport.");
+        let _vpv = serde_json::from_value::<VisualViewport>(vp).expect("should deserialize visualViewport.");
     }
 }

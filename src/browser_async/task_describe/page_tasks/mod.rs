@@ -3,6 +3,7 @@ pub mod print_to_pdf;
 pub mod navigate_to;
 pub mod capture_screenshot;
 pub mod page_enable;
+pub mod page_close;
 pub mod page_events;
 pub mod page_reload;
 pub mod get_layout_metrics;
@@ -14,6 +15,7 @@ pub use print_to_pdf::{PrintToPdfTask, PrintToPdfTaskBuilder};
 pub use navigate_to::{NavigateToTask, NavigateToTaskBuilder};
 pub use capture_screenshot::{CaptureScreenshotTask, CaptureScreenshotTaskBuilder};
 pub use page_enable::{PageEnableTask, PageEnableTaskBuilder};
+pub use page_close::{PageCloseTask, PageCloseTaskBuilder};
 pub use page_reload::{PageReloadTask, PageReloadTaskBuilder};
 pub use get_layout_metrics::{GetLayoutMetricsTask, GetLayoutMetricsTaskBuilder};
 pub use bring_to_front::{BringToFrontTask, BringToFrontTaskBuilder};
@@ -63,7 +65,7 @@ pub fn handle_page_event(
                     "-----------------frame_attached-----------------{:?}",
                     frame_id
                 );
-                let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_attached(raw_parameters);
                 return handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)));
             }
@@ -73,7 +75,7 @@ pub fn handle_page_event(
                     "-----------------frame_detached-----------------{:?}",
                     frame_id.clone()
                 );
-                let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_detached(&frame_id);
             }
             PageEvent::FrameStartedLoading(event) => {
@@ -83,7 +85,7 @@ pub fn handle_page_event(
                     "-----------------frame_started_loading-----------------{:?}",
                     frame_id
                 );
-                let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_started_loading(frame_id.clone());
                 return handle_event_return(
                     maybe_target_id,
@@ -96,7 +98,7 @@ pub fn handle_page_event(
                     event
                 );
                 let frame = event.get_frame();
-                debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())
+                debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())
                     .expect("FrameNavigated event should have target_id.")
                     ._frame_navigated(event.clone_frame());
                 return handle_event_return(
@@ -110,7 +112,7 @@ pub fn handle_page_event(
                     "-----------------frame_stopped_loading-----------------{:?}",
                     event
                 );
-                let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let frame_id = event.into_frame_id();
                 tab._frame_stopped_loading(frame_id.clone());
                 return handle_event_return(
@@ -119,7 +121,7 @@ pub fn handle_page_event(
                 );
             }
             PageEvent::LoadEventFired(event) => {
-                let tab = debug_session.get_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.event_statistics.event_happened(EventName::LoadEventFired);
                 return handle_event_return(maybe_target_id, event.into_page_response());
             }

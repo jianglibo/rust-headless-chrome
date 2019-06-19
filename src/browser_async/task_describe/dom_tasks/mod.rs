@@ -9,6 +9,12 @@ pub use get_box_model::{GetBoxModelTask, GetBoxModelTaskBuilder};
 pub use get_document::{GetDocumentTask, GetDocumentTaskBuilder};
 pub use query_selector::{QuerySelectorTask, QuerySelectorTaskBuilder};
 
+use crate::browser_async::{DebugSession, Tab};
+use crate::browser_async::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone, ReceivedEvent};
+use crate::protocol::{target};
+use log::*;
+use std::sync::{Arc, Mutex};
+
 
 #[derive(Debug)]
 pub enum DomEvent {
@@ -21,3 +27,32 @@ pub enum DomEvent {
     DocumentUpdated(dom_events::DocumentUpdated),
     SetChildNodes(dom_events::SetChildNodes),
 }
+
+pub    fn handle_dom_event(
+        debug_session: &mut DebugSession,
+        dom_event: DomEvent,
+        maybe_session_id: Option<target::SessionID>,
+        maybe_target_id: Option<target::TargetId>,
+    ) -> Result<PageResponseWrapper, failure::Error> {
+        match dom_event {
+            DomEvent::AttributeModified(event) => {}
+            DomEvent::AttributeRemoved(event) => {}
+            DomEvent::CharacterDataModified(event) => {}
+            DomEvent::ChildNodeCountUpdated(event) => {}
+            DomEvent::ChildNodeInserted(event) => {}
+            DomEvent::ChildNodeRemoved(event) => {}
+            DomEvent::DocumentUpdated(event) => {}
+            DomEvent::SetChildNodes(event) => {
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                let (parent_id, nodes) = event.into_parent_children();
+                tab.node_arrived(parent_id, nodes);
+                return Ok(PageResponseWrapper {
+                    target_id: maybe_target_id,
+                    task_id: None,
+                    page_response: PageResponse::ReceivedEvent(ReceivedEvent::SetChildNodesOccurred(parent_id)),
+                });
+            }
+        }
+        warn!("unhandled branch handle_dom_event");
+        Ok(PageResponseWrapper::default())
+    }

@@ -1,13 +1,13 @@
 use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
-use super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
-use super::Tab;
-use super::task_describe::{
-    self as tasks, handle_browser_method_call, handle_target_method_call, 
-    DomEvent, RuntimeEnableTask, RuntimeEvent, SecurityEnableTask,
-    SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask,  TargetEvent,
-    TaskDescribe, handle_network_event, handle_page_event,
+use super::page_message::{PageResponse, PageResponseWrapper};
+use super::{BrowserContext, Tab, BrowserContexts};
+use super::task_describe::{target_tasks, CommonDescribeFieldsBuilder,
+    handle_browser_method_call, handle_target_method_call, 
+    RuntimeEnableTask, SecurityEnableTask,
+    SetDiscoverTargetsTask, SetIgnoreCertificateErrorsTask,
+    TaskDescribe, handle_network_event, handle_page_event, handle_target_event, handle_dom_event, handle_runtime_event,
 };
 
 use crate::browser_async::{ChromePageError, TaskId};
@@ -36,16 +36,16 @@ impl Stream for Wrapper {
     }
 }
 
-fn handle_event_return(
-    maybe_target_id: Option<target::TargetId>,
-    page_response: PageResponse,
-) -> Result<PageResponseWrapper, failure::Error> {
-    Ok(PageResponseWrapper {
-        target_id: maybe_target_id,
-        task_id: None,
-        page_response: page_response,
-    })
-}
+// fn handle_event_return(
+//     maybe_target_id: Option<target::TargetId>,
+//     page_response: PageResponse,
+// ) -> Result<PageResponseWrapper, failure::Error> {
+//     Ok(PageResponseWrapper {
+//         target_id: maybe_target_id,
+//         task_id: None,
+//         page_response: page_response,
+//     })
+// }
 
 /// An adapter for merging the output of two streams.
 ///
@@ -61,6 +61,7 @@ pub struct DebugSession {
     flag: bool,
     pub tabs: Vec<Tab>, // early created at front.
     wrapper: Wrapper,
+    bring_to_front_in_process: bool,
 }
 
 impl Default for DebugSession {
@@ -84,12 +85,61 @@ impl DebugSession {
             wrapper: Wrapper {
                 chrome_debug_session: arc_cds,
             },
+            bring_to_front_in_process: false,
         }
     }
 
+    pub fn loaded_by_this_tab_id(&self, target_id: &str) -> Vec<&Tab> {
+        self.tabs.iter().filter(|tb|tb.target_info.opener_id == Some(target_id.to_string())).collect()
+    }
+
+    pub fn loaded_by_this_tab_name_count(&self, name: &str) -> Option<usize> {
+        if let Some(tab) = self.find_tab_by_name(name).ok() {
+            Some(self.tabs.iter().filter(|tb|tb.target_info.opener_id.as_ref() == Some(&tab.target_info.target_id)).count())
+        } else {
+            None
+        }
+    }
+
+    pub fn loaded_by_this_tab(&self, tab: &Tab) -> Vec<&Tab> {
+        self.tabs.iter().filter(|tb|tb.target_info.opener_id.as_ref() == Some(&tab.target_info.target_id)).collect()
+    }
+
+    pub fn browser_contexts(&mut self) -> BrowserContexts {
+        BrowserContexts{all_tabs: &mut self.tabs[..]}
+    }
+
+    pub fn find_tabs_old_than(&mut self, secs: u64) -> Vec<&mut Tab> {
+        self.tabs.iter_mut().filter(|tb|!tb.explicitly_close).filter(|tb|tb.created_at.elapsed().as_secs() > secs).collect()
+    }
+
+    pub fn find_last_opened_tab(&mut self) -> Option<&mut Tab> {
+        if let Some((first, rest)) = self.tabs.split_first_mut() {
+            let mut last_opened = first;
+            for tb in rest {
+                if tb.created_at > last_opened.created_at {
+                    last_opened = tb;
+                }
+            }
+            Some(last_opened)
+        } else {
+            None
+        }
+    }
+
+    pub fn activate_last_opened_tab(&mut self) {
+        if let Some(tab) = self.find_last_opened_tab() {
+            tab.bring_to_front();
+        }
+    }
+
+
     pub fn activates_next_in_interval(&mut self, secs: u64) {
+        if self.bring_to_front_in_process || self.tabs.len() < 2 {
+            return;
+        }
         let tab = self.tabs.iter_mut().find(|tb|tb.activated_at.is_some());
-        let mut need_wrapup = false;
+        let mut need_return_back = false;
         if let Some(activated_tab) = tab {
             if let Some(activated_at) = activated_tab.activated_at {
                 if activated_at.elapsed().as_secs() > secs {
@@ -98,14 +148,14 @@ impl DebugSession {
                     if let Some(tb) = tabs.next() {
                         tb.bring_to_front();
                     } else {
-                        need_wrapup = true;
+                        need_return_back = true;
                     }
                 }
             }
-        } else {
-            need_wrapup = true;
+        } else { // no tab was activated.
+            need_return_back = true;
         }
-        if need_wrapup {
+        if need_return_back {
             if let Some(tb) = self.tabs.get_mut(0) {
                 tb.bring_to_front();
             }
@@ -116,9 +166,9 @@ impl DebugSession {
         &mut self,
         page_response_wrapper: &PageResponseWrapper,
     ) -> Result<&mut Tab, failure::Error> {
-        self.get_tab_by_id_mut(page_response_wrapper.target_id.as_ref())
+        self.find_tab_by_id_mut(page_response_wrapper.target_id.as_ref())
     }
-    pub fn get_tab_by_id_mut(
+    pub fn find_tab_by_id_mut(
         &mut self,
         target_id: Option<&target::TargetId>,
     ) -> Result<&mut Tab, failure::Error> {
@@ -133,18 +183,78 @@ impl DebugSession {
         }
     }
 
+    pub fn find_tab_by_name(
+        &self,
+        name: &str,
+    ) -> Result<&Tab, failure::Error> {
+        if let Some(tab) = self
+            .tabs
+            .iter()
+            .find(|t| t.page_name == Some(name))
+        {
+            Ok(tab)
+        } else {
+            Err(ChromePageError::TabNotFound.into())
+        }
+    }
+
+    pub fn find_tab_by_name_mut(
+        &mut self,
+        name: &str,
+    ) -> Result<&mut Tab, failure::Error> {
+        if let Some(tab) = self
+            .tabs
+            .iter_mut()
+            .find(|t| t.page_name == Some(name))
+        {
+            Ok(tab)
+        } else {
+            Err(ChromePageError::TabNotFound.into())
+        }
+    }
+
+    pub fn tab_closed(&mut self, target_id: &target::TargetId) {
+        self.tabs.retain(|tb|&tb.target_info.target_id != target_id);
+    }
+
+    // pub fn tab_closed(&mut self, maybe_target_id: Option<&target::TargetId>, task_result: Option<bool>) {
+    //     if let Some(yes) = task_result {
+    //         if yes {
+    //             self.tabs.retain(|tb|Some(&tb.target_info.target_id) != maybe_target_id);
+    //         } else {
+    //             error!("close tab return false.");
+    //         }
+    //     } else {
+    //         error!("close tab return empty reuslt.");
+    //     }
+    // }
+
+    pub fn bring_to_front_responded(&mut self, maybe_target_id: Option<target::TargetId>) -> Result<(), failure::Error> {
+        self.tabs.iter_mut().for_each(|tb|{tb.activated_at.take();});
+        let tab = self.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+        tab.bring_to_front_responded();
+        self.bring_to_front_in_process = false;
+        Ok(())
+    }
+
     pub fn create_new_tab(&mut self, url: &str) {
-        let task = tasks::CreateTargetTaskBuilder::default()
+        let task = self.create_new_tab_task_impl(url, None);
+        self.execute_one_task(task);
+    }
+
+    pub fn create_new_tab_named(&mut self, url: &str, name: &str) {
+        let task = self.create_new_tab_task_impl(url, Some(name));
+        self.execute_one_task(task);
+    }
+
+    fn create_new_tab_task_impl(&mut self, url: &str, name: Option<&str>) -> TaskDescribe {
+        let common_fields = CommonDescribeFieldsBuilder::default().task_id(name.map(Into::into)).build().expect("create common_fields should success.");
+        let task = target_tasks::CreateTargetTaskBuilder::default()
+            .common_fields(common_fields)
             .url(url.to_owned())
             .build()
             .expect("CreateTargetTaskBuilder should success.");
-        let method_str: String = (&tasks::TaskDescribe::from(task))
-            .try_into()
-            .expect("should convert from CreateTargetTask");
-        self.chrome_debug_session
-            .lock()
-            .expect("create_new_tab should obtain chrome_debug_session.")
-            .send_message_direct(method_str);
+        task.into()
     }
 
     pub fn get_browser_context_ids(&self) -> Vec<&target::BrowserContextID> {
@@ -202,7 +312,7 @@ impl DebugSession {
     }
 
     pub fn runtime_enable_task(&mut self) -> TaskDescribe {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+        let common_fields = CommonDescribeFieldsBuilder::default()
             .build()
             .expect("build common_fields should success.");
         RuntimeEnableTask { common_fields }.into()
@@ -223,7 +333,7 @@ impl DebugSession {
     }
 
     pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+        let common_fields = CommonDescribeFieldsBuilder::default()
             .build()
             .expect("build common_fields should success.");
         let task = self.set_ignore_certificate_errors_task(ignore);
@@ -231,7 +341,7 @@ impl DebugSession {
     }
 
     pub fn set_ignore_certificate_errors_task(&mut self, ignore: bool) -> TaskDescribe {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+        let common_fields = CommonDescribeFieldsBuilder::default()
             .build()
             .expect("build common_fields should success.");
         SetIgnoreCertificateErrorsTask {
@@ -249,7 +359,7 @@ impl DebugSession {
     }
 
     pub fn set_discover_targets_task(&mut self, enable: bool) -> TaskDescribe {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+        let common_fields = CommonDescribeFieldsBuilder::default()
             .build()
             .expect("build common_fields should success.");
         SetDiscoverTargetsTask {
@@ -267,129 +377,10 @@ impl DebugSession {
     }
 
     pub fn security_enable_task(&mut self) -> TaskDescribe {
-        let common_fields = tasks::CommonDescribeFieldsBuilder::default()
+        let common_fields = CommonDescribeFieldsBuilder::default()
             .build()
             .expect("build common_fields should success.");
         SecurityEnableTask { common_fields }.into()
-    }
-
-    fn handle_dom_event(
-        &mut self,
-        dom_event: DomEvent,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match dom_event {
-            DomEvent::AttributeModified(event) => {}
-            DomEvent::AttributeRemoved(event) => {}
-            DomEvent::CharacterDataModified(event) => {}
-            DomEvent::ChildNodeCountUpdated(event) => {}
-            DomEvent::ChildNodeInserted(event) => {}
-            DomEvent::ChildNodeRemoved(event) => {}
-            DomEvent::DocumentUpdated(event) => {}
-            DomEvent::SetChildNodes(event) => {
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                let (parent_id, nodes) = event.into_parent_children();
-                tab.node_arrived(parent_id, nodes);
-                return Ok(PageResponseWrapper {
-                    target_id: maybe_target_id,
-                    task_id: None,
-                    page_response: PageResponse::ReceivedEvent(ReceivedEvent::SetChildNodesOccurred(parent_id)),
-                });
-            }
-        }
-        warn!("unhandled branch handle_dom_event");
-        Ok(PageResponseWrapper::default())
-    }
-
-    fn handle_target_event(
-        &mut self,
-        target_event: TargetEvent,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match target_event {
-            TargetEvent::ReceivedMessageFromTarget(event) => {}
-            TargetEvent::TargetCreated(event) => {
-                if let target::TargetType::Page = event.get_target_type() {
-                    // info!("receive page created event: {:?}", event);
-                    let target_info = event.to_target_info();
-                    let target_id = target_info.target_id.clone();
-                    let tab = Tab::new(target_info, Arc::clone(&self.chrome_debug_session));
-                    self.tabs.push(tab);
-                    let idx = self.tabs.len();
-                    return Ok(PageResponseWrapper {
-                        target_id: Some(target_id),
-                        task_id: None,
-                        page_response: PageResponse::ReceivedEvent(ReceivedEvent::PageCreated(idx)),
-                    });
-                } else {
-                    info!("got other target_event: {:?}", event);
-                }
-            }
-            TargetEvent::TargetCrashed(event) => {}
-            TargetEvent::AttachedToTarget(event) => {
-                if event.is_page_attached() {
-                    let target_id = event.get_target_id();
-                    let tab = self
-                        .get_tab_by_id_mut(Some(&target_id))
-                        .expect("when the page attached, tab should have been exists.");
-                    // tab.session_id.replace(event.get_session_id());
-                    tab.page_attached(event.get_session_id());
-                    return Ok(event
-                        .try_into_page_attached()
-                        .expect("should be a page attached."));
-                } else {
-                    info!("got AttachedToTarget event it's target_type was other than page.");
-                }
-            }
-            TargetEvent::TargetInfoChanged(event) => {
-                let target_info = event.into_target_info();
-                if let Ok(tab) = self.get_tab_by_id_mut(Some(&target_info.target_id)) {
-                    tab.target_info = target_info;
-                    trace!("target info changed: {:?}", tab.target_info);
-                } else {
-                    warn!("target changed, no correspond tab. {:?}", target_info);
-                }
-            }
-        }
-        warn!("unhandled branch handle_target_event");
-        Ok(PageResponseWrapper::default())
-    }
-
-    fn handle_runtime_event(
-        &mut self,
-        runtime_event: RuntimeEvent,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match runtime_event {
-            RuntimeEvent::ConsoleAPICalled(event) => {
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                let console_call_parameters = event.into_raw_parameters();
-                tab.verify_execution_context_id(&console_call_parameters);
-            }
-            RuntimeEvent::ExceptionRevoked(event) => {}
-            RuntimeEvent::ExceptionThrown(event) => {}
-            RuntimeEvent::ExecutionContextCreated(event) => {
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                let frame_id = tab
-                    .runtime_execution_context_created(event.get_execution_context_description());
-                return handle_event_return(
-                    maybe_target_id,
-                    PageResponse::ReceivedEvent(ReceivedEvent::ExecutionContextCreated(event)),
-                );
-            }
-            RuntimeEvent::ExecutionContextDestroyed(event) => {
-                let execution_context_id = event.into_execution_context_id();
-                let tab = self.get_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab.runtime_execution_context_destroyed(execution_context_id);
-            }
-            RuntimeEvent::ExecutionContextsCleared(event) => {}
-            RuntimeEvent::InspectRequested(event) => {}
-        }
-        warn!("unhandled branch handle_runtime_event");
-        Ok(PageResponseWrapper::default())
     }
 
     // fn handle_page_event(
@@ -414,7 +405,7 @@ impl DebugSession {
         match item {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
-                self.tabs.iter_mut().for_each(Tab::run_task_queue);
+                self.tabs.iter_mut().for_each(Tab::run_task_queue_delayed);
                 Ok(Some(PageResponseWrapper::new(PageResponse::SecondsElapsed(
                     self.seconds_from_start,
                 )))
@@ -428,16 +419,13 @@ impl DebugSession {
             TaskDescribe::PageEvent(page_event) => Ok(handle_page_event(self, page_event, session_id, target_id)
                 .ok()
                 .into()),
-            TaskDescribe::RuntimeEvent(runtime_event) => Ok(self
-                .handle_runtime_event(runtime_event, session_id, target_id)
+            TaskDescribe::RuntimeEvent(runtime_event) => Ok(handle_runtime_event(self, runtime_event, session_id, target_id)
                 .ok()
                 .into()),
-            TaskDescribe::TargetEvent(target_event) => Ok(self
-                .handle_target_event(target_event, session_id, target_id)
+            TaskDescribe::TargetEvent(target_event) => Ok(handle_target_event(self, target_event, session_id, target_id)
                 .ok()
                 .into()),
-            TaskDescribe::DomEvent(dom_event) => Ok(self
-                .handle_dom_event(dom_event, session_id, target_id)
+            TaskDescribe::DomEvent(dom_event) => Ok(handle_dom_event(self, dom_event, session_id, target_id)
                 .ok()
                 .into()),
             TaskDescribe::ChromeConnected => {

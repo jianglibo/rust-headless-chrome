@@ -174,9 +174,9 @@ impl Tab {
         }
     }
 
-    pub fn bring_to_front(&mut self) {
+    pub fn bring_to_front(&mut self) -> bool {
         if self.activated_at.is_some() || self.activating {
-            return;
+            return false;
         }
         self.activating = true;
         if self.session_id.is_some() {
@@ -187,6 +187,7 @@ impl Tab {
                 .insert(WaitingForPageAttachTaskName::BringToFront);
             self.attach_to_page();
         }
+        true
     }
 
     pub fn bring_to_front_responded(&mut self) {

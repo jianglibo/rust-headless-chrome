@@ -1,10 +1,10 @@
 #![warn(clippy::all)]
 
-extern crate log;
-extern crate fern;
-extern crate chrono;
 
-use fern::colors::ColoredLevelConfig;
+extern crate chrono;
+extern crate fern;
+extern crate log;
+use fern::colors::{Color, ColoredLevelConfig};
 
 #[macro_use]
 extern crate futures;
@@ -22,25 +22,42 @@ use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 use gcii::{GetContentInIframe, PageState, HOME_URL, SHENBIAN_GANDONG_URL};
 
-        // "headless_chrome=trace,get_content_in_iframe=trace",
+// "headless_chrome=trace,get_content_in_iframe=trace",
 fn setup_logger() -> Result<(), fern::InitError> {
-    let colors = ColoredLevelConfig::new();
-    fern::Dispatch::new()
+    let base_config = fern::Dispatch::new()
+        .level(log::LevelFilter::Info)
+        .level_for("headless_chrome", log::LevelFilter::Trace)
+        .level_for("get_content_in_iframe", log::LevelFilter::Trace);
+
+
+    let colors = ColoredLevelConfig::new().info(Color::Green);
+    let std_out_config = fern::Dispatch::new()
         .format(move |out, message, record| {
             out.finish(format_args!(
                 "{}[{}][{}] {}",
                 chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
                 record.target(),
-                // record.level(),
                 colors.color(record.level()),
                 message
             ))
         })
-        .level(log::LevelFilter::Info)
-        .level_for("headless_chrome", log::LevelFilter::Trace)
-        .level_for("get_content_in_iframe", log::LevelFilter::Trace)
-        .chain(std::io::stdout())
-        .chain(fern::log_file("output.log")?)
+        .chain(std::io::stdout());
+
+    let file_config = fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .chain(fern::log_file("output.log")?);
+
+    base_config
+        .chain(std_out_config)
+        .chain(file_config)
         .apply()?;
     Ok(())
 }
@@ -72,23 +89,36 @@ impl Future for GetContentInIframe {
                     self.debug_session.browser_contexts().deduplicate();
                     // self.debug_session.activates_next_in_interval(10);
                     // self.debug_session.activate_last_opened_tab();
-                    if let Some(popup_count) = self.debug_session.loaded_by_this_tab_name_count(HOME_URL) {
+                    if let Some(popup_count) =
+                        self.debug_session.loaded_by_this_tab_name_count(HOME_URL)
+                    {
                         let run_task_queue_manually = popup_count < 2;
-                        let tab = self.debug_session.find_tab_by_name_mut(HOME_URL).expect("home page should exists.");
+                        let tab = self
+                            .debug_session
+                            .find_tab_by_name_mut(HOME_URL)
+                            .expect("home page should exists.");
                         if run_task_queue_manually {
                             info!("run_task_queue_manually.");
                             tab.run_task_queue_manually();
                         }
                     }
-                    
-                    if let Some(popup_count) = self.debug_session.loaded_by_this_tab_name_count(SHENBIAN_GANDONG_URL) {
-                        let run_task_queue_manually = popup_count < 2;
-                        let tab = self.debug_session.find_tab_by_name_mut(HOME_URL).expect("shenbian gandong page should exists.");
-                        if run_task_queue_manually {
-                            info!("run_task_queue_manually.");
-                            tab.run_task_queue_manually();
+                    if let Some(tab) = self
+                        .debug_session
+                        .loaded_by_this_tab_name_mut(HOME_URL)
+                        .get_mut(0)
+                    {
+                        if tab.bring_to_front() {
+                            info!("bring to front................had sent.");
                         }
                     }
+                    // if let Some(popup_count) = self.debug_session.loaded_by_this_tab_name_count(SHENBIAN_GANDONG_URL) {
+                    //     let run_task_queue_manually = popup_count < 2;
+                    //     let tab = self.debug_session.find_tab_by_name_mut(SHENBIAN_GANDONG_URL).expect("shenbian gandong page should exists.");
+                    //     if run_task_queue_manually {
+                    //         info!("run_task_queue_manually.");
+                    //         tab.run_task_queue_manually();
+                    //     }
+                    // }
 
                     self.debug_session
                         .find_tabs_old_than(600)
@@ -150,9 +180,11 @@ impl Future for GetContentInIframe {
     }
 }
 
-
+/**
+ * {"logs":"{\"17171904947631584673_lwjqu85vhfb_1560952133562\":{\"url\":\"https://www.xuexi.cn/lgpage/detail/index.html?id=17171904947631584673\",\"pt\":\"Graphic-article\",\"tags\":\"联合国大会\",\"item_id\":\"17171904947631584673\",\"refer\":\"https://www.xuexi.cn/\",\"read_id\":\"17171904947631584673_lwjqu85vhfb_1560952133562\",\"page_uuid\":\"17171904947631584673\",\"duration\":30,\"et\":2,\"track_id\":\"f82c3c70-e3bd-4879-aaa4-c1b02b930920\",\"tm\":1560952235276}}","uid":"8b07a940-3c0c-11e9-ae50-3981e89811ea","token":"15aff8fa71a24fd095011592ea5f87ed","sid":"c6a61d6fd3aa25275febb1584d687448","uaToken":"115#1kHgE11O1TavOfqVTCCY1CsoE51GLJA11g2mOh2/jCCcAo21/drCBftunjs1y5fyUqczvP5GX9PKi/RChaFGaLumakUNsGBU9jfyeKT8ukZQi/yJHZz4OWNcaLBXyrrQASRretT4O6Nj7RMWhEz8/DNDaLpXyrrQOSYseKT8ukNQi/RChaU8OSP2Z6yiHFtRsCuKFtQc1Sit5JFR7afewgyUKv56jD5jwW9YdjkUMz2ifIaScSlGYmr7P6gj2qgzxdy8Yymx2dHypBbJCX6t2jkVcxkbLc5xd/kVDlW1cwCVLjCxCo6P3E5xwQLES3Q/ZU4c02IOmor2sXEQyHc0zQ9F5k6pihHXKiUyuHJabn1rcActZF97UJUHmLJYtkfRyB3YynN5C7vYn5hzh21l9lddFV9vtPM52vuG69Kj+Wg2KMgVymR8DZEQcy6TuWM/JveFVyQHD9Jh1HN8diShO5naR/1w68JYTlMpBuI+C7U84YLUV4Lnar1kYcrp2pc8rKHs6aDw1m/idODAlDM2poSSp+P7ljdOY2eKpPjgmiVP2sgA9QRr9iT/JWYtvSJIw4ZsYLGT0vKJpPWWzRbzX6I33pGNyLyzK5vPdUryG9Fr/tSlTVpiq7mC4CwPL0alP24WPjq3RhIVB/6/FSCPNTHC+6VR+X1SSwiMAkKHJpzK6mCw8oi8mLk5p3VRPc3RhK3vfbKAhq/Azab4lSYnDpPhJQZxmVSGDZ7OQm+jTGdBc2PZDs2CfAHokhZQA8LR1ddP1OfifJowUdHBzgEaPyc4yh2up1BJhodXwuu8g2MTuGqvfAKYgm/cqUoF9tW7l1GxHxDzPysJKh7qRn8wcCiHfOHIpm441I8oR/Qc71fBhV6D31XB/nyDGpOifuaG42gftI7SOgxfK6ShoatWbUDPd2HTmz8ZJEbf8dA1udsXlasXM9PgNSJTBgGprKY00S3NZAz/0hgLfgmXStnkhwurh9gdm1rxHeH/GgbEKIJpqHgwb5sdhN8294liCe0GOJGZyk4AzbTyb9tDhxExRhcHTLUa3i//gcYq4UU2PtTFWGhzQtKPtZAmfUbRFG+2ljwveDGt2dMoukHHrsbUqZgEwiqYpP6y4Y1NXXFO2DckDHVBbJJMaeY7muPwXebhxlhzkUatZbhe0QaOmGqWrR/jDrzoNagV0ibaJLM4KNNHnmIR4XzyxSYq0k9fF/j69AqK05i1JVRLbPdK+8qS+wNG","webUmidToken":"T11BAD007E91D3135A9A7CB211B61B000D592779860EC49419349ED6B95"}
+ * {"logs":"{\"index_ialldf9k0me_1560951748972\":{\"ext\":\"{\\\"method\\\":\\\"click\\\",\\\"target\\\":\\\"李克强会见联合国大会主席埃斯皮诺萨\\\",\\\"dataId\\\":\\\"grid-business-title\\\",\\\"componentWrapper\\\":\\\"231c\\\",\\\"slotId\\\":\\\"1566\\\"}\",\"url\":\"https://www.xuexi.cn/\",\"refer\":\"https://pc.xuexi.cn/points/login.html?ref=https%3A%2F%2Fwww.xuexi.cn%2F\",\"read_id\":\"index_ialldf9k0me_1560951748972\",\"page_uuid\":\"index\"}}","uid":"8b07a940-3c0c-11e9-ae50-3981e89811ea","token":"15aff8fa71a24fd095011592ea5f87ed","sid":"79a86277603042feddbdcd5027f13a9b"}
+ */
 // the tabs were unattached when created by clicking the link. but the browser_context_id are same. the open_id are same too.
-
 // post to: https://iflow-api.xuexi.cn/logflow/api/v1/pclog
 #[test]
 fn t_get_content_in_iframe() {
@@ -170,3 +202,4 @@ fn t_get_content_in_iframe() {
         .block_on(my_page.into_future())
         .expect("tokio should success.");
 }
+

@@ -31,7 +31,7 @@ pub enum DomEvent {
 pub    fn handle_dom_event(
         debug_session: &mut DebugSession,
         dom_event: DomEvent,
-        maybe_session_id: Option<target::SessionID>,
+        _maybe_session_id: Option<target::SessionID>,
         maybe_target_id: Option<target::TargetId>,
     ) -> Result<PageResponseWrapper, failure::Error> {
         match dom_event {

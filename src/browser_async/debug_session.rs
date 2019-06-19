@@ -94,10 +94,19 @@ impl DebugSession {
     }
 
     pub fn loaded_by_this_tab_name_count(&self, name: &str) -> Option<usize> {
-        if let Some(tab) = self.find_tab_by_name(name).ok() {
+        if let Ok(tab) = self.find_tab_by_name(name) {
             Some(self.tabs.iter().filter(|tb|tb.target_info.opener_id.as_ref() == Some(&tab.target_info.target_id)).count())
         } else {
             None
+        }
+    }
+
+    pub fn loaded_by_this_tab_name_mut(&mut self, name: &str) -> Vec<&mut Tab> {
+        if let Ok(tab) = self.find_tab_by_name(name) {
+            let target_id = tab.target_info.target_id.clone();
+            self.tabs.iter_mut().filter(|tb|tb.target_info.opener_id.as_ref() == Some(&target_id)).collect()
+        } else {
+            Vec::new()
         }
     }
 
@@ -479,7 +488,7 @@ impl Stream for DebugSession {
                 if !a_done {
                     self.flag = !self.flag;
                 }
-                return self.send_page_message(item);
+                self.send_page_message(item)
             }
             Async::Ready(None) if a_done => Ok(None.into()),
             Async::Ready(None) | Async::NotReady => Ok(Async::NotReady),

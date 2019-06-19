@@ -36,6 +36,12 @@ pub struct EventStatistics {
     events: HashMap<EventName, OneEventStatistics>,
 }
 
+impl Default for EventStatistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventStatistics {
     pub fn new() -> Self {
         Self {
@@ -74,8 +80,10 @@ mod tests {
 
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn test_enum_partial_eq() {
-        assert!(EventName::RequestIntercepted == EventName::RequestIntercepted);
+        let b = EventName::RequestIntercepted == EventName::RequestIntercepted;
+        assert!(b);
         assert!(EventName::RequestIntercepted != EventName::SetChildNodes);
 
         let mut h = HashMap::<EventName, u8>::new();

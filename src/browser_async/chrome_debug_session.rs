@@ -61,8 +61,8 @@ impl ChromeDebugSession {
     pub fn handle_inner_target_events(
         &mut self,
         target_message_event: EmbeddedEvent,
-        session_id: Option<String>,
-        target_id: Option<target::TargetId>,
+        _session_id: Option<String>,
+        _target_id: Option<target::TargetId>,
     ) -> Option<TaskDescribe> {
         match target_message_event {
             EmbeddedEvent::SetChildNodes(embedded_event) => {

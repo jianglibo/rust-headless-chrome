@@ -12,10 +12,10 @@ impl<'a> BrowserContexts<'a> {
         let mut ctx_map: HashMap<String, Vec<&mut Tab>> = HashMap::new();
         for tab in self.all_tabs.iter_mut() {
             if let Some(browser_context_id) = tab.target_info.browser_context_id.clone() {
-                ctx_map.entry(browser_context_id).or_insert(Vec::new()).push(tab);
+                ctx_map.entry(browser_context_id).or_insert_with(Vec::new).push(tab);
             }
         }
-        ctx_map.into_iter().map(|(_, tabs)|BrowserContext{tabs: tabs}).collect()
+        ctx_map.into_iter().map(|(_, tabs)|BrowserContext{tabs}).collect()
     }
 
     pub fn deduplicate(&mut self) {

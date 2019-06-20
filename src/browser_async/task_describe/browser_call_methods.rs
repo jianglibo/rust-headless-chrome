@@ -30,7 +30,7 @@ impl HasCallId for BrowserCallMethodTask {
 
 pub fn handle_browser_method_call(
         browser_call_method_task: BrowserCallMethodTask,
-        maybe_session_id: Option<target::SessionID>,
+        _maybe_session_id: Option<target::SessionID>,
         maybe_target_id: Option<target::TargetId>,
     ) -> Result<PageResponseWrapper, failure::Error> {
         match browser_call_method_task {

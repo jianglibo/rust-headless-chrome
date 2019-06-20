@@ -1,7 +1,7 @@
 type Headers = HashMap<String, String>;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::protocol::{runtime, page, security};
+use crate::protocol::{runtime, security};
 
     pub type LoaderId = String;
     pub type MonotonicTime = f32;

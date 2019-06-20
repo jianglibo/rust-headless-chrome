@@ -28,15 +28,15 @@ pub enum TargetEvent {
 pub  fn handle_target_event(
         debug_session: &mut DebugSession,
         target_event: TargetEvent,
-        maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
+        _maybe_session_id: Option<target::SessionID>,
+        _maybe_target_id: Option<target::TargetId>,
     ) -> Result<PageResponseWrapper, failure::Error> {
         match target_event {
-            TargetEvent::ReceivedMessageFromTarget(event) => {}
+            TargetEvent::ReceivedMessageFromTarget(_event) => {}
             TargetEvent::TargetCreated(event) => {
                 if let target::TargetType::Page = event.get_target_type() {
                     // info!("receive page created event: {:?}", event);
-                    let target_info = event.to_target_info();
+                    let target_info = event.into_target_info();
                     let target_id = target_info.target_id.clone();
                     let tab = Tab::new(target_info, Arc::clone(&debug_session.chrome_debug_session));
                     debug_session.tabs.push(tab);
@@ -50,7 +50,7 @@ pub  fn handle_target_event(
                     info!("got other target_event: {:?}", event);
                 }
             }
-            TargetEvent::TargetCrashed(event) => {}
+            TargetEvent::TargetCrashed(_event) => {}
             TargetEvent::AttachedToTarget(event) => {
                 if event.is_page_attached() {
                     let target_id = event.get_target_id();

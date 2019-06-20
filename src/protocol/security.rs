@@ -117,13 +117,13 @@ pub mod methods {
 
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use log::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use log::*;
 
-    #[test]
-    fn test_certificate_error() {
-        assert!(true);
-    }
-}
+//     #[test]
+//     fn test_certificate_error() {
+//         assert!(true);
+//     }
+// }

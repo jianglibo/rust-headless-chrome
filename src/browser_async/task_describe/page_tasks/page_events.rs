@@ -107,8 +107,8 @@ impl FrameStartedLoading {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use log::*;
+    // use super::*;
+    // use log::*;
 
     #[macro_export]
     macro_rules! add {

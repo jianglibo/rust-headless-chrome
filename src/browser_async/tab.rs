@@ -84,7 +84,6 @@ impl Tab {
             created_at: Instant::now(),
             activated_at: None,
             waiting_for_page_attach: HashSet::new(),
-            // state: TabState::Normal,
             activating: false,
             closing: false,
             explicitly_close: false,
@@ -93,14 +92,14 @@ impl Tab {
 
     pub fn run_task_queue_delayed(&mut self) {
         let tasks = self.task_queue.retrieve_delayed_task_to_run();
-        if !tasks.is_empty() {
-            self.execute_tasks(tasks);
+        for tv in tasks {
+            self.execute_tasks(tv);
         }
     }
 
     pub fn run_task_queue_manually(&mut self) {
-        if let Some(task) = self.task_queue.retrieve_manually_task_to_run() {
-            self.execute_one_task(task);
+        if let Some(tasks) = self.task_queue.retrieve_manually_task_to_run() {
+            self.execute_tasks(tasks);
         }
     }
 
@@ -118,7 +117,7 @@ impl Tab {
 
     pub fn take_request(
         &mut self,
-        request_id: &network::RequestId,
+        request_id: &str,
     ) -> network_events::RequestWillBeSent {
         self.ongoing_request
             .remove(request_id)
@@ -136,7 +135,7 @@ impl Tab {
         }
     }
 
-    pub fn get_url<'a>(&'a self) -> &'a str {
+    pub fn get_url(&self) -> &str {
         if let Some(mf) = self.main_frame() {
             &mf.url
         } else {
@@ -340,7 +339,7 @@ impl Tab {
             .find(|frame| filter(frame))
     }
 
-    pub fn find_frame_by_id(&self, frame_id: &page::FrameId) -> Option<&page::Frame> {
+    pub fn find_frame_by_id(&self, frame_id: &str) -> Option<&page::Frame> {
         match self.changing_frames.get(frame_id) {
             Some(ChangingFrame::Navigated(fm)) | Some(ChangingFrame::StoppedLoading(fm)) => {
                 Some(fm)
@@ -468,7 +467,7 @@ impl Tab {
             ChangingFrame::Attached(frame_attached_params),
         );
     }
-    pub fn _frame_detached(&mut self, frame_id: &page::FrameId) {
+    pub fn _frame_detached(&mut self, frame_id: &str) {
         self.changing_frames.remove(frame_id);
     }
 
@@ -521,14 +520,14 @@ impl Tab {
 
     pub fn describe_node_named(
         &mut self,
-        mut describe_node_task_builder: dom_tasks::DescribeNodeTaskBuilder,
+        describe_node_task_builder: dom_tasks::DescribeNodeTaskBuilder,
         name: &str,
     ) {
         self.describe_node_impl(describe_node_task_builder, Some(name.into()));
     }
     pub fn describe_node(
         &mut self,
-        mut describe_node_task_builder: dom_tasks::DescribeNodeTaskBuilder,
+        describe_node_task_builder: dom_tasks::DescribeNodeTaskBuilder,
     ) {
         self.describe_node_impl(describe_node_task_builder, None);
     }
@@ -578,9 +577,9 @@ impl Tab {
         vec![get_document.into(), query_select.into()]
     }
 
-    fn get_box_model(
+    fn get_box_model_by_selector_task_impl(
         &self,
-        selector: &'static str,
+        selector: &str,
         manual_task_id: Option<TaskId>,
     ) -> Vec<TaskDescribe> {
         let mut pre_tasks = self.get_query_selector(selector, None);
@@ -595,12 +594,17 @@ impl Tab {
 
     pub fn get_box_model_by_selector(
         &mut self,
-        selector: &'static str,
-        manual_task_id: Option<TaskId>,
+        selector: &str
     ) {
-        let tasks = self.get_box_model(selector, manual_task_id);
+        let tasks = self.get_box_model_by_selector_task_impl(selector, None);
         self.execute_tasks(tasks);
     }
+
+    pub fn get_box_model_by_selector_named(&mut self, selector: &str, name: &str) {
+        let tasks = self.get_box_model_by_selector_task_impl(selector, Some(name.into()));
+        self.execute_tasks(tasks);
+    }
+
     pub fn capture_screenshot_by_selector(
         &mut self,
         selector: &'static str,
@@ -615,7 +619,7 @@ impl Tab {
             .from_surface(from_surface)
             .build()
             .expect("build CaptureScreenshotTaskBuilder should success.");
-        let mut pre_tasks = self.get_box_model(selector, None);
+        let mut pre_tasks = self.get_box_model_by_selector_task_impl(selector, None);
         pre_tasks.push(screen_shot.into());
         self.execute_tasks(pre_tasks);
     }
@@ -683,7 +687,7 @@ impl Tab {
     }
 
     pub fn runtime_enable_named(&mut self, name: &str) {
-        self.runtime_enable_impl(Some(name.into()));
+        self.runtime_enable_impl(Some(name));
     }
 
     pub fn runtime_enable(&mut self) {
@@ -799,7 +803,7 @@ impl Tab {
             Ok(task) => task.into(),
             Err(err) => {
                 error!("build evaluate task error: {:?}", err);
-                panic!("build evaluate task error: {:?}");
+                panic!("build evaluate task error: {:?}", err);
             }
         }
     }

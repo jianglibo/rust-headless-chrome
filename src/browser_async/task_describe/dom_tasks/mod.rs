@@ -9,11 +9,10 @@ pub use get_box_model::{GetBoxModelTask, GetBoxModelTaskBuilder};
 pub use get_document::{GetDocumentTask, GetDocumentTaskBuilder};
 pub use query_selector::{QuerySelectorTask, QuerySelectorTaskBuilder};
 
-use crate::browser_async::{DebugSession, Tab};
-use crate::browser_async::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone, ReceivedEvent};
+use crate::browser_async::{DebugSession};
+use crate::browser_async::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
 use crate::protocol::{target};
 use log::*;
-use std::sync::{Arc, Mutex};
 
 
 #[derive(Debug)]
@@ -35,13 +34,13 @@ pub    fn handle_dom_event(
         maybe_target_id: Option<target::TargetId>,
     ) -> Result<PageResponseWrapper, failure::Error> {
         match dom_event {
-            DomEvent::AttributeModified(event) => {}
-            DomEvent::AttributeRemoved(event) => {}
-            DomEvent::CharacterDataModified(event) => {}
-            DomEvent::ChildNodeCountUpdated(event) => {}
-            DomEvent::ChildNodeInserted(event) => {}
-            DomEvent::ChildNodeRemoved(event) => {}
-            DomEvent::DocumentUpdated(event) => {}
+            DomEvent::AttributeModified(_event) => {}
+            DomEvent::AttributeRemoved(_event) => {}
+            DomEvent::CharacterDataModified(_event) => {}
+            DomEvent::ChildNodeCountUpdated(_event) => {}
+            DomEvent::ChildNodeInserted(_event) => {}
+            DomEvent::ChildNodeRemoved(_event) => {}
+            DomEvent::DocumentUpdated(_event) => {}
             DomEvent::SetChildNodes(event) => {
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let (parent_id, nodes) = event.into_parent_children();

@@ -76,7 +76,7 @@ impl EventStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log::*;
+    // use log::*;
 
 
     #[test]

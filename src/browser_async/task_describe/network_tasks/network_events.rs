@@ -168,11 +168,11 @@ impl RequestIntercepted {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
     use crate::browser_async::task_describe::network_events;
     use crate::protocol;
-    use log::*;
+    // use log::*;
     #[test]
     fn test_construct_raw_response() {
         let msg = "{\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"7E85CA49A2D740675BCBFB3CDF778050\",\"message\":\"{\\\"method\\\":\\\"Network.requestIntercepted\\\",\\\"params\\\":{\\\"interceptionId\\\":\\\"interception-job-4.0\\\",\\\"request\\\":{\\\"url\\\":\\\"https://59.202.58.131/api/org/getTreeOrg?orgId=1&deep=1&_=1559563518235\\\",\\\"method\\\":\\\"GET\\\",\\\"headers\\\":{\\\"Accept\\\":\\\"application/json, text/javascript, */*; q=0.01\\\",\\\"X-Requested-With\\\":\\\"XMLHttpRequest\\\",\\\"csrftoken\\\":\\\"4a6cb39a-7f3d-4298-83b8-a1b793718f90\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/74.0.3729.169 Safari/537.36\\\",\\\"Referer\\\":\\\"https://59.202.58.131/orgstructure/orgstructure-manage?orgId=100016626\\\",\\\"Cookie\\\":\\\"sid=eaecfb55-be67-407d-b8be-1cff6ee2ba7d; UAASESSIONID=63d2b60f-ff65-4c0b-9142-d3dc381ad3c0; refresh=false\\\"},\\\"initialPriority\\\":\\\"High\\\",\\\"referrerPolicy\\\":\\\"no-referrer-when-downgrade\\\"},\\\"frameId\\\":\\\"5FC90EF2AED61BEE38D00DC041BFB856\\\",\\\"resourceType\\\":\\\"XHR\\\",\\\"isNavigationRequest\\\":false,\\\"isDownload\\\":false,\\\"responseStatusCode\\\":200,\\\"responseHeaders\\\":{\\\"Server\\\":\\\"nginx/1.10.2\\\",\\\"Date\\\":\\\"Mon, 03 Jun 2019 12:06:01 GMT\\\",\\\"Content-Type\\\":\\\"application/json;charset=utf-8\\\",\\\"Content-Length\\\":\\\"2660\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"X-Application-Context\\\":\\\"dingplus-user-web-dubbo:localtest,menu,privilege\\\"}}}\",\"targetId\":\"5FC90EF2AED61BEE38D00DC041BFB856\"}}";

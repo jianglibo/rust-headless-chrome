@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use crate::protocol::{dom as protocol_dom, runtime, network, page};
+use crate::protocol::{dom as protocol_dom, runtime, network};
 
 mod network_raw_event;
 

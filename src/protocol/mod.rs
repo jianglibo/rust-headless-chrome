@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn parse_security_certificate_error() {
         let message = "{\"method\":\"Security.certificateError\",\"params\":{\"eventId\":1,\"errorType\":\"ERR_CERT_AUTHORITY_INVALID\",\"requestURL\":\"https://59.202.58.131/\"}}";
-        let parsed = serde_json::from_str::<Message>(message.as_ref());
+        let parsed = serde_json::from_str::<Message>(message);
         let r = match parsed {
             Ok(_) => true,
             Err(err) => {

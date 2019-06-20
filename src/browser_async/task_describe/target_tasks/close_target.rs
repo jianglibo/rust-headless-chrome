@@ -1,6 +1,6 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, HasCommonField, CanCreateMethodString,};
-use crate::protocol::{page, target};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, HasCallId, BrowserCallMethodTask, HasCommonField,};
+use crate::protocol::{target};
 use failure;
 
 // #[derive(Debug, Builder, Clone)]

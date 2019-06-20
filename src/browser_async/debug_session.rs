@@ -2,7 +2,7 @@ use super::chrome_browser::ChromeBrowser;
 use super::chrome_debug_session::ChromeDebugSession;
 use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{PageResponse, PageResponseWrapper};
-use super::{BrowserContext, Tab, BrowserContexts};
+use super::{Tab, BrowserContexts};
 use super::task_describe::{target_tasks, CommonDescribeFieldsBuilder,
     handle_browser_method_call, handle_target_method_call, 
     RuntimeEnableTask, SecurityEnableTask,
@@ -10,12 +10,11 @@ use super::task_describe::{target_tasks, CommonDescribeFieldsBuilder,
     TaskDescribe, handle_network_event, handle_page_event, handle_target_event, handle_dom_event, handle_runtime_event,
 };
 
-use crate::browser_async::{ChromePageError, TaskId};
+use crate::browser_async::{ChromePageError};
 use crate::protocol::target;
 use failure;
 use futures::{Async, Poll};
-use log::*;
-use std::convert::TryInto;
+// use log::*;
 use std::sync::{Arc, Mutex};
 use websocket::futures::Stream;
 
@@ -222,8 +221,8 @@ impl DebugSession {
         }
     }
 
-    pub fn tab_closed(&mut self, target_id: &target::TargetId) {
-        self.tabs.retain(|tb|&tb.target_info.target_id != target_id);
+    pub fn tab_closed(&mut self, target_id: &str) {
+        self.tabs.retain(|tb|tb.target_info.target_id != target_id);
     }
 
     // pub fn tab_closed(&mut self, maybe_target_id: Option<&target::TargetId>, task_result: Option<bool>) {
@@ -299,18 +298,18 @@ impl DebugSession {
         self.tabs.get(0)
     }
 
-    fn send_fail(
-        &mut self,
-        target_id: Option<target::TargetId>,
-        task_id: Option<TaskId>,
-    ) -> Poll<Option<PageResponseWrapper>, failure::Error> {
-        let pr = PageResponseWrapper {
-            target_id,
-            task_id,
-            page_response: PageResponse::Fail,
-        };
-        Ok(Some(pr).into())
-    }
+    // fn send_fail(
+    //     &mut self,
+    //     target_id: Option<target::TargetId>,
+    //     task_id: Option<TaskId>,
+    // ) -> Poll<Option<PageResponseWrapper>, failure::Error> {
+    //     let pr = PageResponseWrapper {
+    //         target_id,
+    //         task_id,
+    //         page_response: PageResponse::Fail,
+    //     };
+    //     Ok(Some(pr).into())
+    // }
 
     pub fn runtime_enable(&mut self) {
         let task = self.runtime_enable_task();
@@ -342,9 +341,6 @@ impl DebugSession {
     }
 
     pub fn set_ignore_certificate_errors(&mut self, ignore: bool) {
-        let common_fields = CommonDescribeFieldsBuilder::default()
-            .build()
-            .expect("build common_fields should success.");
         let task = self.set_ignore_certificate_errors_task(ignore);
         self.execute_one_task(task);
     }
@@ -364,7 +360,7 @@ impl DebugSession {
         self.chrome_debug_session
             .lock()
             .expect("obtain chrome_debug_session should success.")
-            .execute_task(vec![task.into()]);
+            .execute_task(vec![task]);
     }
 
     pub fn set_discover_targets_task(&mut self, enable: bool) -> TaskDescribe {
@@ -382,7 +378,7 @@ impl DebugSession {
         self.chrome_debug_session
             .lock()
             .expect("obtain chrome_debug_session should success.")
-            .execute_task(vec![task.into()]);
+            .execute_task(vec![task]);
     }
 
     pub fn security_enable_task(&mut self) -> TaskDescribe {
@@ -450,10 +446,10 @@ impl DebugSession {
                 Ok(handle_network_event(self, network_event, session_id, target_id)
                 .ok()
                 .into()),
-            _ => {
-                warn!("debug_session got unknown task. {:?}", item);
-                self.send_fail(None, None)
-            }
+            // _ => {
+            //     warn!("debug_session got unknown task. {:?}", item);
+            //     self.send_fail(None, None)
+            // }
         }
     }
 }

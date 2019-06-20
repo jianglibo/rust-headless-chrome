@@ -1,7 +1,7 @@
 use super::super::{
     CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,
 };
-use crate::protocol::{dom, runtime, target};
+use crate::protocol::{dom, runtime};
 use serde::{Deserialize, Serialize};
 use failure;
 

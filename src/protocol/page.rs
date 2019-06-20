@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn test_parse_frame_attached_event() {
         let message = "{\"method\":\"Page.frameAttached\",\"params\":{\"frameId\":\"100FD572BD64BB38EB2CAEE354C93F52\",\"parentFrameId\":\"2D0E2292FC393BB4953C7629AF041862\",\"stack\":{\"callFrames\":[{\"functionName\":\"Ho\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":445965},{\"functionName\":\"_i\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":466041},{\"functionName\":\"Oi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":463515},{\"functionName\":\"Ei\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":462867},{\"functionName\":\"Ci\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":461888},{\"functionName\":\"$o\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":460808},{\"functionName\":\"Ii\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":469592},{\"functionName\":\"Fi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":469646},{\"functionName\":\"Bi.render\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":473435},{\"functionName\":\"\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":471293},{\"functionName\":\"Ni\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":468914},{\"functionName\":\"qi\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":471226},{\"functionName\":\"render\",\"scriptId\":\"12\",\"url\":\"https://pc.xuexi.cn/points/0.1f01cb06.js\",\"lineNumber\":0,\"columnNumber\":474407},{\"functionName\":\"SurW\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":13244},{\"functionName\":\"a\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":517},{\"functionName\":\"u\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":386},{\"functionName\":\"\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":1469},{\"functionName\":\"\",\"scriptId\":\"14\",\"url\":\"https://pc.xuexi.cn/points/login.46f4e7c1.js\",\"lineNumber\":0,\"columnNumber\":1473}]}}}";
-        serde_json::from_str::<events::FrameAttachedEvent>(message.as_ref()).unwrap();
+        serde_json::from_str::<events::FrameAttachedEvent>(message).unwrap();
 
         let vp = json!({
             "pageX": 0,
@@ -371,7 +371,7 @@ mod tests {
             "clientHeight": 100,
         });
 
-        let vpv = serde_json::from_value::<LayoutViewport>(vp).expect("shold deserialize LayoutViewport");
+        let _vpv = serde_json::from_value::<LayoutViewport>(vp).expect("shold deserialize LayoutViewport");
 
         let vp = json!({
             "offsetX": 0,

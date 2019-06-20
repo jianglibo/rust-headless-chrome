@@ -19,7 +19,7 @@ impl TargetCreated {
         &self.raw_event.params.target_info.target_type
     }
 
-    pub fn to_target_info(self) -> target::TargetInfo {
+    pub fn into_target_info(self) -> target::TargetInfo {
         self.raw_event.params.target_info
     }
 }

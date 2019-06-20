@@ -44,7 +44,7 @@ fn handle_event_return(
     Ok(PageResponseWrapper {
         target_id: maybe_target_id,
         task_id: None,
-        page_response: page_response,
+        page_response
     })
 }
 
@@ -52,11 +52,11 @@ fn handle_event_return(
 pub fn handle_page_event(
     debug_session: &mut DebugSession,
     page_event: PageEvent,
-    maybe_session_id: Option<target::SessionID>,
+    _maybe_session_id: Option<target::SessionID>,
     maybe_target_id: Option<target::TargetId>,
 ) -> Result<PageResponseWrapper, failure::Error> {
         match page_event {
-            PageEvent::DomContentEventFired(event) => {}
+            PageEvent::DomContentEventFired(_event) => {}
             // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             PageEvent::FrameAttached(event) => {
                 let raw_parameters = event.into_raw_parameters();
@@ -97,7 +97,7 @@ pub fn handle_page_event(
                     "-----------------frame_navigated-----------------{:?}",
                     event
                 );
-                let frame = event.get_frame();
+                // let frame = event.get_frame();
                 debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())
                     .expect("FrameNavigated event should have target_id.")
                     ._frame_navigated(event.clone_frame());

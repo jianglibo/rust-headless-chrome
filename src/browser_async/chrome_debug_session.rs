@@ -338,10 +338,10 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::ContinueInterceptedRequest(_task) => {
                     info!("continue_intercepted_request done.");
                 }
-                TargetCallMethodTask::GetLayoutMetrics(task) => {
+                TargetCallMethodTask::GetLayoutMetrics(_task) => {
                     info!("get_layout_metrics done.");
                 }
-                TargetCallMethodTask::BringToFront(task) => {
+                TargetCallMethodTask::BringToFront(_task) => {
                     info!("bring_to_front done.");
                 }
                 // TargetCallMethodTask::CloseTarget(task) => {

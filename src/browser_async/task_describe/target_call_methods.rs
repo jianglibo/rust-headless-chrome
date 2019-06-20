@@ -1,9 +1,8 @@
-use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, target_tasks};
+use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks};
 
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone};
 use crate::protocol::target;
-use std::time::{Instant};
 use log::*;
 
 use super::{HasCallId, HasTaskId};
@@ -64,7 +63,7 @@ impl HasCallId for TargetCallMethodTask {
 pub fn handle_target_method_call(
     debug_session: &mut DebugSession,
     target_call_method_task: TargetCallMethodTask,
-    maybe_session_id: Option<target::SessionID>,
+    _maybe_session_id: Option<target::SessionID>,
     maybe_target_id: Option<target::TargetId>,
 ) -> Result<PageResponseWrapper, failure::Error> {
     match target_call_method_task {
@@ -88,8 +87,8 @@ pub fn handle_target_method_call(
             });
         }
         TargetCallMethodTask::DescribeNode(task) => {
-            let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-            let node_id = task.task_result.as_ref().and_then(|n| Some(n.node_id));
+            // let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+            // let node_id = task.task_result.as_ref().and_then(|n| Some(n.node_id));
 
             let v = Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
@@ -168,23 +167,23 @@ pub fn handle_target_method_call(
                 page_response: PageResponse::MethodCallDone(MethodCallDone::CallFunctionOn(task)),
             });
         }
-        TargetCallMethodTask::SetRequestInterception(task) => {
+        TargetCallMethodTask::SetRequestInterception(_task) => {
             warn!("ignored method return SetRequestInterception");
             return Ok(PageResponseWrapper::default());
         }
-        TargetCallMethodTask::NetworkEnable(task) => {
+        TargetCallMethodTask::NetworkEnable(_task) => {
             warn!("ignored method return. NetworkEnable");
             return Ok(PageResponseWrapper::default());
         }
-        TargetCallMethodTask::ContinueInterceptedRequest(task) => {
+        TargetCallMethodTask::ContinueInterceptedRequest(_task) => {
             warn!("ignored method return. ContinueInterceptedRequest");
             return Ok(PageResponseWrapper::default());
         }
-        TargetCallMethodTask::PageReload(task) => {
+        TargetCallMethodTask::PageReload(_task) => {
             warn!("ignored method return. PageReload");
             return Ok(PageResponseWrapper::default());
         }
-        TargetCallMethodTask::GetLayoutMetrics(task) => {
+        TargetCallMethodTask::GetLayoutMetrics(_task) => {
             warn!("ignored method return. GetLayoutMetrics");
             return Ok(PageResponseWrapper::default());
         }

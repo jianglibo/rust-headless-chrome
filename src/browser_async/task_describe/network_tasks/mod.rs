@@ -34,7 +34,7 @@ pub enum NetworkEvent {
 pub fn handle_network_event(
     debug_session: &mut DebugSession,
     network_event: NetworkEvent,
-    maybe_session_id: Option<target::SessionID>,
+    _maybe_session_id: Option<target::SessionID>,
     maybe_target_id: Option<target::TargetId>,
 ) -> Result<PageResponseWrapper, failure::Error> {
     match network_event {
@@ -42,54 +42,54 @@ pub fn handle_network_event(
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_request_id();
             tab.response_received.insert(request_id.clone(), event);
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::ResponseReceived(
                     request_id,
                 )),
-            });
+            })
         }
         NetworkEvent::RequestIntercepted(event) => {
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_interception_id();
             tab.request_intercepted.insert(request_id.clone(), event);
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::RequestIntercepted(
                     request_id,
                 )),
-            });
+            })
             // warn!("unhandled network_events RequestIntercepted");
         }
         NetworkEvent::RequestWillBeSent(event) => {
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_request_id();
             tab.request_will_be_sent(event);
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::RequestWillBeSent(
                     request_id,
                 )),
-            });
+            })
             // warn!("unhandled network_events RequestWillBeSent");
         }
         NetworkEvent::LoadingFinished(event) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::LoadingFinished(event)),
-            });
+            })
             // warn!("unhandled network_events LoadingFinished");
         }
         NetworkEvent::DataReceived(event) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::DataReceived(event)),
-            });
+            })
             // warn!("unhandled network_events DataReceived");
         }
         NetworkEvent::LoadingFailed(event) => {
@@ -97,13 +97,13 @@ pub fn handle_network_event(
             let request = tab.take_request(&event.get_request_id());
             error!("failed request: {:?}", request);
             error!("failed request event: {:?}", event);
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::LoadingFailed(event)),
-            });
+            })
             // warn!("unhandled network_events DataReceived");
         }
     }
-    Ok(PageResponseWrapper::default())
+    // Ok(PageResponseWrapper::default())
 }

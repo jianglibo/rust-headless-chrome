@@ -4,7 +4,7 @@ use crate::browser_async::{
 };
 use crate::protocol::{self, target};
 use log::*;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 pub mod dom_tasks;
 pub mod other_tasks;
@@ -79,7 +79,7 @@ impl<T> HasTaskId for T where T: HasCommonField {
     }
 
     fn task_id_equal(&self, pattern: &str) -> bool {
-        &self.get_common_fields().task_id == pattern
+        self.get_common_fields().task_id == pattern
     }
 
     fn task_id_starts_with(&self, pattern: &str) -> bool {

@@ -1,7 +1,7 @@
 use super::RuntimeEvent;
 use super::super::TaskDescribe;
 use crate::browser_async::embedded_events;
-use crate::protocol::{network, page, runtime};
+use crate::protocol::{runtime};
 
 #[derive(Debug)]
 pub struct ExceptionRevoked {}

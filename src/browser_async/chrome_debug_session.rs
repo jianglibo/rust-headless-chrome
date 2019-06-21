@@ -262,27 +262,27 @@ impl ChromeDebugSession {
     ) -> Result<(), failure::Error> {
         match &mut task_describe {
             TaskDescribe::TargetCallMethod(target_call) => match target_call {
-                TargetCallMethodTask::GetDocument(get_document) => {
-                    let get_document_return_object =
+                TargetCallMethodTask::GetDocument(task) => {
+                    let return_object =
                         protocol::parse_response::<dom::methods::GetDocumentReturnObject>(resp)?;
-                    get_document.task_result = Some(get_document_return_object.root);
+                    task.task_result.replace(return_object.root);
                 }
                 TargetCallMethodTask::PageEnable(_common_fields) => {}
                 TargetCallMethodTask::PageReload(_page_reload) => {}
-                TargetCallMethodTask::QuerySelector(query_selector) => {
+                TargetCallMethodTask::QuerySelector(task) => {
                     let return_object =
                         protocol::parse_response::<dom::methods::QuerySelectorReturnObject>(resp)?;
-                    query_selector.task_result= Some(return_object.node_id);
+                    task.task_result.replace(return_object.node_id);
                 }
-                TargetCallMethodTask::DescribeNode(describe_node) => {
-                    let describe_node_return_object =
+                TargetCallMethodTask::DescribeNode(task) => {
+                    let return_object =
                         protocol::parse_response::<dom::methods::DescribeNodeReturnObject>(resp)?;
-                    describe_node.task_result= Some(describe_node_return_object.node);
+                    task.task_result.replace(return_object.node);
                 }
-                TargetCallMethodTask::GetBoxModel(get_box_model) => {
-                    let get_box_model_return_object =
+                TargetCallMethodTask::GetBoxModel(task) => {
+                    let return_object =
                         protocol::parse_response::<dom::methods::GetBoxModelReturnObject>(resp)?;
-                    let raw_model = get_box_model_return_object.model;
+                    let raw_model = return_object.model;
                     let model_box = BoxModel {
                         content: ElementQuad::from_raw_points(&raw_model.content),
                         padding: ElementQuad::from_raw_points(&raw_model.padding),
@@ -291,32 +291,37 @@ impl ChromeDebugSession {
                         width: raw_model.width,
                         height: raw_model.height,
                     };
-                    get_box_model.task_result = Some(model_box);
+                    task.task_result.replace(model_box);
                 }
-                TargetCallMethodTask::CaptureScreenshot(screen_shot) => {
+                TargetCallMethodTask::GetContentQuads(task) => {
+                    let return_object =
+                        protocol::parse_response::<dom::methods::GetContentQuadsReturnObject>(resp)?;
+                    task.task_result.replace(return_object.quads);
+                }
+                TargetCallMethodTask::CaptureScreenshot(task) => {
                     let capture_screenshot_return_object =
                         protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
-                    screen_shot.task_result= Some(capture_screenshot_return_object.data);
+                    task.task_result.replace(capture_screenshot_return_object.data);
                 }
-                TargetCallMethodTask::RuntimeEvaluate(runtime_evaluate) => {
+                TargetCallMethodTask::RuntimeEvaluate(task) => {
                     let evaluate_return_object =
                         protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
-                    runtime_evaluate.task_result = Some(evaluate_return_object);
+                    task.task_result.replace(evaluate_return_object);
                 }
-                TargetCallMethodTask::NavigateTo(navigate_to) => {
-                    let navigate_to_return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
-                    navigate_to.task_result = Some(navigate_to_return_object);
+                TargetCallMethodTask::NavigateTo(task) => {
+                    let return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
+                    task.task_result.replace(return_object);
                 }
-                TargetCallMethodTask::RuntimeEnable(common_fields) => {
-                    trace!("runtime enabled: {:?}", common_fields);
+                TargetCallMethodTask::RuntimeEnable(task) => {
+                    trace!("runtime enabled: {:?}", task);
                 }
-                TargetCallMethodTask::RuntimeGetProperties(get_properties) => {
-                    let get_properties_return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
-                    get_properties.task_result = Some(get_properties_return_object);
+                TargetCallMethodTask::RuntimeGetProperties(task) => {
+                    let return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
+                    task.task_result.replace(return_object);
                 }
                 TargetCallMethodTask::GetResponseBodyForInterception(task) => {
                     let return_object = protocol::parse_response::<network::methods::GetResponseBodyForInterceptionReturnObject>(resp)?;
-                    task.task_result = Some(return_object);
+                    task.task_result.replace(return_object);
                 }
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
                     let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
@@ -324,7 +329,7 @@ impl ChromeDebugSession {
                 }
                 TargetCallMethodTask::PrintToPDF(task) => {
                     let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
-                    task.task_result = Some(task_return_object.data);
+                    task.task_result.replace(task_return_object.data);
                 }
                 TargetCallMethodTask::NetworkEnable(_task) => {
                     info!("network enabled.");
@@ -343,6 +348,9 @@ impl ChromeDebugSession {
                 }
                 TargetCallMethodTask::BringToFront(_task) => {
                     info!("bring_to_front done.");
+                }
+                TargetCallMethodTask::DispatchMouseEvent(_task) => {
+                    info!("dispatch_mouse_event done.");
                 }
                 // TargetCallMethodTask::CloseTarget(task) => {
                 //     let task_return_object = protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;

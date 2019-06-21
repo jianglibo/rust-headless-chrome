@@ -1,4 +1,4 @@
-use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks};
+use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks};
 
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone};
@@ -14,6 +14,7 @@ pub enum TargetCallMethodTask {
     DescribeNode(dom_tasks::DescribeNodeTask),
     PrintToPDF(page_tasks::PrintToPdfTask),
     GetBoxModel(dom_tasks::GetBoxModelTask),
+    GetContentQuads(dom_tasks::GetContentQuadsTask),
     GetDocument(dom_tasks::GetDocumentTask),
     PageEnable(page_tasks::PageEnableTask),
     PageClose(page_tasks::PageCloseTask),
@@ -29,6 +30,7 @@ pub enum TargetCallMethodTask {
     ContinueInterceptedRequest(network_tasks::ContinueInterceptedRequestTask),
     GetResponseBodyForInterception(network_tasks::GetResponseBodyForInterceptionTask),
     PageReload(page_tasks::PageReloadTask),
+    DispatchMouseEvent(input_tasks::DispatchMouseEventTask),
     // CloseTarget(target_tasks::CloseTargetTask),
 }
 
@@ -40,6 +42,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::DescribeNode(task) => task.get_call_id(),
             TargetCallMethodTask::PrintToPDF(task) => task.get_call_id(),
             TargetCallMethodTask::GetBoxModel(task) => task.get_call_id(),
+            TargetCallMethodTask::GetContentQuads(task) => task.get_call_id(),
             TargetCallMethodTask::GetDocument(task) => task.get_call_id(),
             TargetCallMethodTask::PageEnable(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeEnable(task) => task.get_call_id(),
@@ -55,6 +58,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::GetLayoutMetrics(task) => task.get_call_id(),
             TargetCallMethodTask::BringToFront(task) => task.get_call_id(),
             TargetCallMethodTask::PageClose(task) => task.get_call_id(),
+            TargetCallMethodTask::DispatchMouseEvent(task) => task.get_call_id(),
             // TargetCallMethodTask::CloseTarget(task) => task.get_call_id(),
         }
     }
@@ -108,11 +112,14 @@ pub fn handle_target_method_call(
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
-                // page_response: PageResponse::MethodCallDone(MethodCallDone::GetBoxModel(
-                //     task.selector,
-                //     task.task_result.map(Box::new),
-                // )),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetBoxModel(task)),
+            });
+        }
+        TargetCallMethodTask::GetContentQuads(task) => {
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::GetContentQuads(task)),
             });
         }
         TargetCallMethodTask::PageEnable(task) => {
@@ -185,6 +192,10 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::GetLayoutMetrics(_task) => {
             warn!("ignored method return. GetLayoutMetrics");
+            return Ok(PageResponseWrapper::default());
+        }
+        TargetCallMethodTask::DispatchMouseEvent(_task) => {
+            warn!("ignored method return. DispatchMouseEvent");
             return Ok(PageResponseWrapper::default());
         }
         TargetCallMethodTask::BringToFront(task) => {

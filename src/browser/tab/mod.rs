@@ -24,7 +24,7 @@ use std::time::Duration;
 
 pub mod element;
 pub mod keys;
-mod point;
+pub mod point;
 
 #[derive(Debug)]
 pub enum RequestInterceptionDecision {

@@ -73,6 +73,7 @@ pub enum MethodCallDone {
     BringToFront(page_tasks::BringToFrontTask),
     DescribeNode(dom_tasks::DescribeNodeTask),
     GetBoxModel(dom_tasks::GetBoxModelTask),
+    GetContentQuads(dom_tasks::GetContentQuadsTask),
     GetDocument(dom_tasks::GetDocumentTask),
     CaptureScreenshot(response_object::CaptureScreenshot),
     Evaluate(runtime_tasks::RuntimeEvaluateTask),

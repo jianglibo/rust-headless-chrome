@@ -15,6 +15,7 @@ pub mod security_tasks;
 pub mod target_call_methods;
 pub mod browser_call_methods;
 pub mod network_tasks;
+pub mod input_tasks;
 
 
 pub use dom_tasks::{
@@ -137,6 +138,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::DescribeNode(task) => task.get_method_str(),
                 TargetCallMethodTask::PrintToPDF(task) => task.get_method_str(),
                 TargetCallMethodTask::GetBoxModel(task) => task.get_method_str(),
+                TargetCallMethodTask::GetContentQuads(task) => task.get_method_str(),
                 TargetCallMethodTask::CaptureScreenshot(task) => task.get_method_str(),
                 TargetCallMethodTask::GetDocument(task) => task.get_method_str(),
                 TargetCallMethodTask::NavigateTo(task) => task.get_method_str(),
@@ -153,6 +155,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::GetLayoutMetrics(task) => task.get_method_str(),
                 TargetCallMethodTask::BringToFront(task) => task.get_method_str(),
                 TargetCallMethodTask::PageClose(task) => task.get_method_str(),
+                TargetCallMethodTask::DispatchMouseEvent(task) => task.get_method_str(),
                 // TargetCallMethodTask::CloseTarget(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {

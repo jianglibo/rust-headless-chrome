@@ -3,9 +3,11 @@ pub mod get_box_model;
 pub mod get_document;
 pub mod query_selector;
 pub mod dom_events;
+pub mod get_content_quads;
 
 pub use describe_node::{DescribeNodeTask, DescribeNodeTaskBuilder};
 pub use get_box_model::{GetBoxModelTask, GetBoxModelTaskBuilder};
+pub use get_content_quads::{GetContentQuadsTask, GetContentQuadsTaskBuilder};
 pub use get_document::{GetDocumentTask, GetDocumentTaskBuilder};
 pub use query_selector::{QuerySelectorTask, QuerySelectorTaskBuilder};
 

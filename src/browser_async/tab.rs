@@ -1,16 +1,19 @@
 use super::super::browser_async::{create_unique_prefixed_id, embedded_events, TaskId, ChromeDebugSession};
+use crate::browser::tab::element::{BoxModel, ElementQuad};
+use crate::browser::tab::point::Point;
 
 use super::page_message::ChangingFrame;
 use super::task_describe::{
     dom_tasks, network_events, network_tasks, page_tasks, runtime_tasks, target_tasks,
-    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe,
+    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks,
 };
 use super::{EventName, EventStatistics, TaskQueue};
-use crate::protocol::{self, dom, network, page, runtime, target};
+use crate::protocol::{self, dom, network, page, runtime, target, input};
 use log::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use failure;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum WaitingForPageAttachTaskName {
@@ -577,14 +580,123 @@ impl Tab {
         vec![get_document.into(), query_select.into()]
     }
 
+    /// Moves the mouse to this point (dispatches a mouseMoved event)
+    pub fn move_mouse_to_point_task(&self, point: Point) -> TaskDescribe {
+        if point.x == 0.0 && point.y == 0.0 {
+            warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
+        }
+        let task = input_tasks::DispatchMouseEventTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .event_type(input_tasks::MouseEventType::Moved)
+            .x(point.x)
+            .y(point.y)
+            .build().expect("move_mouse_to_point should build success.");
+        task.into()
+    }
+
+    pub fn mouse_press_at_point_task(&self, point: Point) -> TaskDescribe {
+        trace!("Clicking point: {:?}", point);
+        if point.x == 0.0 && point.y == 0.0 {
+            warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
+        }
+        let task = input_tasks::DispatchMouseEventTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .event_type(input_tasks::MouseEventType::Pressed)
+            .x(point.x)
+            .y(point.y)
+            .button(input_tasks::MouseButton::Left)
+            .click_count(1)
+            .build().expect("mouse_press_at_point_task should build success.");
+        task.into()
+    }
+    
+    pub fn mouse_release_at_point(&self, point: Point) -> TaskDescribe {
+        trace!("Clicking point: {:?}", point);
+        if point.x == 0.0 && point.y == 0.0 {
+            warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
+        }
+        let task = input_tasks::DispatchMouseEventTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .event_type(input_tasks::MouseEventType::Released)
+            .x(point.x)
+            .y(point.y)
+            .button(input_tasks::MouseButton::Left)
+            .click_count(1)
+            .build().expect("mouse_press_at_point_task should build success.");
+        task.into()
+    }
+
+    // pub fn click_point(&self, point: Point) -> Result<&Self, failure::Error> {
+    //     trace!("Clicking point: {:?}", point);
+    //     if point.x == 0.0 && point.y == 0.0 {
+    //         warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
+    //     }
+
+    //     self.move_mouse_to_point(point)?;
+
+    //     self.call_method(input::methods::DispatchMouseEvent {
+    //         event_type: "mousePressed",
+    //         x: point.x,
+    //         y: point.y,
+    //         button: Some("left"),
+    //         click_count: Some(1),
+    //     })?;
+    //     self.call_method(input::methods::DispatchMouseEvent {
+    //         event_type: "mouseReleased",
+    //         x: point.x,
+    //         y: point.y,
+    //         button: Some("left"),
+    //         click_count: Some(1),
+    //     })?;
+    //     Ok(self)
+    // }
+
+    // dom_tasks::GetContentQuads
+    pub fn get_midpoint(&self, raw_quad: &[f64; 8]) -> Result<Point, failure::Error> {
+        let input_quad = ElementQuad::from_raw_points(&raw_quad);
+        Ok((input_quad.bottom_right + input_quad.top_left) / 2.0)
+    }
+
+    fn get_box_model_task_impl(
+        &mut self,
+        mut get_box_model_task_builder: dom_tasks::GetBoxModelTaskBuilder,
+        manual_task_id: Option<&str>,
+    ) -> TaskDescribe {
+        let task = get_box_model_task_builder.common_fields(self.get_common_field(manual_task_id.map(Into::into))).build().expect("GetBoxModelTaskBuilder should success.");
+        task.into()
+    }
+    pub fn get_box_model_task(
+        &mut self,
+        get_box_model_task_builder: dom_tasks::GetBoxModelTaskBuilder,
+    ) -> TaskDescribe {
+        self.get_box_model_task_impl(get_box_model_task_builder, None)
+    }
+
+    pub fn get_box_model_task_named(
+        &mut self,
+        get_box_model_task_builder: dom_tasks::GetBoxModelTaskBuilder,
+        name: &str,
+    ) -> TaskDescribe {
+        self.get_box_model_task_impl(get_box_model_task_builder, Some(name))
+    }
+
+    pub fn get_box_model_by_selector_task(&self, selector: &str) -> Vec<TaskDescribe> {
+        self.get_box_model_by_selector_task_impl(selector, None)
+    }
+
+    pub fn get_box_model_by_selector_task_named(&self, selector: &str, name: &str) -> Vec<TaskDescribe> {
+        self.get_box_model_by_selector_task_impl(selector, Some(name))
+    }
+
+
     fn get_box_model_by_selector_task_impl(
         &self,
         selector: &str,
-        manual_task_id: Option<TaskId>,
+        manual_task_id: Option<&str>,
     ) -> Vec<TaskDescribe> {
         let mut pre_tasks = self.get_query_selector(selector, None);
         let get_box_model = dom_tasks::GetBoxModelTaskBuilder::default()
-            .common_fields(self.get_common_field(manual_task_id))
+            .common_fields(self.get_common_field(manual_task_id.map(Into::into)))
             .selector(selector.to_owned())
             .build()
             .expect("build GetBoxModelTaskBuilder should success.");

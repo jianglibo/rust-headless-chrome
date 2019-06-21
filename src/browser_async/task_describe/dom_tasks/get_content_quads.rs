@@ -1,0 +1,35 @@
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
+use crate::protocol::{dom, runtime};
+use failure;
+
+
+#[derive(Debug, Builder, Default)]
+#[builder(setter(into))]
+pub struct GetContentQuadsTask {
+    pub common_fields: CommonDescribeFields,
+    #[builder(default = "None")]
+    pub node_id: Option<dom::NodeId>,
+    #[builder(default = "None")]
+    pub selector: Option<String>,
+    #[builder(default = "None")]
+    pub backend_node_id: Option<dom::NodeId>,
+    #[builder(default = "None")]
+    pub object_id: Option<runtime::RemoteObjectId>,
+    #[builder(setter(skip))]
+    pub task_result: Option<Vec<[f64; 8]>>,
+}
+
+impl_has_common_fields!(GetContentQuadsTask);
+
+impl AsMethodCallString for GetContentQuadsTask {
+    fn get_method_str(&self) -> Result<String, failure::Error> {
+        let method = dom::methods::GetContentQuads {
+            node_id: self.node_id,
+            backend_node_id: self.backend_node_id,
+            object_id: self.object_id.as_ref().map(String::as_str)
+        };
+        Ok(self.create_method_str(method))
+    }
+}
+
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::GetContentQuads, GetContentQuadsTask);

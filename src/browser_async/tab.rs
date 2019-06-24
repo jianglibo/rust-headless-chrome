@@ -577,84 +577,49 @@ impl Tab {
     }
 
     /// Moves the mouse to this point (dispatches a mouseMoved event)
-    pub fn mouse_move_to_point_task(&self, point: Point) -> TaskDescribe {
-        if point.x == 0.0 && point.y == 0.0 {
-            warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
-        }
+    pub fn mouse_move_to_point_task(&self, point: Option<Point>) -> TaskDescribe {
         let task = input_tasks::DispatchMouseEventTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .event_type(input_tasks::MouseEventType::Moved)
-            .x(point.x)
-            .y(point.y)
+            .x(point.map(|p|p.x))
+            .y(point.map(|p|p.y))
             .build().expect("move_mouse_to_point should build success.");
         task.into()
     }
 
-    pub fn mouse_press_at_point_task(&self, point: Point) -> TaskDescribe {
-        trace!("Clicking point: {:?}", point);
-        if point.x == 0.0 && point.y == 0.0 {
-            warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
-        }
+    pub fn mouse_press_at_point_task(&self, point: Option<Point>) -> TaskDescribe {
         let task = input_tasks::DispatchMouseEventTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .event_type(input_tasks::MouseEventType::Pressed)
-            .x(point.x)
-            .y(point.y)
+            .x(point.map(|p|p.x))
+            .y(point.map(|p|p.y))
             .button(input_tasks::MouseButton::Left)
             .click_count(1)
             .build().expect("mouse_press_at_point_task should build success.");
         task.into()
     }
     
-    pub fn mouse_release_at_point(&self, point: Point) -> TaskDescribe {
-        trace!("Clicking point: {:?}", point);
-        if point.x == 0.0 && point.y == 0.0 {
-            warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
-        }
+    pub fn mouse_release_at_point(&self, point: Option<Point>) -> TaskDescribe {
         let task = input_tasks::DispatchMouseEventTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .event_type(input_tasks::MouseEventType::Released)
-            .x(point.x)
-            .y(point.y)
+            .x(point.map(|p|p.x))
+            .y(point.map(|p|p.y))
             .button(input_tasks::MouseButton::Left)
             .click_count(1)
             .build().expect("mouse_press_at_point_task should build success.");
         task.into()
     }
 
-    pub fn mouse_click_task(&self, point: Point) -> Vec<TaskDescribe> {
-        vec![self.mouse_move_to_point_task(point), self.mouse_press_at_point_task(point), self.mouse_release_at_point(point)]
+    pub fn mouse_click_on_remote_object_task(&self, remote_object_id: runtime::RemoteObjectId) -> Vec<TaskDescribe> {
+        let mut tasks = self.mouse_click_on_point_task(None);
+        tasks.insert(0, self.get_content_quads_by_object_id_task(remote_object_id));
+        tasks
     }
 
-    // pub fn click_point(&self, point: Point) -> Result<&Self, failure::Error> {
-    //     trace!("Clicking point: {:?}", point);
-    //     if point.x == 0.0 && point.y == 0.0 {
-    //         warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
-    //     }
 
-    //     self.move_mouse_to_point(point)?;
-
-    //     self.call_method(input::methods::DispatchMouseEvent {
-    //         event_type: "mousePressed",
-    //         x: point.x,
-    //         y: point.y,
-    //         button: Some("left"),
-    //         click_count: Some(1),
-    //     })?;
-    //     self.call_method(input::methods::DispatchMouseEvent {
-    //         event_type: "mouseReleased",
-    //         x: point.x,
-    //         y: point.y,
-    //         button: Some("left"),
-    //         click_count: Some(1),
-    //     })?;
-    //     Ok(self)
-    // }
-
-    // dom_tasks::GetContentQuads
-    pub fn get_midpoint(&self, raw_quad: &[f64; 8]) -> Point {
-        let input_quad = ElementQuad::from_raw_points(&raw_quad);
-        (input_quad.bottom_right + input_quad.top_left) / 2.0
+    pub fn mouse_click_on_point_task(&self, point: Option<Point>) -> Vec<TaskDescribe> {
+        vec![self.mouse_move_to_point_task(point), self.mouse_press_at_point_task(point), self.mouse_release_at_point(point)]
     }
 
     pub fn get_content_quads_by_object_id_task(&self, remote_object_id: runtime::RemoteObjectId) -> TaskDescribe {

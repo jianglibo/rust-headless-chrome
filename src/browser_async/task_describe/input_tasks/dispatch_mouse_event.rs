@@ -70,8 +70,8 @@ impl From<PointerType> for &'static str {
 pub struct DispatchMouseEventTask {
     pub common_fields: CommonDescribeFields,
     pub event_type: MouseEventType,
-    pub x: f64,
-    pub y: f64,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
     #[builder(default = "None")]
     pub modifiers: Option<u8>,
     #[builder(default = "None")]
@@ -96,8 +96,8 @@ impl AsMethodCallString for DispatchMouseEventTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {
         let method = input::methods::DispatchMouseEvent {
             event_type: self.event_type.clone().into(),
-            x: self.x,
-            y: self.y,
+            x: self.x.expect("mouse point x should be assigned."),
+            y: self.y.expect("mouse point y should be assigned."),
             button: self.button.as_ref().cloned().map(Into::into),
             click_count: self.click_count,
         };

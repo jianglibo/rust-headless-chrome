@@ -41,18 +41,13 @@ pub    fn handle_runtime_event(
             RuntimeEvent::ExceptionRevoked(_event) => {}
             RuntimeEvent::ExceptionThrown(_event) => {}
             RuntimeEvent::ExecutionContextCreated(event) => {
-                // let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-                // let frame_id = tab
-                //     .runtime_execution_context_created(event.get_execution_context_description());
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab.runtime_execution_context_created(event.get_execution_context_description());
                 return Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: None,
                     page_response: PageResponse::ReceivedEvent(ReceivedEvent::ExecutionContextCreated(event)),
                 });
-                // return handle_event_return(
-                //     maybe_target_id,
-                //     PageResponse::ReceivedEvent(ReceivedEvent::ExecutionContextCreated(event)),
-                // );
             }
             RuntimeEvent::ExecutionContextDestroyed(event) => {
                 let execution_context_id = event.into_execution_context_id();

@@ -76,6 +76,7 @@ impl Future for GetContentInIframe {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
+                info!("{:?}", self.state);
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
                     // trace!(

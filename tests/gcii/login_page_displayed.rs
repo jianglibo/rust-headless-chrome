@@ -38,7 +38,7 @@ impl GetContentInIframe {
                                 tab.execute_one_task(t1);
                                 self.ddlogin_frame_stopped_loading = true;
                             } else {
-                                error!("cannot find execution_context_description");
+                                panic!("cannot find execution_context_description");
                             }
                         }
                     }

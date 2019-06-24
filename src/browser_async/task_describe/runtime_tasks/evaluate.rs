@@ -32,7 +32,22 @@ pub struct RuntimeEvaluateTask {
     pub task_result: Option<runtime::methods::EvaluateReturnObject>,
 }
 
+// task_result: Some(EvaluateReturnObject { result: RemoteObject { object_type: "number", subtype: None, class_name: None, value: Some(Number(20)), unserializable_value: None, description: Some("20"), object_id: None, preview: None }, exception_details: None }) }
+// task_result: Some(EvaluateReturnObject { result: RemoteObject { object_type: "object", subtype: Some("array"), class_name: Some("NodeList"), value: None, unserializable_value: None, description: Some("NodeList(16)"), object_id: Some("{\"injectedScriptId\":11,\"id\":1}"), preview: None }, exception_details: None }) }
 impl RuntimeEvaluateTask {
+    pub fn get_object_id(&self) -> Option<runtime::RemoteObjectId> {
+        if let Some(ero) = self.task_result.as_ref() {
+            if let Some(object_id) = ero.result.object_id.as_ref() {
+                return Some(object_id).cloned();
+            } else {
+                error!("evaluate_result has empty object_id field. {:?}", self);
+            }
+        } else {
+            error!("evaluate_result has empty result. {:?}", self);
+        }
+        None
+    }
+
     pub fn get_string_result(&self) -> Option<&String> {
         if let Some(ero) = self.task_result.as_ref() {
             if let Some(serde_json::Value::String(jv)) = ero.result.value.as_ref() {

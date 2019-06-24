@@ -3,11 +3,14 @@ use headless_chrome::browser_async::{WaitingForPageAttachTaskName};
 use headless_chrome::browser_async::page_message::{
     MethodCallDone, PageResponse, ReceivedEvent,
 };
-use headless_chrome::browser_async::task_describe::HasTaskId;
+use headless_chrome::browser_async::task_describe::{HasTaskId, dom_tasks, runtime_tasks};
 use headless_chrome::protocol::target;
 use log::*;
 
 use super::{HOME_URL, GetContentInIframe, SHENBIAN_GANDONG_URL};
+
+const QUERY_ARTICLE_TITLES: &str = "query-article-titles";
+const DESCRIBE_ARTICLE_TITLES: &str = "describe-article-titles";
 
 impl GetContentInIframe {
     pub fn waiting_for_qrcode_scan(
@@ -59,46 +62,58 @@ impl GetContentInIframe {
                 match method_call_done {
                     MethodCallDone::Evaluate(task) => {
                         info!("{:?}", task);
+                        
                         if task.task_id_equal(get_children_number_task_name) {
-                        if let Some(v) = task.get_u64_result() {
-                            assert!(v == 16);
-                            let tab = self
-                                .get_tab(maybe_target_id)
-                                .expect("tab should exists. FrameStoppedLoading");
-                            let fm = |i: u64| {
-                                format!(r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text').item({}).click()"##, i)
-                            };
-                            for i in 0..15 {
-                                let exp = fm(i);
-                                let slice = exp.as_str();
-                                let t1 = tab.evaluate_expression_task(slice);
-                                tab.task_queue.add_manually(t1);
+                            if let Some(v) = task.get_u64_result() {
+                                assert!(v == 16);
+                                let tab = self
+                                    .get_tab(maybe_target_id)
+                                    .expect("tab should exists. FrameStoppedLoading");
+                                let children_nodes_expression = r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text')"##;
+                                tab.evaluate_expression_named(children_nodes_expression, QUERY_ARTICLE_TITLES);
+                                // let fm = |i: u64| {
+                                //     format!(r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text').item({}).click()"##, i)
+                                // };
+                                // for i in 0..15 {
+                                //     let exp = fm(i);
+                                //     let slice = exp.as_str();
+                                //     let t1 = tab.evaluate_expression_task(slice);
+                                //     tab.task_queue.add_manually(t1);
+                                // }
+                            } else {
+                                panic!("unexpected call return.");
                             }
-                        } else {
-                            panic!("unexpected call return.");
-                        }
-                    } else if task.task_id_equal(shiping_children_num_task_name) {
-                        if let Some(v) = task.get_u64_result() {
-                            error!("vvvvvvvvvvvvvvvvvvvvvvvvvvv{:?}",v);
-                            assert!(v > 0);
-                            let tab = self
-                                .get_tab(maybe_target_id)
-                                .expect("tab should exists. FrameStoppedLoading");
-                            let fm = |i: u64| {
-                                format!(r##"document.querySelectorAll("#root div.grid-cell span.text").item({}).click()"##, i)
-                            };
-                            for i in 0..15 {
-                                let exp = fm(i);
-                                let slice = exp.as_str();
-                                let t1 = tab.evaluate_expression_task(slice);
-                                tab.task_queue.add_manually(t1);
+                        } else if task.task_id_equal(shiping_children_num_task_name) {
+                            if let Some(v) = task.get_u64_result() {
+                                error!("vvvvvvvvvvvvvvvvvvvvvvvvvvv{:?}",v);
+                                assert!(v > 0);
+                                let tab = self
+                                    .get_tab(maybe_target_id)
+                                    .expect("tab should exists. FrameStoppedLoading");
+                                let fm = |i: u64| {
+                                    format!(r##"document.querySelectorAll("#root div.grid-cell span.text").item({}).click()"##, i)
+                                };
+                                for i in 0..15 {
+                                    let exp = fm(i);
+                                    let slice = exp.as_str();
+                                    let t1 = tab.evaluate_expression_task(slice);
+                                    tab.task_queue.add_manually(t1);
+                                }
+                            } else {
+                                panic!("unexpected call return.");
                             }
+                        } else if task.task_id_equal(QUERY_ARTICLE_TITLES) {
+                                let tab = self
+                                    .get_tab(maybe_target_id)
+                                    .expect("tab should exists. FrameStoppedLoading");
+                                let remote_object_id = task.get_object_id().expect("remote_object_id should exists.");
+                                tab.get_properties_by_object_id_named(remote_object_id, DESCRIBE_ARTICLE_TITLES);
+                            
+                        } else if task.task_id_equal(DESCRIBE_ARTICLE_TITLES) {
+                            error!("{:?}", task);
                         } else {
-                            panic!("unexpected call return.");
+                            info!("{:?}", task);
                         }
-                    }else {
-                        info!("{:?}", task);
-                    }
                     } 
                     MethodCallDone::GetResponseBodyForInterception(_task) => {}
                     _ => {}

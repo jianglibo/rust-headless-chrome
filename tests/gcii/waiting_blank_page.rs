@@ -28,7 +28,7 @@ impl GetContentInIframe {
                         let tasks = vec![
                             WaitingForPageAttachTaskName::PageEnable,
                             WaitingForPageAttachTaskName::RuntimeEnable,
-                            WaitingForPageAttachTaskName::NetworkEnable
+                            // WaitingForPageAttachTaskName::NetworkEnable
                         ];
                         tab.attach_to_page_and_then(tasks);
                     }

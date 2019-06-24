@@ -438,10 +438,6 @@ impl Tab {
         if let Some(changing_frame) = self.changing_frames.get_mut(&frame_id) {
             *changing_frame = ChangingFrame::StartedLoading(frame_id);
         } else {
-            trace!(
-                "Cannot found frame with id when got _frame_started_loading, no it shouldn't.: {:?}",
-                &frame_id
-            );
             self.changing_frames
                 .insert(frame_id.clone(), ChangingFrame::StartedLoading(frame_id));
         }
@@ -581,7 +577,7 @@ impl Tab {
     }
 
     /// Moves the mouse to this point (dispatches a mouseMoved event)
-    pub fn move_mouse_to_point_task(&self, point: Point) -> TaskDescribe {
+    pub fn mouse_move_to_point_task(&self, point: Point) -> TaskDescribe {
         if point.x == 0.0 && point.y == 0.0 {
             warn!("Midpoint of element shouldn't be 0,0. Something is probably wrong.")
         }
@@ -626,6 +622,10 @@ impl Tab {
         task.into()
     }
 
+    pub fn mouse_click_task(&self, point: Point) -> Vec<TaskDescribe> {
+        vec![self.mouse_move_to_point_task(point), self.mouse_press_at_point_task(point), self.mouse_release_at_point(point)]
+    }
+
     // pub fn click_point(&self, point: Point) -> Result<&Self, failure::Error> {
     //     trace!("Clicking point: {:?}", point);
     //     if point.x == 0.0 && point.y == 0.0 {
@@ -652,9 +652,28 @@ impl Tab {
     // }
 
     // dom_tasks::GetContentQuads
-    pub fn get_midpoint(&self, raw_quad: &[f64; 8]) -> Result<Point, failure::Error> {
+    pub fn get_midpoint(&self, raw_quad: &[f64; 8]) -> Point {
         let input_quad = ElementQuad::from_raw_points(&raw_quad);
-        Ok((input_quad.bottom_right + input_quad.top_left) / 2.0)
+        (input_quad.bottom_right + input_quad.top_left) / 2.0
+    }
+
+    pub fn get_content_quads_by_object_id_task(&self, remote_object_id: runtime::RemoteObjectId) -> TaskDescribe {
+        let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
+            builder.common_fields(self.get_common_field(None))
+            .object_id(remote_object_id);
+        self.get_content_quads_task(builder)
+    }
+
+    pub fn get_content_quads_by_backend_node_id_task(&self, backend_node_id: dom::NodeId) -> TaskDescribe {
+        let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
+            builder.common_fields(self.get_common_field(None))
+            .backend_node_id(backend_node_id);
+        self.get_content_quads_task(builder)
+    }
+
+    pub fn get_content_quads_task(&self, mut get_content_quads_task_builder: dom_tasks::GetContentQuadsTaskBuilder) -> TaskDescribe {
+        let task = get_content_quads_task_builder.common_fields(self.get_common_field(None)).build().expect("GetContentQuadsTaskBuilder should success.");
+        task.into()
     }
 
     fn get_box_model_task_impl(
@@ -971,17 +990,25 @@ impl Tab {
         }
     }
 
-    pub fn runtime_get_properties_by_object_id(
+    fn get_properties_by_object_id_impl(
         &mut self,
         object_id: runtime::RemoteObjectId,
-        manual_task_id: Option<TaskId>,
+        name: Option<&str>,
     ) {
         let task = runtime_tasks::RuntimeGetPropertiesTaskBuilder::default()
             .object_id(object_id)
-            .common_fields(self.get_common_field(manual_task_id))
+            .common_fields(self.get_common_field(name.map(Into::into)))
             .build()
             .expect("build RuntimeGetPropertiesTaskBuilder should success.");
         self.execute_one_task(task.into());
+    }
+
+    pub fn get_properties_by_object_id(&mut self, object_id: runtime::RemoteObjectId) {
+        self.get_properties_by_object_id_impl(object_id, None);
+    }
+
+    pub fn get_properties_by_object_id_named(&mut self, object_id: runtime::RemoteObjectId, name: &str) {
+        self.get_properties_by_object_id_impl(object_id, Some(name));
     }
 
     pub fn runtime_get_properties(

@@ -108,13 +108,22 @@ impl GetContentInIframe {
                                     .expect("tab should exists. FrameStoppedLoading");
                                 let remote_object_id = task.get_object_id().expect("remote_object_id should exists.");
                                 tab.get_properties_by_object_id_named(remote_object_id, DESCRIBE_ARTICLE_TITLES);
-                            
-                        } else if task.task_id_equal(DESCRIBE_ARTICLE_TITLES) {
-                            error!("{:?}", task);
                         } else {
                             info!("{:?}", task);
                         }
                     } 
+                    MethodCallDone::GetProperties(task) => {
+                        info!("{:?}", task);
+                        assert!(task.task_id_equal(DESCRIBE_ARTICLE_TITLES));
+                        let property_describers = task.task_result.expect("task_result should exists").result;
+                        for pd in property_describers {
+                            if let Some(ro) = pd.value {
+                                if let Some(object_id) = ro.object_id {
+                                    info!("{:?}", object_id);
+                                }
+                            }
+                        }
+                    }
                     MethodCallDone::GetResponseBodyForInterception(_task) => {}
                     _ => {}
                 }

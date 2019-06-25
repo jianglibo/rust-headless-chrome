@@ -1,5 +1,6 @@
 use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
 use crate::protocol::{runtime};
+use crate::browser::tab::point::Point;
 use failure;
 
 #[derive(Debug, Builder, Clone)]
@@ -25,6 +26,30 @@ pub struct RuntimeCallFunctionOnTask {
     pub object_group: Option<String>,
     #[builder(default = "None")]
     pub task_result: Option<runtime::methods::CallFunctionOnReturnObject>,
+}
+
+impl RuntimeCallFunctionOnTask {
+    pub fn get_midpoint(&self) -> Option<Point> {
+        if let Some(task_return_object) = self.task_result.clone() {
+            let properties = task_return_object.result
+                .preview
+                .expect("JS couldn't give us quad for element")
+                .properties;
+            let mut prop_map = std::collections::HashMap::new();
+
+            for prop in properties {
+                prop_map.insert(prop.name, prop.value.unwrap().parse::<f64>().unwrap());
+            }
+
+            let midpoint = Point {
+                x: prop_map["x"] + (prop_map["width"] / 2.0),
+                y: prop_map["y"] + (prop_map["height"] / 2.0),
+            };
+            Some(midpoint)
+        } else {
+            None
+        }
+    }
 }
 
 impl_has_common_fields!(RuntimeCallFunctionOnTask);

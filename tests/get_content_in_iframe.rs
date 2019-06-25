@@ -99,7 +99,7 @@ impl Future for GetContentInIframe {
                             .find_tab_by_name_mut(HOME_URL)
                             .expect("home page should exists.");
                         if run_task_queue_manually {
-                            info!("run_task_queue_manually.");
+                            // info!("run_task_queue_manually.");
                             tab.run_task_queue_manually();
                         }
                     }

@@ -116,13 +116,41 @@ impl GetContentInIframe {
                         info!("{:?}", task);
                         assert!(task.task_id_equal(DESCRIBE_ARTICLE_TITLES));
                         let property_describers = task.task_result.expect("task_result should exists").result;
-                        for pd in property_describers {
-                            if let Some(ro) = pd.value {
-                                if let Some(object_id) = ro.object_id {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. FrameStoppedLoading");
+                        // for pd in property_describers {
+                        //     if let Some(ro) = pd.value {
+                        //         if let Some(object_id) = ro.object_id {
+                        //             info!("{:?}", object_id);
+                        //             let tasks = tab.mouse_click_on_remote_object_task(object_id);
+                        //             tab.task_queue.add_manually_many(tasks);
+                        //         }
+                        //     }
+                        // }
+                        // tab.run_task_queue_manually();
+                        if let Some(pd) = property_describers.get(0) {
+                            if let Some(ro) = &pd.value {
+                                if let Some(object_id) = &ro.object_id {
                                     info!("{:?}", object_id);
+                                    let task = tab.get_content_quads_by_object_id_task_named(object_id.to_string(), "get-quads");
+                                    tab.execute_one_task(task);
+
+                                    let task = tab.get_js_midpoint_task(object_id.to_string(), Some("get-js-midpoint"));
+                                    tab.execute_one_task(task);
+                                    // let tasks = tab.mouse_click_on_remote_object_task(object_id.to_string());
+                                    // tab.execute_tasks(tasks);
                                 }
                             }
+                        } else {
+                            panic!("empty property_describers.");
                         }
+                    }
+                    MethodCallDone::GetContentQuads(task) => {
+                        info!("-------------{:?}", task);
+                    }
+                    MethodCallDone::CallFunctionOn(task) => {
+                        info!("---------------{:?}", task);
                     }
                     MethodCallDone::GetResponseBodyForInterception(_task) => {}
                     _ => {}

@@ -622,6 +622,13 @@ impl Tab {
         vec![self.mouse_move_to_point_task(point), self.mouse_press_at_point_task(point), self.mouse_release_at_point(point)]
     }
 
+    pub fn get_content_quads_by_object_id_task_named(&self, remote_object_id: runtime::RemoteObjectId, name: &str) -> TaskDescribe {
+        let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
+            builder.common_fields(self.get_common_field(Some(name.into())))
+            .object_id(remote_object_id);
+        self.get_content_quads_task(builder)
+    }
+
     pub fn get_content_quads_by_object_id_task(&self, remote_object_id: runtime::RemoteObjectId) -> TaskDescribe {
         let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
             builder.common_fields(self.get_common_field(None))
@@ -931,7 +938,7 @@ impl Tab {
         call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
         name: &str,
     ) {
-        self.call_function_on_impl(call_function_on_task_builder, Some(name.into()));
+        self.call_function_on_impl(call_function_on_task_builder, Some(name));
     }
 
     pub fn call_function_on(
@@ -941,18 +948,69 @@ impl Tab {
         self.call_function_on_impl(call_function_on_task_builder, None);
     }
 
+    pub fn get_js_midpoint_task(&self, remote_object_id: runtime::RemoteObjectId, name: Option<&str>) -> TaskDescribe {
+        self.call_function_on_remote_object_task(name, remote_object_id, "function(){ return this.getBoundingClientRect();}", Some(true))
+    }
+    // pub fn call_js_fn(
+    //     &self,
+    //     function_declaration: &str,
+    //     await_promise: bool,
+    // ) -> Result<runtime::RemoteObject, Error> {
+    //     let result = self
+    //         .parent
+    //         .call_method(runtime::methods::CallFunctionOn {
+    //             object_id: Some(self.remote_object_id.clone()),
+    //             function_declaration,
+    //             return_by_value: Some(false),
+    //             generate_preview: Some(true),
+    //             silent: Some(false),
+    //             await_promise: Some(await_promise),
+    //             ..Default::default()
+    //         })?
+    //         .result;
+    //     Ok(result)
+    // }
+    pub fn call_function_on_remote_object_task(&self, 
+        name: Option<&str>,
+        remote_object_id: runtime::RemoteObjectId,
+        fnd: &str,
+        generate_preview: Option<bool>,
+        ) -> TaskDescribe {
+            self.call_function_on_remote_object_task_impl(name, remote_object_id, fnd, generate_preview)
+        }
+
+    fn call_function_on_remote_object_task_impl(&self, 
+        name: Option<&str>,
+        remote_object_id: runtime::RemoteObjectId,
+        fnd: &str,
+        generate_preview: Option<bool>,
+        ) -> TaskDescribe {
+        let task = runtime_tasks::RuntimeCallFunctionOnTaskBuilder::default()
+            .common_fields(self.get_common_field(name.map(Into::into)))
+            .object_id(remote_object_id)
+            .function_declaration(fnd)
+            .generate_preview(generate_preview)
+            .build()
+            .expect("RuntimeCallFunctionOnTaskBuilder should work.");
+        task.into()
+    }
+
     fn call_function_on_impl(
         &mut self,
-        mut call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
-        manual_task_id: Option<TaskId>,
+        call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
+        name: Option<&str>,
     ) {
+        let task = self.call_function_on_task_impl(call_function_on_task_builder, name);
+        self.execute_one_task(task);
+    }
+
+    fn call_function_on_task_impl(&self,
+        mut call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
+        name: Option<&str>) -> TaskDescribe {
         let task = call_function_on_task_builder
-            .common_fields(self.get_common_field(manual_task_id))
-            .build();
-        match task {
-            Ok(task) => self.execute_one_task(task.into()),
-            Err(err) => error!("build call_function_on task error: {:?}", err),
-        }
+            .common_fields(self.get_common_field(name.map(Into::into)))
+            .build().expect("build call_function_on task error.");
+        task.into()
     }
 
     fn get_properties_by_object_id_impl(

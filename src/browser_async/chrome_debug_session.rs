@@ -247,6 +247,34 @@ impl ChromeDebugSession {
                     failure::bail!("found_box is None!");
                 }
             }
+            (
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetContentQuads(get_content_quads)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event))
+            ) => {
+                if let Some(mid_point) = get_content_quads.get_midpoint() {
+                    dispatch_mouse_event.x.replace(mid_point.x);
+                    dispatch_mouse_event.y.replace(mid_point.y);
+                } else {
+                    warn!("get_content_quads return empty result.");
+                }
+                self.execute_next_and_return_remains(tasks);
+            }
+            (
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_1)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_2))
+            ) => {
+                if dispatch_mouse_event_2.x.is_none() && dispatch_mouse_event_2.y.is_none() {
+                    if dispatch_mouse_event_1.x.is_some() && dispatch_mouse_event_1.y.is_some() {
+                        dispatch_mouse_event_2.x.replace(dispatch_mouse_event_1.x.unwrap());
+                        dispatch_mouse_event_2.y.replace(dispatch_mouse_event_1.y.unwrap());
+                    } else {
+                        warn!("dispatch_mouse_event_2 has part point. missing x or y");
+                    }
+                } else {
+                    warn!("dispatch_mouse_event_1 has part point. missing x or y.");
+                }
+                self.execute_next_and_return_remains(tasks);
+            }
             _ => {
                 // warn!("unknown pair: {:?}, {:?}", current_task, next_task);
                 self.execute_next_and_return_remains(tasks);

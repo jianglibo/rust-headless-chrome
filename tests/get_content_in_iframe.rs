@@ -84,9 +84,9 @@ impl Future for GetContentInIframe {
                     //     seconds,
                     //     self.debug_session.tabs.len()
                     // );
-                    // for t in &self.debug_session.tabs {
-                    //     trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
-                    // }
+                    for t in &self.debug_session.tabs {
+                        trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
+                    }
                     self.debug_session.browser_contexts().deduplicate();
                     // self.debug_session.activates_next_in_interval(10);
                     // self.debug_session.activate_last_opened_tab();

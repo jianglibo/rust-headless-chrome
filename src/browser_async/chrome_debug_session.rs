@@ -371,8 +371,9 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::ContinueInterceptedRequest(_task) => {
                     info!("continue_intercepted_request done.");
                 }
-                TargetCallMethodTask::GetLayoutMetrics(_task) => {
-                    info!("get_layout_metrics done.");
+                TargetCallMethodTask::GetLayoutMetrics(task) => {
+                    let task_return_object = protocol::parse_response::<page::methods::GetLayoutMetricsObject>(resp)?;
+                    task.task_result.replace(task_return_object);
                 }
                 TargetCallMethodTask::BringToFront(_task) => {
                     info!("bring_to_front done.");

@@ -250,7 +250,7 @@ pub mod methods {
     pub struct GetLayoutMetrics {
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct GetLayoutMetricsObject {
         layout_viewport: LayoutViewport,

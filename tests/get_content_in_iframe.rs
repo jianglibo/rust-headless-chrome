@@ -4,13 +4,13 @@
 extern crate chrono;
 extern crate fern;
 extern crate log;
-use fern::colors::{Color, ColoredLevelConfig};
 
 #[macro_use]
 extern crate futures;
 extern crate tokio_timer;
 
 mod gcii;
+mod tutil;
 
 use headless_chrome::browser_async::{EventName, Tab};
 
@@ -21,46 +21,6 @@ use std::default::Default;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 use gcii::{GetContentInIframe, PageState, HOME_URL, SHENBIAN_GANDONG_URL};
-
-// "headless_chrome=trace,get_content_in_iframe=trace",
-fn setup_logger() -> Result<(), fern::InitError> {
-    let base_config = fern::Dispatch::new()
-        .level(log::LevelFilter::Info)
-        .level_for("headless_chrome", log::LevelFilter::Trace)
-        .level_for("get_content_in_iframe", log::LevelFilter::Trace);
-
-
-    let colors = ColoredLevelConfig::new().info(Color::Green);
-    let std_out_config = fern::Dispatch::new()
-        .format(move |out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                colors.color(record.level()),
-                message
-            ))
-        })
-        .chain(std::io::stdout());
-
-    let file_config = fern::Dispatch::new()
-        .format(move |out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .chain(fern::log_file("output.log")?);
-
-    base_config
-        .chain(std_out_config)
-        .chain(file_config)
-        .apply()?;
-    Ok(())
-}
 
 impl GetContentInIframe {
     fn assert_result(&self) {
@@ -189,12 +149,7 @@ impl Future for GetContentInIframe {
 // post to: https://iflow-api.xuexi.cn/logflow/api/v1/pclog
 #[test]
 fn t_get_content_in_iframe() {
-    // ::std::env::set_var(
-    //     "RUST_LOG",
-    //     "headless_chrome=trace,get_content_in_iframe=trace",
-    // );
-    // env_logger::init();
-    setup_logger().expect("fern log should work.");
+    tutil::setup_logger().expect("fern log should work.");
 
     let my_page = GetContentInIframe::default();
 

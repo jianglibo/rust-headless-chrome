@@ -142,15 +142,15 @@ pub fn handle_target_method_call(
             });
         }
         TargetCallMethodTask::CaptureScreenshot(task) => {
-            let task_id = task.get_task_id();
-            let ro = response_object::CaptureScreenshot {
-                selector: task.selector,
-                base64: task.task_result,
-            };
+            // let task_id = task.get_task_id();
+            // let ro = response_object::CaptureScreenshot {
+            //     selector: task.selector,
+            //     base64: task.task_result,
+            // };
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
-                task_id: Some(task_id),
-                page_response: PageResponse::MethodCallDone(MethodCallDone::CaptureScreenshot(ro)),
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::CaptureScreenshot(task)),
             });
         }
         TargetCallMethodTask::RuntimeEvaluate(task) => {
@@ -190,9 +190,12 @@ pub fn handle_target_method_call(
             warn!("ignored method return. PageReload");
             return Ok(PageResponseWrapper::default());
         }
-        TargetCallMethodTask::GetLayoutMetrics(_task) => {
-            warn!("ignored method return. GetLayoutMetrics");
-            return Ok(PageResponseWrapper::default());
+        TargetCallMethodTask::GetLayoutMetrics(task) => {
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::GetLayoutMetrics(task)),
+            });
         }
         TargetCallMethodTask::DispatchMouseEvent(_task) => {
             warn!("ignored method return. DispatchMouseEvent");

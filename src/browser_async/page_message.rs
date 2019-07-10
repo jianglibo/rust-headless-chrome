@@ -75,7 +75,7 @@ pub enum MethodCallDone {
     GetBoxModel(dom_tasks::GetBoxModelTask),
     GetContentQuads(dom_tasks::GetContentQuadsTask),
     GetDocument(dom_tasks::GetDocumentTask),
-    CaptureScreenshot(response_object::CaptureScreenshot),
+    CaptureScreenshot(page_tasks::CaptureScreenshotTask),
     Evaluate(runtime_tasks::RuntimeEvaluateTask),
     GetProperties(runtime_tasks::RuntimeGetPropertiesTask),
     CallFunctionOn(runtime_tasks::RuntimeCallFunctionOnTask),

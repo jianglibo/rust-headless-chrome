@@ -6,12 +6,13 @@ use failure;
 #[builder(setter(into))]
 pub struct CaptureScreenshotTask {
     pub common_fields: CommonDescribeFields,
+    #[builder(default = "None")]
     pub selector: Option<&'static str>,
     pub format: page::ScreenshotFormat,
     #[builder(default = "None")]
     pub clip: Option<page::Viewport>,
-    #[builder(default = "false")]
-    pub from_surface: bool,
+    #[builder(default = "None")]
+    pub from_surface: Option<bool>,
     #[builder(default = "None")]
     pub task_result: Option<String>,
 }
@@ -33,7 +34,7 @@ impl AsMethodCallString for CaptureScreenshotTask {
             clip: self.clip.as_ref().cloned(),
             format,
             quality,
-            from_surface: self.from_surface,
+            from_surface: self.from_surface.map_or(true, |o|o),
         };
         Ok(self.create_method_str(method))
     }

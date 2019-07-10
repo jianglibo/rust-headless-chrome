@@ -143,8 +143,9 @@ impl GetContentInIframe {
 
                                     let task = tab.get_js_midpoint_task(object_id.to_string(), Some("get-js-midpoint"));
                                     tab.execute_one_task(task);
-                                    // let tasks = tab.mouse_click_on_remote_object_task(object_id.to_string());
-                                    // tab.execute_tasks(tasks);
+                                    
+                                    let tasks = tab.mouse_click_on_remote_object_task(object_id.to_string());
+                                    tab.execute_tasks(tasks);
                                 }
                             }
                         } else {

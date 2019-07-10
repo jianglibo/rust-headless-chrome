@@ -708,6 +708,20 @@ impl Tab {
         self.execute_tasks(tasks);
     }
 
+    pub fn get_layout_metrics(&mut self) {
+        self.get_layout_metrics_impl(None);
+    }
+
+    fn get_layout_metrics_impl(&mut self,
+        name: Option<&str>,
+    ) {
+        let task = page_tasks::GetLayoutMetricsTaskBuilder::default()
+            .common_fields(self.get_common_field(name.map(Into::into)))
+            .build()
+            .expect("build GetBoxModelTaskBuilder should success.");
+        self.execute_one_task(task.into());
+    }
+
     pub fn capture_screenshot_by_selector(
         &mut self,
         selector: &'static str,
@@ -725,6 +739,49 @@ impl Tab {
         let mut pre_tasks = self.get_box_model_by_selector_task_impl(selector, None);
         pre_tasks.push(screen_shot.into());
         self.execute_tasks(pre_tasks);
+    }
+
+    pub fn capture_screenshot_view_jpeg(&mut self) {
+        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(Some(100)),
+         Some(false), None);
+        self.execute_one_task(task);
+    }
+
+    pub fn capture_screenshot_surface_jpeg(&mut self) {
+        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(Some(100)),
+         Some(true), None);
+        self.execute_one_task(task);
+    }
+
+    pub fn capture_screenshot_view_png(
+        &mut self
+    ) {
+        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG,
+         Some(false), None);
+        self.execute_one_task(task);
+    }
+
+    pub fn capture_screenshot_surface_png(
+        &mut self
+    ) {
+        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG,
+         Some(true), None);
+        self.execute_one_task(task);
+    }
+
+    fn capture_screenshot_impl_task(
+        &mut self,
+        format: page::ScreenshotFormat,
+        from_surface: Option<bool>,
+        manual_task_id: Option<TaskId>,
+    ) -> TaskDescribe {
+        let screen_shot = page_tasks::CaptureScreenshotTaskBuilder::default()
+            .common_fields(self.get_common_field(manual_task_id))
+            .format(format)
+            .from_surface(from_surface)
+            .build()
+            .expect("build CaptureScreenshotTaskBuilder should success.");
+        screen_shot.into()
     }
 
     pub fn get_common_field(&self, manual_task_id: Option<TaskId>) -> CommonDescribeFields {

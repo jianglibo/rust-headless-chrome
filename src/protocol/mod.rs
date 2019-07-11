@@ -16,8 +16,15 @@ pub mod profiler;
 pub mod runtime;
 pub mod target;
 pub mod security;
+pub mod emulation;
 
 pub type CallId = usize;
+
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmptyReturnObject {
+}
 
 #[derive(Serialize, Debug)]
 pub struct MethodCall<T>

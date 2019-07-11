@@ -8,12 +8,13 @@ use super::task_describe::{
     CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks,
 };
 use super::{EventName, EventStatistics, TaskQueue};
-use crate::protocol::{self, dom, network, page, runtime, target, input};
+use crate::protocol::{self, dom, network, page, runtime, target};
 use log::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use failure;
+mod screen_shot_func;
+mod box_model_func;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum WaitingForPageAttachTaskName {
@@ -471,20 +472,30 @@ impl Tab {
     }
 
     pub fn get_document(&mut self, depth: Option<u8>) {
-        self.get_document_impl(depth, None);
+        let task = self.get_document_task(depth);
+        self.execute_one_task(task.into());
+    }
+
+    pub fn get_document_task(&mut self, depth: Option<u8>) -> TaskDescribe {
+        self.get_document_task_impl(depth, None)
     }
 
     pub fn get_document_named(&mut self, depth: Option<u8>, name: &str) {
-        self.get_document_impl(depth, Some(name.into()));
+        let task = self.get_document_task_named(depth, name);
+        self.execute_one_task(task);
     }
 
-    fn get_document_impl(&mut self, depth: Option<u8>, manual_task_id: Option<TaskId>) {
+    pub fn get_document_task_named(&mut self, depth: Option<u8>, name: &str) -> TaskDescribe {
+        self.get_document_task_impl(depth, Some(name.into()))
+    }
+
+    fn get_document_task_impl(&mut self, depth: Option<u8>, manual_task_id: Option<TaskId>) -> TaskDescribe {
         let task = dom_tasks::GetDocumentTaskBuilder::default()
             .common_fields(self.get_common_field(manual_task_id))
             .depth(depth)
             .build()
             .expect("build GetDocumentTaskBuilder should success.");
-        self.execute_one_task(task.into());
+        task.into()
     }
 
     pub fn query_selector_by_selector(&mut self, selector: &str) {
@@ -648,65 +659,7 @@ impl Tab {
         task.into()
     }
 
-    fn get_box_model_task_impl(
-        &mut self,
-        mut get_box_model_task_builder: dom_tasks::GetBoxModelTaskBuilder,
-        manual_task_id: Option<&str>,
-    ) -> TaskDescribe {
-        let task = get_box_model_task_builder.common_fields(self.get_common_field(manual_task_id.map(Into::into))).build().expect("GetBoxModelTaskBuilder should success.");
-        task.into()
-    }
-    pub fn get_box_model_task(
-        &mut self,
-        get_box_model_task_builder: dom_tasks::GetBoxModelTaskBuilder,
-    ) -> TaskDescribe {
-        self.get_box_model_task_impl(get_box_model_task_builder, None)
-    }
 
-    pub fn get_box_model_task_named(
-        &mut self,
-        get_box_model_task_builder: dom_tasks::GetBoxModelTaskBuilder,
-        name: &str,
-    ) -> TaskDescribe {
-        self.get_box_model_task_impl(get_box_model_task_builder, Some(name))
-    }
-
-    pub fn get_box_model_by_selector_task(&self, selector: &str) -> Vec<TaskDescribe> {
-        self.get_box_model_by_selector_task_impl(selector, None)
-    }
-
-    pub fn get_box_model_by_selector_task_named(&self, selector: &str, name: &str) -> Vec<TaskDescribe> {
-        self.get_box_model_by_selector_task_impl(selector, Some(name))
-    }
-
-
-    fn get_box_model_by_selector_task_impl(
-        &self,
-        selector: &str,
-        manual_task_id: Option<&str>,
-    ) -> Vec<TaskDescribe> {
-        let mut pre_tasks = self.get_query_selector(selector, None);
-        let get_box_model = dom_tasks::GetBoxModelTaskBuilder::default()
-            .common_fields(self.get_common_field(manual_task_id.map(Into::into)))
-            .selector(selector.to_owned())
-            .build()
-            .expect("build GetBoxModelTaskBuilder should success.");
-        pre_tasks.push(get_box_model.into());
-        pre_tasks
-    }
-
-    pub fn get_box_model_by_selector(
-        &mut self,
-        selector: &str
-    ) {
-        let tasks = self.get_box_model_by_selector_task_impl(selector, None);
-        self.execute_tasks(tasks);
-    }
-
-    pub fn get_box_model_by_selector_named(&mut self, selector: &str, name: &str) {
-        let tasks = self.get_box_model_by_selector_task_impl(selector, Some(name.into()));
-        self.execute_tasks(tasks);
-    }
 
     pub fn get_layout_metrics(&mut self) {
         self.get_layout_metrics_impl(None);
@@ -718,71 +671,11 @@ impl Tab {
         let task = page_tasks::GetLayoutMetricsTaskBuilder::default()
             .common_fields(self.get_common_field(name.map(Into::into)))
             .build()
-            .expect("build GetBoxModelTaskBuilder should success.");
+            .expect("build GetLayoutMetricsTaskBuilder should success.");
         self.execute_one_task(task.into());
     }
 
-    pub fn capture_screenshot_by_selector(
-        &mut self,
-        selector: &'static str,
-        format: page::ScreenshotFormat,
-        from_surface: bool,
-        manual_task_id: Option<TaskId>,
-    ) {
-        let screen_shot = page_tasks::CaptureScreenshotTaskBuilder::default()
-            .common_fields(self.get_common_field(manual_task_id))
-            .selector(selector)
-            .format(format)
-            .from_surface(from_surface)
-            .build()
-            .expect("build CaptureScreenshotTaskBuilder should success.");
-        let mut pre_tasks = self.get_box_model_by_selector_task_impl(selector, None);
-        pre_tasks.push(screen_shot.into());
-        self.execute_tasks(pre_tasks);
-    }
 
-    pub fn capture_screenshot_view_jpeg(&mut self) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(Some(100)),
-         Some(false), None);
-        self.execute_one_task(task);
-    }
-
-    pub fn capture_screenshot_surface_jpeg(&mut self) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(Some(100)),
-         Some(true), None);
-        self.execute_one_task(task);
-    }
-
-    pub fn capture_screenshot_view_png(
-        &mut self
-    ) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG,
-         Some(false), None);
-        self.execute_one_task(task);
-    }
-
-    pub fn capture_screenshot_surface_png(
-        &mut self
-    ) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG,
-         Some(true), None);
-        self.execute_one_task(task);
-    }
-
-    fn capture_screenshot_impl_task(
-        &mut self,
-        format: page::ScreenshotFormat,
-        from_surface: Option<bool>,
-        manual_task_id: Option<TaskId>,
-    ) -> TaskDescribe {
-        let screen_shot = page_tasks::CaptureScreenshotTaskBuilder::default()
-            .common_fields(self.get_common_field(manual_task_id))
-            .format(format)
-            .from_surface(from_surface)
-            .build()
-            .expect("build CaptureScreenshotTaskBuilder should success.");
-        screen_shot.into()
-    }
 
     pub fn get_common_field(&self, manual_task_id: Option<TaskId>) -> CommonDescribeFields {
         CommonDescribeFieldsBuilder::default()

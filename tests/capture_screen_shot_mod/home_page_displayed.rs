@@ -1,10 +1,9 @@
 use headless_chrome::browser_async::page_message::{
     write_base64_str_to, MethodCallDone, PageResponse, ReceivedEvent,
 };
-use headless_chrome::browser_async::task_describe::RuntimeEvaluateTaskBuilder;
+
 use headless_chrome::protocol::{target, page};
 use log::*;
-use std::default::Default;
 
 use std::fs;
 use std::path::Path;
@@ -26,13 +25,16 @@ impl CaptureScreenShotTest {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. LoadEventFired");
                         // tab.capture_screenshot_view_jpeg();
-                        tab.get_layout_metrics();
+                        // tab.get_layout_metrics();
+                        // let task = tab.capture_screenshot_jpeg_task(Some(100), Some(false));
+                        let tasks = tab.capture_screenshot_by_selector_jpeg_task("body", Some(100), Some(false), None);
+                        tab.task_queue.add_delayed_many(tasks, 3);
                     }
                     ReceivedEvent::FrameStoppedLoading(frame_id) => {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
-                        let frame = tab.find_frame_by_id(&frame_id).expect("frame should be found by frame_id.");
+                        let _frame = tab.find_frame_by_id(&frame_id).expect("frame should be found by frame_id.");
                         // if frame.
                     }
                     ReceivedEvent::ResponseReceived(_event) => {}
@@ -46,7 +48,8 @@ impl CaptureScreenShotTest {
             PageResponse::MethodCallDone(method_call_done) => {
                 match  method_call_done {
                     MethodCallDone::CaptureScreenshot(capture_screen_shot) => {
-                        info!("got screen shot: {:?}", capture_screen_shot.task_result);
+                        // info!("got screen shot: {:?}", capture_screen_shot.task_result);
+                        info!("got screen shot: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
                         assert!(capture_screen_shot.task_result.is_some());
 
                         let file_name = if let page::ScreenshotFormat::PNG = capture_screen_shot.format {

@@ -1,9 +1,20 @@
 use serde::{Deserialize, Deserializer};
+use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 
 pub type NodeId = u16;
 
 pub type NodeAttributes = HashMap<String, String>;
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RGBA {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: Option<f64>,
+}
+
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

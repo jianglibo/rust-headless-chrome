@@ -7,7 +7,7 @@ use failure;
 pub struct GetLayoutMetricsTask {
     pub common_fields: CommonDescribeFields,
     #[builder(default = "None")]
-    pub task_result: Option<page::methods::GetLayoutMetricsObject>,
+    pub task_result: Option<page::methods::GetLayoutMetricsReturnObject>,
 }
 
 impl_has_common_fields!(GetLayoutMetricsTask);

@@ -1,7 +1,7 @@
-use serde::{Deserialize, Deserializer};
-use serde::{Serialize, Serializer};
+use serde::{Deserializer};
+use serde::{Serialize};
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum ScreenOrientationType {
     PortraitPrimary,
@@ -10,7 +10,7 @@ pub enum ScreenOrientationType {
     LandscapeSecondary,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenOrientation {
     #[serde(rename = "type")]
@@ -19,8 +19,8 @@ pub struct ScreenOrientation {
 }
 
 pub mod events {
-    use crate::protocol::runtime;
-    use serde::Deserialize;
+    // use crate::protocol::runtime;
+    // use serde::Deserialize;
 
     // #[derive(Deserialize, Debug, Clone)]
     // pub struct LifecycleEvent {
@@ -138,7 +138,7 @@ pub mod methods {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub position_y: Option<u64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub dontSetVisibleSize: Option<bool>,
+        pub dont_set_visible_size: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub screen_orientation: Option<ScreenOrientation>,
         #[serde(skip_serializing_if = "Option::is_none")]

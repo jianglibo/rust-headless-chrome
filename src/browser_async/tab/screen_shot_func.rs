@@ -1,10 +1,7 @@
+use super::super::protocol::page;
+use super::super::task_describe::{page_tasks, TaskDescribe};
 use super::Tab;
-use super::super::protocol::{page, runtime, target, input};
-use super::{TaskId, ChromeDebugSession};
-use super::super::task_describe::{
-    network_tasks, page_tasks, runtime_tasks, target_tasks,
-    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks,
-};
+use super::TaskId;
 
 impl Tab {
     fn capture_screenshot_by_selector_task_impl(
@@ -26,54 +23,77 @@ impl Tab {
         pre_tasks
     }
 
-    pub fn capture_screenshot_by_selector_jpeg_task(&mut self, selector: &'static str, quality: Option<u8>, from_surface: Option<bool>, task_name: Option<&str>) -> Vec<TaskDescribe> {
-        self.capture_screenshot_by_selector_task_impl(selector, page::ScreenshotFormat::JPEG(quality), from_surface, task_name)
+    pub fn capture_screenshot_by_selector_jpeg_task(
+        &mut self,
+        selector: &'static str,
+        quality: Option<u8>,
+        from_surface: Option<bool>,
+        task_name: Option<&str>,
+    ) -> Vec<TaskDescribe> {
+        self.capture_screenshot_by_selector_task_impl(
+            selector,
+            page::ScreenshotFormat::JPEG(quality),
+            from_surface,
+            task_name,
+        )
     }
 
-    pub fn capture_screenshot_by_selector_png_task(&mut self, selector: &'static str, from_surface: Option<bool>, task_name: Option<&str>) -> Vec<TaskDescribe> {
-        self.capture_screenshot_by_selector_task_impl(selector, page::ScreenshotFormat::PNG, from_surface, task_name)
+    // pub fn get_full_page_screenshot_jpeg_task(&mut self, quality: Option<u8>) -> Vec<TaskDescribe> {
+        
+    // }
+
+    pub fn capture_screenshot_by_selector_png_task(
+        &mut self,
+        selector: &'static str,
+        from_surface: Option<bool>,
+        task_name: Option<&str>,
+    ) -> Vec<TaskDescribe> {
+        self.capture_screenshot_by_selector_task_impl(
+            selector,
+            page::ScreenshotFormat::PNG,
+            from_surface,
+            task_name,
+        )
     }
 
     pub fn capture_screenshot_view_jpeg(&mut self, quality: Option<u8>) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(quality),
-         Some(false), None);
+        let task = self.capture_screenshot_impl_task(
+            page::ScreenshotFormat::JPEG(quality),
+            Some(false),
+            None,
+        );
         self.execute_one_task(task);
     }
 
     pub fn capture_screenshot_surface_jpeg(&mut self, quality: Option<u8>) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(quality),
-         Some(true), None);
+        let task = self.capture_screenshot_impl_task(
+            page::ScreenshotFormat::JPEG(quality),
+            Some(true),
+            None,
+        );
         self.execute_one_task(task);
     }
 
-    pub fn capture_screenshot_view_png(
-        &mut self
-    ) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG,
-         Some(false), None);
+    pub fn capture_screenshot_view_png(&mut self) {
+        let task =
+            self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG, Some(false), None);
         self.execute_one_task(task);
     }
 
-    pub fn capture_screenshot_surface_png(
-        &mut self
-    ) {
-        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG,
-         Some(true), None);
+    pub fn capture_screenshot_surface_png(&mut self) {
+        let task = self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG, Some(true), None);
         self.execute_one_task(task);
     }
 
     pub fn capture_screenshot_jpeg_task(
         &mut self,
         quality: Option<u8>,
-        from_surface: Option<bool>
+        from_surface: Option<bool>,
     ) -> TaskDescribe {
         self.capture_screenshot_impl_task(page::ScreenshotFormat::JPEG(quality), from_surface, None)
     }
 
-    pub fn capture_screenshot_png_task(
-        &mut self,
-        from_surface: Option<bool>
-    ) -> TaskDescribe {
+    pub fn capture_screenshot_png_task(&mut self, from_surface: Option<bool>) -> TaskDescribe {
         self.capture_screenshot_impl_task(page::ScreenshotFormat::PNG, from_surface, None)
     }
 
@@ -81,7 +101,7 @@ impl Tab {
         &mut self,
         format: page::ScreenshotFormat,
         from_surface: Option<bool>,
-        name: &str
+        name: &str,
     ) -> TaskDescribe {
         self.capture_screenshot_impl_task(format, from_surface, Some(name.into()))
     }

@@ -1,7 +1,7 @@
-use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks};
+use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks, emulation_tasks};
 
 use super::super::debug_session::DebugSession;
-use super::super::page_message::{response_object, PageResponse, PageResponseWrapper, MethodCallDone};
+use super::super::page_message::{PageResponse, PageResponseWrapper, MethodCallDone};
 use crate::protocol::target;
 use log::*;
 
@@ -31,7 +31,8 @@ pub enum TargetCallMethodTask {
     GetResponseBodyForInterception(network_tasks::GetResponseBodyForInterceptionTask),
     PageReload(page_tasks::PageReloadTask),
     DispatchMouseEvent(input_tasks::DispatchMouseEventTask),
-    // CloseTarget(target_tasks::CloseTargetTask),
+    CanEmulate(emulation_tasks::CanEmulateTask),
+    SetDeviceMetricsOverride(emulation_tasks::SetDeviceMetricsOverrideTask),
 }
 
 impl HasCallId for TargetCallMethodTask {
@@ -59,7 +60,8 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::BringToFront(task) => task.get_call_id(),
             TargetCallMethodTask::PageClose(task) => task.get_call_id(),
             TargetCallMethodTask::DispatchMouseEvent(task) => task.get_call_id(),
-            // TargetCallMethodTask::CloseTarget(task) => task.get_call_id(),
+            TargetCallMethodTask::CanEmulate(task) => task.get_call_id(),
+            TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_call_id(),
         }
     }
 }
@@ -142,11 +144,6 @@ pub fn handle_target_method_call(
             });
         }
         TargetCallMethodTask::CaptureScreenshot(task) => {
-            // let task_id = task.get_task_id();
-            // let ro = response_object::CaptureScreenshot {
-            //     selector: task.selector,
-            //     base64: task.task_result,
-            // };
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
@@ -216,18 +213,20 @@ pub fn handle_target_method_call(
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetResponseBodyForInterception(task)),
             });
         }
-        // TargetCallMethodTask::CloseTarget(task) => {
-        //     if let Some(r) = task.task_result {
-        //         if r {
-        //             info!("tab close method call returned. close successfully.");
-        //         } else {
-        //             error!("tab close method call returned. close failed.");
-        //         }
-        //     } else {
-        //         error!("tab close method call returned. close failed. {:?}", task);
-        //     }
-        //     // debug_session.tab_closed(maybe_target_id.as_ref(), task.task_result);
-        // }
+        TargetCallMethodTask::CanEmulate(task) => {
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::CanEmulate(task)),
+            });
+        }
+        TargetCallMethodTask::SetDeviceMetricsOverride(task) => {
+            return Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::SetDeviceMetricsOverride(task)),
+            });
+        }
     } 
     warn!("unhandled branch handle_target_method_call");
     Ok(PageResponseWrapper::default())

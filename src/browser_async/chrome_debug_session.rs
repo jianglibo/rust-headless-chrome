@@ -5,7 +5,7 @@ use super::embedded_events::{self, EmbeddedEvent};
 use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
 
 use crate::browser::tab::element::{BoxModel, ElementQuad};
-use crate::protocol::{self, dom, page, runtime, target, network};
+use crate::protocol::{self, dom, page, runtime, target, network, emulation};
 use failure::Error;
 use log::*;
 use std::convert::TryFrom;
@@ -372,7 +372,7 @@ impl ChromeDebugSession {
                     info!("continue_intercepted_request done.");
                 }
                 TargetCallMethodTask::GetLayoutMetrics(task) => {
-                    let task_return_object = protocol::parse_response::<page::methods::GetLayoutMetricsObject>(resp)?;
+                    let task_return_object = protocol::parse_response::<page::methods::GetLayoutMetricsReturnObject>(resp)?;
                     task.task_result.replace(task_return_object);
                 }
                 TargetCallMethodTask::BringToFront(_task) => {
@@ -381,10 +381,13 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::DispatchMouseEvent(_task) => {
                     info!("dispatch_mouse_event done.");
                 }
-                // TargetCallMethodTask::CloseTarget(task) => {
-                //     let task_return_object = protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;
-                //     task.task_result = Some(task_return_object.success);
-                // }
+                TargetCallMethodTask::CanEmulate(task) => {
+                    let task_return_object = protocol::parse_response::<emulation::methods::CanEmulateReturnObject>(resp)?;
+                    task.task_result.replace(task_return_object.result);
+                }
+                TargetCallMethodTask::SetDeviceMetricsOverride(task) => {
+                    task.task_result.replace(true);
+                }
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {

@@ -252,7 +252,7 @@ pub mod methods {
 
     #[derive(Debug, Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
-    pub struct GetLayoutMetricsObject {
+    pub struct GetLayoutMetricsReturnObject {
         layout_viewport: LayoutViewport,
         visual_viewport: VisualViewport,
         content_size: dom::Rect,
@@ -260,7 +260,7 @@ pub mod methods {
 
     impl Method for GetLayoutMetrics {
         const NAME: &'static str = "Page.getLayoutMetrics";
-        type ReturnObject = GetLayoutMetricsObject;
+        type ReturnObject = GetLayoutMetricsReturnObject;
     }
 
     #[derive(Serialize, Debug)]

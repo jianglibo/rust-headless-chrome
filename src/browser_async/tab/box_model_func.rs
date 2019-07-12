@@ -1,10 +1,5 @@
+use super::super::task_describe::{dom_tasks, TaskDescribe};
 use super::Tab;
-use super::super::protocol::{page, runtime, target, input};
-use super::{TaskId, ChromeDebugSession};
-use super::super::task_describe::{
-    dom_tasks, page_tasks, runtime_tasks, target_tasks,
-    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks,
-};
 
 impl Tab {
     fn get_box_model_task_impl(
@@ -37,10 +32,13 @@ impl Tab {
         self.get_box_model_by_selector_task_impl(selector, None)
     }
 
-    pub fn get_box_model_by_selector_task_named(&self, selector: &str, name: &str) -> Vec<TaskDescribe> {
+    pub fn get_box_model_by_selector_task_named(
+        &self,
+        selector: &str,
+        name: &str,
+    ) -> Vec<TaskDescribe> {
         self.get_box_model_by_selector_task_impl(selector, Some(name))
     }
-
 
     fn get_box_model_by_selector_task_impl(
         &self,
@@ -57,10 +55,11 @@ impl Tab {
         pre_tasks
     }
 
-    pub fn get_box_model_by_selector(
-        &mut self,
-        selector: &str
-    ) {
+    pub fn get_body_box_model_task(&mut self) -> Vec<TaskDescribe> {
+        self.get_box_model_by_selector_task_impl("body", None)
+    }
+
+    pub fn get_box_model_by_selector(&mut self, selector: &str) {
         let tasks = self.get_box_model_by_selector_task_impl(selector, None);
         self.execute_tasks(tasks);
     }
@@ -70,12 +69,12 @@ impl Tab {
         self.execute_tasks(tasks);
     }
 
-    fn get_document_box_model_impl(&mut self, name: Option<&str>) -> Vec<TaskDescribe> {
-        let get_document_task = self.get_document_task(Some(1));
-        let task = dom_tasks::GetBoxModelTaskBuilder::default()
-            .common_fields(self.get_common_field(name.map(Into::into)))
-            .build()
-            .expect("GetBoxModelTaskBuilder should success.");
-        vec![get_document_task, task.into()]
-    }
+    // fn get_document_box_model_impl(&mut self, name: Option<&str>) -> Vec<TaskDescribe> {
+    //     let get_document_task = self.get_document_task(Some(1));
+    //     let task = dom_tasks::GetBoxModelTaskBuilder::default()
+    //         .common_fields(self.get_common_field(name.map(Into::into)))
+    //         .build()
+    //         .expect("GetBoxModelTaskBuilder should success.");
+    //     vec![get_document_task, task.into()]
+    // }
 }

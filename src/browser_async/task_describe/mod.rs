@@ -16,6 +16,7 @@ pub mod target_call_methods;
 pub mod browser_call_methods;
 pub mod network_tasks;
 pub mod input_tasks;
+pub mod emulation_tasks;
 
 
 pub use dom_tasks::{
@@ -156,7 +157,8 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::BringToFront(task) => task.get_method_str(),
                 TargetCallMethodTask::PageClose(task) => task.get_method_str(),
                 TargetCallMethodTask::DispatchMouseEvent(task) => task.get_method_str(),
-                // TargetCallMethodTask::CloseTarget(task) => task.get_method_str(),
+                TargetCallMethodTask::CanEmulate(task) => task.get_method_str(),
+                TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),

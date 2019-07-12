@@ -1,6 +1,6 @@
 use crate::protocol::{dom, page, target, network};
 use super::super::browser_async::{TaskId};
-use super::super::browser_async::task_describe::{network_tasks, network_events, runtime_tasks, runtime_events, dom_tasks, page_tasks, page_events};
+use super::super::browser_async::task_describe::{network_tasks, network_events, runtime_tasks, runtime_events, dom_tasks, page_tasks, page_events, emulation_tasks};
 use std::path::Path;
 use std::fs::OpenOptions;
 use log::*;
@@ -82,6 +82,8 @@ pub enum MethodCallDone {
     SetIgnoreCertificateErrors(bool),
     GetResponseBodyForInterception(network_tasks::GetResponseBodyForInterceptionTask),
     TargetAttached(page_tasks::AttachToTargetTask),
+    CanEmulate(emulation_tasks::CanEmulateTask),
+    SetDeviceMetricsOverride(emulation_tasks::SetDeviceMetricsOverrideTask),
 }
 
 // just wait for things happen. don't care who caused happen.

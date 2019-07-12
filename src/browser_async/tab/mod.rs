@@ -1,5 +1,4 @@
 use super::super::browser_async::{create_unique_prefixed_id, embedded_events, TaskId, ChromeDebugSession};
-use crate::browser::tab::element::{BoxModel, ElementQuad};
 use crate::browser::tab::point::Point;
 
 use super::page_message::ChangingFrame;
@@ -15,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 mod screen_shot_func;
 mod box_model_func;
+mod emulation_func;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum WaitingForPageAttachTaskName {

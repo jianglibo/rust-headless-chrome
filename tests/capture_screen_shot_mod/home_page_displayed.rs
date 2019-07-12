@@ -27,8 +27,11 @@ impl CaptureScreenShotTest {
                         // tab.capture_screenshot_view_jpeg();
                         // tab.get_layout_metrics();
                         // let task = tab.capture_screenshot_jpeg_task(Some(100), Some(false));
-                        let tasks = tab.capture_screenshot_by_selector_jpeg_task("body", Some(100), Some(false), None);
+                        let tasks = tab.capture_screenshot_by_selector_jpeg_task("body", Some(100), None, None);
                         tab.task_queue.add_delayed_many(tasks, 3);
+                        let set_metrics = tab.set_device_metrics_override_simple_task(1000, 20000);
+                        // tab.can_emulate();
+                        tab.execute_one_task(set_metrics);
                     }
                     ReceivedEvent::FrameStoppedLoading(frame_id) => {
                         let tab = self
@@ -66,6 +69,9 @@ impl CaptureScreenShotTest {
                     }
                     MethodCallDone::GetLayoutMetrics(task) => {
                         info!("got get_layout_metrics: {:?}", task);
+                    }
+                    MethodCallDone::CanEmulate(task) => {
+                        info!("got can_emulate answer: {:?}", task);
                     }
                     _ => {
                         error!("got other method_call_done. {:?}", method_call_done);

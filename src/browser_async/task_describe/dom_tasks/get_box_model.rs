@@ -18,6 +18,10 @@ pub struct GetBoxModelTask {
     pub object_id: Option<runtime::RemoteObjectId>,
     #[builder(setter(skip))]
     pub task_result: Option<BoxModel>,
+    #[builder(setter(skip))]
+    pub full_page_box_model: Option<BoxModel>,
+    #[builder(default = "false")]
+    pub request_full_page: bool,
 }
 
 impl_has_common_fields!(GetBoxModelTask);

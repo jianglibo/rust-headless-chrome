@@ -1,11 +1,14 @@
-use super::task_describe::{TaskDescribe, HasCallId, TargetCallMethodTask, BrowserCallMethodTask, 
-page_events, target_events, dom_events, runtime_events, network_events};
+use super::task_describe::{
+    dom_events, network_events, page_events, runtime_events, target_events, BrowserCallMethodTask,
+    TargetCallMethodTask, TaskDescribe,
+};
 
 use super::embedded_events::{self, EmbeddedEvent};
-use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId, ChromePageError};
+use crate::browser_async::{chrome_browser::ChromeBrowser, ChromePageError, TaskId};
 
+use super::task_manager;
 use crate::browser::tab::element::{BoxModel, ElementQuad};
-use crate::protocol::{self, dom, page, runtime, target, network, emulation};
+use crate::protocol::{self, dom, emulation, network, page, runtime, target};
 use failure::Error;
 use log::*;
 use std::convert::TryFrom;
@@ -17,7 +20,7 @@ pub struct ChromeDebugSession {
     chrome_browser: ChromeBrowser,
     session_id: Option<String>,
     unique_number: AtomicUsize,
-    tasks_waiting_for_response: Vec<Vec<TaskDescribe>>,
+    task_manager: task_manager::TaskManager,
 }
 
 impl ChromeDebugSession {
@@ -26,19 +29,19 @@ impl ChromeDebugSession {
             chrome_browser,
             session_id: None,
             unique_number: AtomicUsize::new(10000),
-            tasks_waiting_for_response: Vec::new(),
+            task_manager: task_manager::TaskManager::new(),
         }
     }
 
     pub fn tasks_waiting_for_response_count(&self) -> usize {
-        self.tasks_waiting_for_response.len()
+        self.task_manager.tasks_count()
     }
 
     pub fn execute_task(&mut self, tasks: Vec<TaskDescribe>) {
         if let Some(task_ref) = tasks.get(0) {
             match String::try_from(task_ref) {
                 Ok(method_str) => {
-                    self.tasks_waiting_for_response.push(tasks);
+                    self.task_manager.push_task_vec(tasks);
                     self.chrome_browser.send_message(method_str);
                 }
                 Err(err) => error!("first task deserialize fail: {:?}", err),
@@ -136,18 +139,8 @@ impl ChromeDebugSession {
             info!("{:?}", s);
         }
         let call_id = resp.call_id;
-        if let Some(idx) = self.tasks_waiting_for_response.iter().position(|tasks| {
-            if let Some(task) = tasks.get(0) {
-                match task {
-                    TaskDescribe::TargetCallMethod(target_call) => target_call.get_call_id() == call_id,
-                    TaskDescribe::BrowserCallMethod(browser_call) => browser_call.get_call_id() == call_id,
-                    _ => false,
-                }
-            } else {
-                false
-            }
-        }) {
-            let mut tasks = self.tasks_waiting_for_response.remove(idx);
+        if let Some(idx) = self.task_manager.find_task_vec_by_call_id(call_id) {
+            let mut tasks = self.task_manager.remove_task_vec(idx);
             let mut current_task = tasks.remove(0);
 
             // if has remote error.
@@ -158,7 +151,10 @@ impl ChromeDebugSession {
                 } else {
                     current_task
                 };
-                error!("return current or last task with unfulfilled result: {:?}", last_task);
+                error!(
+                    "return current or last task with unfulfilled result: {:?}",
+                    last_task
+                );
                 return Some(last_task);
             }
 
@@ -191,25 +187,29 @@ impl ChromeDebugSession {
         None
     }
 
-    fn execute_next_and_return_remains(
-        &mut self,
-        tasks: Vec<TaskDescribe>,
-    ) {
-        let next_task = tasks.get(0).expect("execute_next_and_return_remains got empty tasks.");
-        if let Ok(method_str) =  String::try_from(next_task) {
-            self.tasks_waiting_for_response.push(tasks);
+    fn execute_next_and_return_remains(&mut self, tasks: Vec<TaskDescribe>) {
+        let next_task = tasks
+            .get(0)
+            .expect("execute_next_and_return_remains got empty tasks.");
+        if let Ok(method_str) = String::try_from(next_task) {
+            self.task_manager.push_task_vec(tasks);
             self.send_message_direct(method_str);
         } else {
-            error!("execute_next_and_return_remains to_method_str failed. {:?}", next_task);
+            error!(
+                "execute_next_and_return_remains to_method_str failed. {:?}",
+                next_task
+            );
         }
-     }
+    }
 
     fn handle_next_task(
         &mut self,
         current_task: &TaskDescribe,
         mut tasks: Vec<TaskDescribe>,
     ) -> Result<(), failure::Error> {
-        let mut next_task = tasks.get_mut(0).expect("handle_next_task received empty tasks.");
+        let mut next_task = tasks
+            .get_mut(0)
+            .expect("handle_next_task received empty tasks.");
         match (current_task, &mut next_task) {
             (
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetDocument(get_document)),
@@ -236,8 +236,10 @@ impl ChromeDebugSession {
                 self.execute_next_and_return_remains(tasks);
             }
             (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)), 
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(screen_shot)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(
+                    screen_shot,
+                )),
             ) => {
                 if let Some(mb) = &get_box_model.task_result {
                     let viewport = mb.content_viewport();
@@ -248,8 +250,12 @@ impl ChromeDebugSession {
                 }
             }
             (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetContentQuads(get_content_quads)),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event))
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetContentQuads(
+                    get_content_quads,
+                )),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
+                    dispatch_mouse_event,
+                )),
             ) => {
                 if let Some(mid_point) = get_content_quads.get_midpoint() {
                     dispatch_mouse_event.x.replace(mid_point.x);
@@ -260,13 +266,21 @@ impl ChromeDebugSession {
                 self.execute_next_and_return_remains(tasks);
             }
             (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_1)),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_2))
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
+                    dispatch_mouse_event_1,
+                )),
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
+                    dispatch_mouse_event_2,
+                )),
             ) => {
                 if dispatch_mouse_event_2.x.is_none() && dispatch_mouse_event_2.y.is_none() {
                     if dispatch_mouse_event_1.x.is_some() && dispatch_mouse_event_1.y.is_some() {
-                        dispatch_mouse_event_2.x.replace(dispatch_mouse_event_1.x.unwrap());
-                        dispatch_mouse_event_2.y.replace(dispatch_mouse_event_1.y.unwrap());
+                        dispatch_mouse_event_2
+                            .x
+                            .replace(dispatch_mouse_event_1.x.unwrap());
+                        dispatch_mouse_event_2
+                            .y
+                            .replace(dispatch_mouse_event_1.y.unwrap());
                     } else {
                         warn!("dispatch_mouse_event_2 has part point. missing x or y");
                     }
@@ -322,14 +336,17 @@ impl ChromeDebugSession {
                     task.task_result.replace(model_box);
                 }
                 TargetCallMethodTask::GetContentQuads(task) => {
-                    let return_object =
-                        protocol::parse_response::<dom::methods::GetContentQuadsReturnObject>(resp)?;
+                    let return_object = protocol::parse_response::<
+                        dom::methods::GetContentQuadsReturnObject,
+                    >(resp)?;
                     task.task_result.replace(return_object.quads);
                 }
                 TargetCallMethodTask::CaptureScreenshot(task) => {
-                    let capture_screenshot_return_object =
-                        protocol::parse_response::<page::methods::CaptureScreenshotReturnObject>(resp)?;
-                    task.task_result.replace(capture_screenshot_return_object.data);
+                    let capture_screenshot_return_object = protocol::parse_response::<
+                        page::methods::CaptureScreenshotReturnObject,
+                    >(resp)?;
+                    task.task_result
+                        .replace(capture_screenshot_return_object.data);
                 }
                 TargetCallMethodTask::RuntimeEvaluate(task) => {
                     let evaluate_return_object =
@@ -337,26 +354,34 @@ impl ChromeDebugSession {
                     task.task_result.replace(evaluate_return_object);
                 }
                 TargetCallMethodTask::NavigateTo(task) => {
-                    let return_object = protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
+                    let return_object =
+                        protocol::parse_response::<page::methods::NavigateReturnObject>(resp)?;
                     task.task_result.replace(return_object);
                 }
                 TargetCallMethodTask::RuntimeEnable(task) => {
                     trace!("runtime enabled: {:?}", task);
                 }
                 TargetCallMethodTask::RuntimeGetProperties(task) => {
-                    let return_object = protocol::parse_response::<runtime::methods::GetPropertiesReturnObject>(resp)?;
+                    let return_object = protocol::parse_response::<
+                        runtime::methods::GetPropertiesReturnObject,
+                    >(resp)?;
                     task.task_result.replace(return_object);
                 }
                 TargetCallMethodTask::GetResponseBodyForInterception(task) => {
-                    let return_object = protocol::parse_response::<network::methods::GetResponseBodyForInterceptionReturnObject>(resp)?;
+                    let return_object = protocol::parse_response::<
+                        network::methods::GetResponseBodyForInterceptionReturnObject,
+                    >(resp)?;
                     task.task_result.replace(return_object);
                 }
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
-                    let task_return_object = protocol::parse_response::<runtime::methods::CallFunctionOnReturnObject>(resp)?;
+                    let task_return_object = protocol::parse_response::<
+                        runtime::methods::CallFunctionOnReturnObject,
+                    >(resp)?;
                     task.task_result = Some(task_return_object);
                 }
                 TargetCallMethodTask::PrintToPDF(task) => {
-                    let task_return_object = protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
+                    let task_return_object =
+                        protocol::parse_response::<page::methods::PrintToPdfReturnObject>(resp)?;
                     task.task_result.replace(task_return_object.data);
                 }
                 TargetCallMethodTask::NetworkEnable(_task) => {
@@ -372,7 +397,9 @@ impl ChromeDebugSession {
                     info!("continue_intercepted_request done.");
                 }
                 TargetCallMethodTask::GetLayoutMetrics(task) => {
-                    let task_return_object = protocol::parse_response::<page::methods::GetLayoutMetricsReturnObject>(resp)?;
+                    let task_return_object = protocol::parse_response::<
+                        page::methods::GetLayoutMetricsReturnObject,
+                    >(resp)?;
                     task.task_result.replace(task_return_object);
                 }
                 TargetCallMethodTask::BringToFront(_task) => {
@@ -382,13 +409,15 @@ impl ChromeDebugSession {
                     info!("dispatch_mouse_event done.");
                 }
                 TargetCallMethodTask::CanEmulate(task) => {
-                    let task_return_object = protocol::parse_response::<emulation::methods::CanEmulateReturnObject>(resp)?;
+                    let task_return_object = protocol::parse_response::<
+                        emulation::methods::CanEmulateReturnObject,
+                    >(resp)?;
                     task.task_result.replace(task_return_object.result);
                 }
                 TargetCallMethodTask::SetDeviceMetricsOverride(task) => {
                     task.task_result.replace(true);
                 }
-            }
+            },
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {
                     info!("nothing to full fill: {:?}", task);
@@ -406,7 +435,8 @@ impl ChromeDebugSession {
                     info!("nothing to full fill:: {:?}", task);
                 }
                 BrowserCallMethodTask::CloseTarget(task) => {
-                    let task_return_object = protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;
+                    let task_return_object =
+                        protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;
                     task.task_result = Some(task_return_object.success);
                     // if let Some(r) = task.task_result {
                     //     if r {
@@ -419,7 +449,7 @@ impl ChromeDebugSession {
                     // }
                     // debug_session.tab_closed(maybe_target_id.as_ref(), task.task_result);
                 }
-            }
+            },
             task_describe => {
                 warn!("got unprocessed task_describe: {:?}", task_describe);
             }
@@ -482,102 +512,111 @@ impl ChromeDebugSession {
         None
     }
 
-fn process_message(&mut self, value: protocol::Message) -> Option<(Option<target::SessionID>, Option<target::TargetId>, TaskDescribe)> {
-                match value {
-                    protocol::Message::Response(resp) => {
-                        if let Some(page_message) = self.handle_response(resp, None, None) {
-                            (None, None, page_message).into()
-                        } else{
-                            None
-                        }
-                    }
-                    protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
-                        target_message_event,
-                    )) => {
-                        let event_params = &target_message_event.params;
-                        let session_id = event_params.session_id.clone();
-                        let target_id = event_params.target_id.clone();
-                        let message_field = &event_params.message;
-                        match protocol::parse_raw_message(&message_field) {
-                            Ok(protocol::Message::Response(resp)) => {
-                                if let Some(page_message) =
-                                    self.handle_response(resp, Some(session_id.clone()), Some(target_id.clone()))
-                                {
-                                    (Some(session_id), Some(target_id), page_message).into()
-                                } else {
-                                    None
-                                }
-                            }
-                            Ok(protocol::Message::Event(protocol_event)) => {
-                                if let Some(page_message) = self.handle_protocol_event(
-                                    protocol_event,
-                                    Some(session_id.clone()),
-                                    Some(target_id.clone()),
-                                ) {
-                                    (Some(session_id), Some(target_id), page_message).into()
-                                } else {
-                                    None
-                                }
-                            }
-                            _ => match parse_raw_message(&message_field) {
-                                Ok(embedded_events::EmbeddedEventWrapper::EmbeddedEvent(target_message_event)) => {
-                                    // trace!("got inner event: {:?}", target_message_event);
-                                    if let Some(page_message) = self.handle_inner_target_events(
-                                        target_message_event,
-                                        Some(session_id.clone()),
-                                        Some(target_id.clone()),
-                                    ) {
-                                        (Some(session_id), Some(target_id), page_message).into()
-                                    } else{
-                                        None
-                                    }
-                                }
-                                Err(_error) => {
-                                    error!(
-                                        "parse_raw_message failed ** this is message_field aka inner event: {:?}",
-                                        message_field
-                                    );
-                                    None
-                                }
-                            },
-                        }
-                    }
-                    protocol::Message::Event(protocol_event) => {
-                        if let Some(page_message) =
-                            self.handle_protocol_event(protocol_event, None, None)
-                        {
-                            (None, None, page_message).into()
+    fn process_message(
+        &mut self,
+        value: protocol::Message,
+    ) -> Option<(
+        Option<target::SessionID>,
+        Option<target::TargetId>,
+        TaskDescribe,
+    )> {
+        match value {
+            protocol::Message::Response(resp) => {
+                if let Some(page_message) = self.handle_response(resp, None, None) {
+                    (None, None, page_message).into()
+                } else {
+                    None
+                }
+            }
+            protocol::Message::Event(protocol::Event::ReceivedMessageFromTarget(
+                target_message_event,
+            )) => {
+                let event_params = &target_message_event.params;
+                let session_id = event_params.session_id.clone();
+                let target_id = event_params.target_id.clone();
+                let message_field = &event_params.message;
+                match protocol::parse_raw_message(&message_field) {
+                    Ok(protocol::Message::Response(resp)) => {
+                        if let Some(page_message) = self.handle_response(
+                            resp,
+                            Some(session_id.clone()),
+                            Some(target_id.clone()),
+                        ) {
+                            (Some(session_id), Some(target_id), page_message).into()
                         } else {
                             None
                         }
                     }
-                    protocol::Message::Connected => {
-                        Some((None, None, TaskDescribe::ChromeConnected))
+                    Ok(protocol::Message::Event(protocol_event)) => {
+                        if let Some(page_message) = self.handle_protocol_event(
+                            protocol_event,
+                            Some(session_id.clone()),
+                            Some(target_id.clone()),
+                        ) {
+                            (Some(session_id), Some(target_id), page_message).into()
+                        } else {
+                            None
+                        }
                     }
-                    other => {
-                        warn!("got unknown message1: {:?}", other);
-                        None
-                    }
+                    _ => match parse_raw_message(&message_field) {
+                        Ok(embedded_events::EmbeddedEventWrapper::EmbeddedEvent(
+                            target_message_event,
+                        )) => {
+                            // trace!("got inner event: {:?}", target_message_event);
+                            if let Some(page_message) = self.handle_inner_target_events(
+                                target_message_event,
+                                Some(session_id.clone()),
+                                Some(target_id.clone()),
+                            ) {
+                                (Some(session_id), Some(target_id), page_message).into()
+                            } else {
+                                None
+                            }
+                        }
+                        Err(_error) => {
+                            error!(
+                                        "parse_raw_message failed ** this is message_field aka inner event: {:?}",
+                                        message_field
+                                    );
+                            None
+                        }
+                    },
                 }
-}
+            }
+            protocol::Message::Event(protocol_event) => {
+                if let Some(page_message) = self.handle_protocol_event(protocol_event, None, None) {
+                    (None, None, page_message).into()
+                } else {
+                    None
+                }
+            }
+            protocol::Message::Connected => Some((None, None, TaskDescribe::ChromeConnected)),
+            other => {
+                warn!("got unknown message1: {:?}", other);
+                None
+            }
+        }
+    }
 }
 
-pub fn parse_raw_message(raw_message: &str) -> Result<embedded_events::EmbeddedEventWrapper, Error> {
-    Ok(serde_json::from_str::<embedded_events::EmbeddedEventWrapper>(
-        raw_message,
-    )?)
+pub fn parse_raw_message(
+    raw_message: &str,
+) -> Result<embedded_events::EmbeddedEventWrapper, Error> {
+    Ok(serde_json::from_str::<embedded_events::EmbeddedEventWrapper>(raw_message)?)
 }
-
 
 // The main loop should stop at some point, by invoking the methods on the page to drive the loop to run.
 impl Stream for ChromeDebugSession {
-    type Item = (Option<target::SessionID>, Option<target::TargetId>, TaskDescribe);
+    type Item = (
+        Option<target::SessionID>,
+        Option<target::TargetId>,
+        TaskDescribe,
+    );
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             if let Some(value) = try_ready!(self.chrome_browser.poll()) {
-
                 if let Some(task_describe) = self.process_message(value) {
                     break Ok(Some(task_describe).into());
                 }

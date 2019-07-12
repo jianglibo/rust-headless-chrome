@@ -13,6 +13,7 @@ pub mod embedded_events;
 pub mod event_statistics;
 pub mod task_queue;
 pub mod browser_context;
+pub mod task_manager;
 
 pub use event_statistics::{EventStatistics, EventName};
 pub use chrome_debug_session::{ChromeDebugSession};

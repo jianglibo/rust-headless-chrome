@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer};
-use serde::{Serialize, Serializer};
+use serde::{Serialize};
 use std::collections::HashMap;
 
 pub type NodeId = u16;

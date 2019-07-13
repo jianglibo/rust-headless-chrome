@@ -5,11 +5,9 @@ extern crate futures;
 extern crate tokio_timer;
 
 use headless_chrome::browser_async::{EventName, Tab};
-use headless_chrome::browser_async::page_message::{response_object, PageResponse};
+use headless_chrome::browser_async::page_message::{PageResponse};
 use log::*;
 use std::default::Default;
-use std::fs;
-use std::path::Path;
 mod tutil;
 use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};

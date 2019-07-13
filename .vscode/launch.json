@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "type": "lldb",
             "request": "launch",
@@ -44,16 +45,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in example 'print_to_pdf'",
+            "name": "Debug unit tests in example 'capture_screen_shot'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--example=print_to_pdf",
+                    "--example=capture_screen_shot",
                     "--package=headless_chrome"
                 ],
                 "filter": {
-                    "name": "print_to_pdf",
+                    "name": "capture_screen_shot",
                     "kind": "example"
                 }
             },

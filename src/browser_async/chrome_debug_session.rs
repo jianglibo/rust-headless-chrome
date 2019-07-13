@@ -4,7 +4,7 @@ use super::task_describe::{
 };
 
 use super::embedded_events::{self, EmbeddedEvent};
-use crate::browser_async::{chrome_browser::ChromeBrowser, ChromePageError, TaskId};
+use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId};
 
 use super::task_manager;
 use crate::browser::tab::element::{BoxModel, ElementQuad};
@@ -37,18 +37,18 @@ impl ChromeDebugSession {
         self.task_manager.tasks_count()
     }
 
-    pub fn execute_task(&mut self, tasks: Vec<TaskDescribe>) {
-        if let Some(task_ref) = tasks.get(0) {
-            match String::try_from(task_ref) {
-                Ok(method_str) => {
-                    self.task_manager.push_task_vec(tasks);
-                    self.chrome_browser.send_message(method_str);
+    pub fn execute_task(&mut self, task_vec: Vec<TaskDescribe>) {
+            if let Some(task_ref) = task_vec.get(0) {
+                match String::try_from(task_ref) {
+                    Ok(method_str) => {
+                        self.task_manager.push_task_vec(task_vec);
+                        self.chrome_browser.send_message(method_str);
+                    }
+                    Err(err) => error!("first task deserialize fail: {:?}", err),
                 }
-                Err(err) => error!("first task deserialize fail: {:?}", err),
+            } else {
+                error!("empty tasks list.")
             }
-        } else {
-            error!("empty tasks list.")
-        }
     }
 
     pub fn send_message_direct(&mut self, method_str: String) {
@@ -140,17 +140,13 @@ impl ChromeDebugSession {
         }
         let call_id = resp.call_id;
         if let Some(idx) = self.task_manager.find_task_vec_by_call_id(call_id) {
-            let mut tasks = self.task_manager.remove_task_vec(idx);
-            let mut current_task = tasks.remove(0);
+            let mut task_group = self.task_manager.remove_task_vec(idx);
+            let mut current_task = task_group.get_first_task();
 
             // if has remote error.
             if resp.error.is_some() {
                 error!("got remote error: {:?}", resp);
-                let last_task = if let Some(tk) = tasks.pop() {
-                    tk
-                } else {
-                    current_task
-                };
+                let last_task = task_group.get_last_task_or_current(current_task);
                 error!(
                     "return current or last task with unfulfilled result: {:?}",
                     last_task
@@ -158,41 +154,49 @@ impl ChromeDebugSession {
                 return Some(last_task);
             }
 
-            if let Err(err) = self.full_fill_task(resp, &mut current_task) {
+            if let Err(err) = self.full_fill_current_task(resp, &mut current_task) {
                 error!("fulfill task failed. {:?}", err);
                 // return last task (not fulfilled) in vec.
-                if let Some(tk) = tasks.pop() {
-                    return Some(tk);
-                } else {
-                    return Some(current_task);
-                }
+                return Some(task_group.get_last_task_or_current(current_task));
             }
-            if tasks.is_empty() {
+            if task_group.is_empty() {
                 return Some(current_task);
             }
-            if let Err(mut err) = self.handle_next_task(&current_task, tasks) {
-                if let Some(ChromePageError::NextTaskExecution { tasks, error }) =
-                    err.downcast_mut::<ChromePageError>()
-                {
-                    error!("handle next task fail. {:?}, {:?}", tasks, error);
-                    return (*tasks).pop();
-                } else {
-                    panic!("handle next task fail. {:?}", err);
+
+            // some task we should always return to user.
+            let mut return_task = false;
+            match &current_task {
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::PageEnable(_task)) => {
+                    return_task = true;
                 }
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::RuntimeEnable(_task)) => {
+                    return_task = true;
+                }
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::NetworkEnable(_task)) => {
+                    return_task = true;
+                }
+                _ => {}
             }
-            return Some(current_task); // always popup task.
+
+            if return_task {
+                self.execute_next_and_return_remains(task_group);
+                return Some(current_task);
+            } else {
+                task_group.push_completed_task(current_task);
+                task_group.full_fill_next_task();
+                self.execute_next_and_return_remains(task_group);
+                return None;
+            }
         } else {
             error!("no matching task for call_id: {:?}", resp);
         }
         None
     }
 
-    fn execute_next_and_return_remains(&mut self, tasks: Vec<TaskDescribe>) {
-        let next_task = tasks
-            .get(0)
-            .expect("execute_next_and_return_remains got empty tasks.");
+    fn execute_next_and_return_remains(&mut self, task_group: task_manager::TaskGroup) {
+        let next_task = task_group.get_first_task_ref();
         if let Ok(method_str) = String::try_from(next_task) {
-            self.task_manager.push_task_vec(tasks);
+            self.task_manager.push_task_group(task_group);
             self.send_message_direct(method_str);
         } else {
             error!(
@@ -202,102 +206,7 @@ impl ChromeDebugSession {
         }
     }
 
-    fn handle_next_task(
-        &mut self,
-        current_task: &TaskDescribe,
-        mut tasks: Vec<TaskDescribe>,
-    ) -> Result<(), failure::Error> {
-        let mut next_task = tasks
-            .get_mut(0)
-            .expect("handle_next_task received empty tasks.");
-        match (current_task, &mut next_task) {
-            (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetDocument(get_document)),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
-            ) => {
-                query_selector.node_id = get_document
-                    .task_result
-                    .as_ref()
-                    .and_then(|nd| Some(nd.node_id));
-                self.execute_next_and_return_remains(tasks);
-            }
-            (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DescribeNode(describe_node)),
-            ) => {
-                describe_node.node_id = query_selector.task_result;
-                self.execute_next_and_return_remains(tasks);
-            }
-            (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::QuerySelector(query_selector)),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)),
-            ) => {
-                get_box_model.node_id = query_selector.task_result;
-                self.execute_next_and_return_remains(tasks);
-            }
-            (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(
-                    screen_shot,
-                )),
-            ) => {
-                if let Some(mb) = &get_box_model.task_result {
-                    let viewport = mb.content_viewport();
-                    screen_shot.clip = Some(viewport);
-                    self.execute_next_and_return_remains(tasks);
-                } else {
-                    failure::bail!("found_box is None!");
-                }
-            }
-            (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetContentQuads(
-                    get_content_quads,
-                )),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
-                    dispatch_mouse_event,
-                )),
-            ) => {
-                if let Some(mid_point) = get_content_quads.get_midpoint() {
-                    dispatch_mouse_event.x.replace(mid_point.x);
-                    dispatch_mouse_event.y.replace(mid_point.y);
-                } else {
-                    warn!("get_content_quads return empty result.");
-                }
-                self.execute_next_and_return_remains(tasks);
-            }
-            (
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
-                    dispatch_mouse_event_1,
-                )),
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
-                    dispatch_mouse_event_2,
-                )),
-            ) => {
-                if dispatch_mouse_event_2.x.is_none() && dispatch_mouse_event_2.y.is_none() {
-                    if dispatch_mouse_event_1.x.is_some() && dispatch_mouse_event_1.y.is_some() {
-                        dispatch_mouse_event_2
-                            .x
-                            .replace(dispatch_mouse_event_1.x.unwrap());
-                        dispatch_mouse_event_2
-                            .y
-                            .replace(dispatch_mouse_event_1.y.unwrap());
-                    } else {
-                        warn!("dispatch_mouse_event_2 has part point. missing x or y");
-                    }
-                } else {
-                    warn!("dispatch_mouse_event_1 has part point. missing x or y.");
-                }
-                self.execute_next_and_return_remains(tasks);
-            }
-            _ => {
-                // warn!("unknown pair: {:?}, {:?}", current_task, next_task);
-                self.execute_next_and_return_remains(tasks);
-            }
-        }
-        Ok(())
-    }
-
-    fn full_fill_task(
+    fn full_fill_current_task(
         &self,
         resp: protocol::Response,
         mut task_describe: &mut TaskDescribe,
@@ -619,6 +528,8 @@ impl Stream for ChromeDebugSession {
             if let Some(value) = try_ready!(self.chrome_browser.poll()) {
                 if let Some(task_describe) = self.process_message(value) {
                     break Ok(Some(task_describe).into());
+                } else {
+                    info!("discard intermedia tasks.");
                 }
             // trace!("receive message: {:?}", value);
             // return Ok(Some(PageMessage::MessageAvailable(value)).into());

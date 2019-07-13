@@ -473,7 +473,7 @@ impl Tab {
 
     pub fn get_document(&mut self, depth: Option<u8>) {
         let task = self.get_document_task(depth);
-        self.execute_one_task(task.into());
+        self.execute_one_task(task);
     }
 
     pub fn get_document_task(&mut self, depth: Option<u8>) -> TaskDescribe {

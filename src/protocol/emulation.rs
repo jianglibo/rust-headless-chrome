@@ -1,4 +1,4 @@
-use serde::{Deserializer};
+// use serde::{Deserializer};
 use serde::{Serialize};
 
 #[derive(Serialize, Debug, Clone)]
@@ -277,8 +277,8 @@ pub mod methods {
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct SetUserAgentOverride {
-        pub userAgent: String,
-        pub acceptLanguage: Option<String>,
+        pub user_agent: String,
+        pub accept_language: Option<String>,
         pub platform: Option<String>,
     }
     impl Method for SetUserAgentOverride {

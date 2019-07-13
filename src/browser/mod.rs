@@ -1,4 +1,4 @@
-use crate::browser::process::get_chrome_path_from_registry;
+// use crate::browser::process::get_chrome_path_from_registry;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;

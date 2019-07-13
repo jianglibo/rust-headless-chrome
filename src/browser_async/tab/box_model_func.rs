@@ -56,7 +56,15 @@ impl Tab {
     }
 
     pub fn get_body_box_model_task(&mut self) -> Vec<TaskDescribe> {
-        self.get_box_model_by_selector_task_impl("body", None)
+        let mut pre_tasks = self.get_query_selector("body", None);
+        let get_box_model = dom_tasks::GetBoxModelTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .selector("body".to_string())
+            .request_full_page(true)
+            .build()
+            .expect("build GetBoxModelTaskBuilder should success.");
+        pre_tasks.push(get_box_model.into());
+        pre_tasks
     }
 
     pub fn get_box_model_by_selector(&mut self, selector: &str) {
@@ -65,7 +73,7 @@ impl Tab {
     }
 
     pub fn get_box_model_by_selector_named(&mut self, selector: &str, name: &str) {
-        let tasks = self.get_box_model_by_selector_task_impl(selector, Some(name.into()));
+        let tasks = self.get_box_model_by_selector_task_impl(selector, Some(name));
         self.execute_tasks(tasks);
     }
 

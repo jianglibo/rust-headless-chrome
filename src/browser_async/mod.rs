@@ -21,7 +21,7 @@ pub use task_queue::{TaskQueue};
 pub use debug_session::{DebugSession};
 
 use failure;
-use task_describe::{self as tasks, TaskDescribe};
+use task_describe::{self as tasks};
 use crate::protocol::{self, target};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
@@ -98,7 +98,7 @@ pub enum ChromePageError {
     TaskDescribeConvert,
     #[fail(display = "next task execution failed.")]
     NextTaskExecution {
-        tasks: Vec<TaskDescribe>,
+        task_group: task_manager::TaskGroup,
         error: failure::Error,
     },
     #[fail(display = "cannot find tab.")]

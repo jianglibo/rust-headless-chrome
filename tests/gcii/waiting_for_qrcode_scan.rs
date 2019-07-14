@@ -84,7 +84,7 @@ impl GetContentInIframe {
                         let tasks = vec![
                             WaitingForPageAttachTaskName::PageEnable,
                             WaitingForPageAttachTaskName::RuntimeEnable,
-                            // WaitingForPageAttachTaskName::NetworkEnable
+                            WaitingForPageAttachTaskName::NetworkEnable,
                             ];
                         tab.attach_to_page_and_then(tasks);
                     }
@@ -92,19 +92,9 @@ impl GetContentInIframe {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
-                        info!("url current: {:?}", tab.get_url());
-                        if tab.is_at_url(HOME_URL) {
-                            tab.explicitly_close = true;
-                            tab.name_the_page(HOME_URL);
-                            let task = tab.evaluate_expression_task_named(expression, GET_CHILDREN_NUMBER_TASK_NAME);
-                            tab.task_queue.add_delayed(task, 2);
-                            // self.debug_session.create_new_tab_named(SHENBIAN_GANDONG_URL, shenbian_gandong_task_name);
-                        } else if tab.is_at_url(SHENBIAN_GANDONG_URL) {
-                            tab.explicitly_close = true;
-                            tab.name_the_page(SHENBIAN_GANDONG_URL);
-                            let task = tab.evaluate_expression_task_named(r##"document.querySelectorAll("#root div.grid-cell span.text").length"##, SHIPING_CHILDREN_NUM_TASK_NAME);
-                            tab.task_queue.add_delayed(task, 3);
-                        }
+                        let tasks = tab.display_full_page_task();
+                        tab.task_queue.add_delayed_many(tasks, 3);
+
                     }
                     ReceivedEvent::ResponseReceived(_event) => {}
                     _ => {
@@ -117,6 +107,26 @@ impl GetContentInIframe {
                     MethodCallDone::Evaluate(task) => {
                         self.handle_evaluate(task, maybe_target_id);
                     } 
+                    MethodCallDone::SetDeviceMetricsOverride(_task) => {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. FrameStoppedLoading");
+                        info!("url current: {:?}", tab.get_url());
+                        if tab.is_at_url(HOME_URL) {
+                            tab.explicitly_close = true;
+                            tab.name_the_page(HOME_URL);
+                            let task = tab.evaluate_expression_task_named(expression, GET_CHILDREN_NUMBER_TASK_NAME);
+                            tab.execute_one_task(task);
+                            // tab.task_queue.add_delayed(task, 2);
+                            // self.debug_session.create_new_tab_named(SHENBIAN_GANDONG_URL, shenbian_gandong_task_name);
+                        } else if tab.is_at_url(SHENBIAN_GANDONG_URL) {
+                            tab.explicitly_close = true;
+                            tab.name_the_page(SHENBIAN_GANDONG_URL);
+                            let task = tab.evaluate_expression_task_named(r##"document.querySelectorAll("#root div.grid-cell span.text").length"##, SHIPING_CHILDREN_NUM_TASK_NAME);
+                            tab.execute_one_task(task);
+                            // tab.task_queue.add_delayed(task, 3);
+                        }
+                    }
                     MethodCallDone::GetProperties(task) => {
                         info!("{:?}", task);
                         assert!(task.task_id_equal(DESCRIBE_ARTICLE_TITLES));

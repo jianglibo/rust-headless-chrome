@@ -17,6 +17,7 @@ pub enum TargetCallMethodTask {
     GetContentQuads(dom_tasks::GetContentQuadsTask),
     GetDocument(dom_tasks::GetDocumentTask),
     PageEnable(page_tasks::PageEnableTask),
+    SetLifecycleEventsEnabled(page_tasks::SetLifecycleEventsEnabledTask),
     PageClose(page_tasks::PageCloseTask),
     GetLayoutMetrics(page_tasks::GetLayoutMetricsTask),
     BringToFront(page_tasks::BringToFrontTask),
@@ -62,6 +63,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::DispatchMouseEvent(task) => task.get_call_id(),
             TargetCallMethodTask::CanEmulate(task) => task.get_call_id(),
             TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_call_id(),
+            TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_call_id(),
         }
     }
 }
@@ -185,6 +187,10 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::PageReload(_task) => {
             warn!("ignored method return. PageReload");
+            return Ok(PageResponseWrapper::default());
+        }
+        TargetCallMethodTask::SetLifecycleEventsEnabled(_task) => {
+            warn!("ignored method return. SetLifecycleEventsEnabled");
             return Ok(PageResponseWrapper::default());
         }
         TargetCallMethodTask::GetLayoutMetrics(task) => {

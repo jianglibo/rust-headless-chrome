@@ -105,6 +105,79 @@ impl FrameStartedLoading {
     }
 }
 
+// "{\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"E4863C4370687B1CD691540302E0A216\",\"message\":\"{\\\"method\\\":\\\"Page.lifecycleEvent\\\",\\\"params\\\":{\\\"frameId\\\":\\\"C50C87D5E5FBED3D00A80C15EEC95C55\\\",\\\"loaderId\\\":\\\"5D2AF99A577628F908336CB00B7E309C\\\",\\\"name\\\":\\\"firstMeaningfulPaintCandidate\\\",\\\"timestamp\\\":467696.10251}}\",\"targetId\":\"C50C87D5E5FBED3D00A80C15EEC95C55\"}}"
+wrapper_raw_event!(
+    TaskDescribe::PageEvent,
+    PageEvent::LifeCycle,
+    LifeCycle,
+    page::events::LifecycleEvent
+);
+
+impl LifeCycle {
+
+    pub fn get_name(&self) -> &str {
+        &*self.raw_event.params.name
+    }
+    pub fn is_init(&self) -> bool {
+        self.raw_event.params.name == "init"
+    }
+
+    pub fn is_first_paint(&self) -> bool {
+        self.raw_event.params.name == "firstPaint"
+    }
+
+    pub fn is_first_contentful_paint(&self) -> bool {
+        self.raw_event.params.name == "firstContentfulPaint"
+    }
+
+    pub fn is_fist_meaningful_paint_candicate(&self) -> bool {
+        self.raw_event.params.name == "firstMeaningfulPaintCandidate"
+    }
+
+    pub fn is_first_image_paint(&self) -> bool {
+        self.raw_event.params.name == "firstImagePaint"
+    }
+
+    pub fn is_commit(&self) -> bool {
+        self.raw_event.params.name == "commit"
+    }
+
+    pub fn is_load(&self) -> bool {
+        self.raw_event.params.name == "load"
+    }
+
+    pub fn is_dom_content_loaded(&self) -> bool {
+        self.raw_event.params.name == "DOMContentLoaded"
+    }
+
+    pub fn is_network_almost_idle(&self) -> bool {
+        self.raw_event.params.name == "networkAlmostIdle"
+    }
+
+    pub fn is_network_idle(&self) -> bool {
+        self.raw_event.params.name == "networkIdle"
+    }
+}
+
+
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "commit", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "DOMContentLoaded", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "load", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "networkAlmostIdle", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "networkIdle", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "networkAlmostIdle", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "63D840A62CD6045DB067488920C6CB95", name: "networkIdle", timestamp: 467692.44 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "init", timestamp: 467694.75 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "DOMContentLoaded", timestamp: 467695.16 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "load", timestamp: 467695.16 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "networkAlmostIdle", timestamp: 467695.16 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "firstPaint", timestamp: 467696.1 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "firstContentfulPaint", timestamp: 467696.1 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "firstMeaningfulPaintCandidate", timestamp: 467696.1 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "firstMeaningfulPaintCandidate", timestamp: 467696.16 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "firstImagePaint", timestamp: 467696.5 } })
+// LifecycleParams { frame_id: "C50C87D5E5FBED3D00A80C15EEC95C55", loader_id: "5D2AF99A577628F908336CB00B7E309C", name: "firstMeaningfulPaintCandidate", timestamp: 467696.5 } })
+
 #[cfg(test)]
 mod tests {
     // use super::*;

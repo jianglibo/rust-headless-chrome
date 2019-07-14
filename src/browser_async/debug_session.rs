@@ -92,11 +92,11 @@ impl DebugSession {
         self.tabs.iter().filter(|tb|tb.target_info.opener_id == Some(target_id.to_string())).collect()
     }
 
-    pub fn loaded_by_this_tab_name_count(&self, name: &str) -> Option<usize> {
+    pub fn loaded_by_this_tab_name_count(&self, name: &str) -> usize {
         if let Ok(tab) = self.find_tab_by_name(name) {
-            Some(self.tabs.iter().filter(|tb|tb.target_info.opener_id.as_ref() == Some(&tab.target_info.target_id)).count())
+            self.tabs.iter().filter(|tb|tb.target_info.opener_id.as_ref() == Some(&tab.target_info.target_id)).count()
         } else {
-            None
+            0
         }
     }
 

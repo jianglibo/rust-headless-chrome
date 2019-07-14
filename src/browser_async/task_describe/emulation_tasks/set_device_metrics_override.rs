@@ -8,9 +8,13 @@ use failure;
 #[builder(setter(into))]
 pub struct SetDeviceMetricsOverrideTask {
     pub common_fields: CommonDescribeFields,
-    pub width: u64,
-    pub height: u64,
+    #[builder(default = "None")]
+    pub width: Option<u64>,
+    #[builder(default = "None")]
+    pub height: Option<u64>,
+    #[builder(default = "0.0")]
     pub device_scale_factor: f64, // 0 disables the override
+    #[builder(default = "false")]
     pub mobile: bool,
     #[builder(default = "None")]
     pub scale: Option<f64>,
@@ -37,8 +41,8 @@ impl_has_common_fields!(SetDeviceMetricsOverrideTask);
 impl AsMethodCallString for SetDeviceMetricsOverrideTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{
         let method = emulation::methods::SetDeviceMetricsOverride {
-            width: self.width,
-            height: self.height,
+            width: self.width.expect("set_device_metrics_override width parameter is mandatory."),
+            height: self.height.expect("set_device_metrics_override height parameter is mandatory."),
             device_scale_factor: self.device_scale_factor,
             mobile: self.mobile,
             scale: self.scale,

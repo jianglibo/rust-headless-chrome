@@ -20,6 +20,19 @@ pub struct SetChildNodesParams {
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ChildNodeCountUpdated {
+    pub params: ChildNodeCountUpdatedParams,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildNodeCountUpdatedParams {
+    pub node_id: protocol_dom::NodeId,
+    pub child_node_count: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LoadEventFired {
     pub params: LoadEventFiredParams,
 }
@@ -93,6 +106,8 @@ pub struct ConsoleAPICalledParams {
 pub enum EmbeddedEvent {
     #[serde(rename = "DOM.setChildNodes")]
     SetChildNodes(SetChildNodes),
+    #[serde(rename = "DOM.childNodeCountUpdated")]
+    ChildNodeCountUpdated(ChildNodeCountUpdated),
     #[serde(rename = "Page.loadEventFired")]
     LoadEventFired(LoadEventFired),
     #[serde(rename = "Runtime.executionContextCreated")]

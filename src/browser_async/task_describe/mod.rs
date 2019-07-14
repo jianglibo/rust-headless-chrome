@@ -159,6 +159,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::DispatchMouseEvent(task) => task.get_method_str(),
                 TargetCallMethodTask::CanEmulate(task) => task.get_method_str(),
                 TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_method_str(),
+                TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_method_str(),
             }
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),

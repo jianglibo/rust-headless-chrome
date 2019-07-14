@@ -19,10 +19,23 @@ impl Tab {
             .common_fields(self.get_common_field(None))
             .width(width)
             .height(height)
-            .device_scale_factor(0)
-            .mobile(false)
             .build()
             .expect("SetDeviceMetricsOverrideTaskBuilder should success.");
         task.into()
+    }
+
+    pub fn display_full_page(&mut self) {
+        let tasks = self.display_full_page_task();
+        self.execute_tasks(tasks);
+    }
+
+    pub fn display_full_page_task(&mut self) -> Vec<TaskDescribe> {
+        let mut pre_tasks = self.get_body_box_model_task();
+        let task = emulation_tasks::SetDeviceMetricsOverrideTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .build()
+            .expect("SetDeviceMetricsOverrideTaskBuilder should success.");
+        pre_tasks.push(task.into());
+        pre_tasks
     }
 }

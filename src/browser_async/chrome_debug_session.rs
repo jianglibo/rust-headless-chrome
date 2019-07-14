@@ -111,6 +111,10 @@ impl ChromeDebugSession {
                 let event = network_events::RequestWillBeSent::new(embedded_event);
                 return TaskDescribe::from(event).into();
             }
+            EmbeddedEvent::ChildNodeCountUpdated(embedded_event) => {
+                let event = dom_events::ChildNodeCountUpdated::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
             _ => {
                 warn!("discard inner event: {:?}", target_message_event);
             }
@@ -299,6 +303,9 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::PageClose(_task) => {
                     info!("page closed.");
                 }
+                TargetCallMethodTask::SetLifecycleEventsEnabled(_task) => {
+                    info!("set lifecycle event enabled.");
+                }
                 TargetCallMethodTask::SetRequestInterception(task) => {
                     info!("set_request_interception enabled. {:?}", task);
                 }
@@ -412,6 +419,10 @@ impl ChromeDebugSession {
             }
             protocol::Event::TargetDestroyed(raw_event) => {
                 let event = target_events::TargetDestroyed::new(raw_event);
+                return Some(event.into());
+            }
+            protocol::Event::Lifecycle(raw_event) => {
+                let event = page_events::LifeCycle::new(raw_event);
                 return Some(event.into());
             }
             _ => {

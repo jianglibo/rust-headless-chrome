@@ -9,8 +9,17 @@ pub struct AttributeModified {}
 pub struct AttributeRemoved {}
 #[derive(Debug)]
 pub struct CharacterDataModified {}
-#[derive(Debug)]
-pub struct ChildNodeCountUpdated {}
+
+// "{\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"8CD21A9AA6837F6F1E4A661A73763B83\",\"message\":\"{\\\"method\\\":\\\"DOM.childNodeCountUpdated\\\",\\\"params\\\":{\\\"nodeId\\\":4,\\\"childNodeCount\\\":50}}\",\"targetId\":\"CDFB010DEEB3CF620374B1CCB84610F6\"}}"
+wrapper_raw_event!(
+    TaskDescribe::DomEvent,
+    DomEvent::ChildNodeCountUpdated,
+    ChildNodeCountUpdated,
+    embedded_events::ChildNodeCountUpdated
+);
+
+// #[derive(Debug)]
+// pub struct ChildNodeCountUpdated {}
 
 #[derive(Debug)]
 pub struct ChildNodeInserted {}
@@ -59,11 +68,7 @@ impl_into_task_describe!(
     DomEvent::CharacterDataModified,
     CharacterDataModified
 );
-impl_into_task_describe!(
-    TaskDescribe::DomEvent,
-    DomEvent::ChildNodeCountUpdated,
-    ChildNodeCountUpdated
-);
+
 impl_into_task_describe!(
     TaskDescribe::DomEvent,
     DomEvent::DocumentUpdated,

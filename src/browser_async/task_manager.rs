@@ -90,10 +90,14 @@ impl TaskGroup {
         })
     }
 
-    pub fn find_get_box_model_task(&self) -> Option<&dom_tasks::GetBoxModelTask> {
-        self.completed_tasks.iter().find_map(|task| match task {
+    pub fn find_get_box_model_task(&self, request_full_page: bool) -> Option<&dom_tasks::GetBoxModelTask> {
+        self.completed_tasks.iter().rev().find_map(|task| match task {
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)) => {
-                Some(get_box_model)
+                if get_box_model.request_full_page == request_full_page {
+                    Some(get_box_model)
+                } else {
+                    None
+                }
             }
             _ => None,
         })
@@ -173,7 +177,7 @@ impl TaskGroup {
                 mut screen_shot,
             )) => {
                 if let Some(mb) = self
-                    .find_get_box_model_task()
+                    .find_get_box_model_task(false)
                     .and_then(|v| v.task_result.as_ref())
                 {
                     let viewport = mb.content_viewport();
@@ -220,6 +224,21 @@ impl TaskGroup {
                     warn!("get_content_quads return empty result.");
                 }
                 self.waiting_tasks.insert(0, dispatch_mouse_event.into());
+            }
+            TaskDescribe::TargetCallMethod(TargetCallMethodTask::SetDeviceMetricsOverride(mut task)) => {
+                if let Some(mb) = self
+                    .find_get_box_model_task(true)
+                    .and_then(|v| v.task_result.as_ref())
+                {
+                    let viewport = mb.border_viewport();
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                    let (width, height) = (viewport.width as u64, viewport.height as u64);
+                    task.width.replace(width);
+                    task.height.replace(height);
+                } else {
+                    error!("found_box is None!");
+                }
+                self.waiting_tasks.insert(0, task.into());
             }
             task_describe => {
                 self.waiting_tasks.insert(0, task_describe);

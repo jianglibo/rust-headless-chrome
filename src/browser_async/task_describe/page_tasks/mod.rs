@@ -9,6 +9,7 @@ pub mod page_reload;
 pub mod get_layout_metrics;
 pub mod bring_to_front;
 pub mod attach_to_target;
+pub mod set_life_cycle_events_enable;
 
 use crate::browser_async::page_message::{PageResponseWrapper, PageResponse, ReceivedEvent,};
 pub use print_to_pdf::{PrintToPdfTask, PrintToPdfTaskBuilder};
@@ -20,6 +21,7 @@ pub use page_reload::{PageReloadTask, PageReloadTaskBuilder};
 pub use get_layout_metrics::{GetLayoutMetricsTask, GetLayoutMetricsTaskBuilder};
 pub use bring_to_front::{BringToFrontTask, BringToFrontTaskBuilder};
 pub use attach_to_target::{AttachToTargetTask, AttachToTargetTaskBuilder};
+pub use set_life_cycle_events_enable::{SetLifecycleEventsEnabledTask, SetLifecycleEventsEnabledTaskBuilder};
 
 use super::super::protocol::{target};
 use super::super::EventName;
@@ -35,6 +37,7 @@ pub enum PageEvent {
     FrameStartedLoading(page_events::FrameStartedLoading),
     FrameStoppedLoading(page_events::FrameStoppedLoading),
     LoadEventFired(page_events::LoadEventFired),
+    LifeCycle(page_events::LifeCycle),
 }
 
 fn handle_event_return(
@@ -124,6 +127,12 @@ pub fn handle_page_event(
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.event_statistics.event_happened(EventName::LoadEventFired);
                 return handle_event_return(maybe_target_id, event.into_page_response());
+            }
+            PageEvent::LifeCycle(event) => {
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                tab.life_cycle_happened(event);
+                return handle_event_return(maybe_target_id, 
+                PageResponse::ReceivedEvent(ReceivedEvent::LifeCycle));
             }
         }
         warn!("unhandled branch handle_page_event");

@@ -50,9 +50,8 @@ impl Future for GetContentInIframe {
                     self.debug_session.browser_contexts().deduplicate();
                     // self.debug_session.activates_next_in_interval(10);
                     // self.debug_session.activate_last_opened_tab();
-                    if let Some(popup_count) =
-                        self.debug_session.loaded_by_this_tab_name_count(HOME_URL)
-                    {
+                    let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
+                    if popup_count > 0 { //when popup_count > 0, home tab should exist.
                         let run_task_queue_manually = popup_count < 2;
                         let tab = self
                             .debug_session
@@ -63,15 +62,18 @@ impl Future for GetContentInIframe {
                             tab.run_task_queue_manually();
                         }
                     }
-                    if let Some(tab) = self
-                        .debug_session
-                        .loaded_by_this_tab_name_mut(HOME_URL)
-                        .get_mut(0)
-                    {
-                        if tab.bring_to_front() {
-                            info!("bring to front................had sent.");
-                        }
-                    }
+                    info!("popup_count is {}", popup_count);
+                    self.debug_session.activates_next_in_interval(3);
+                    // if let Some(tab) = self
+                    //     .debug_session
+                    //     .loaded_by_this_tab_name_mut(HOME_URL)
+                    //     .get_mut(0)
+                    // {
+                    //     // info!("bring to front. {:?}", tab);
+                    //     if tab.bring_to_front() {
+                    //         info!("bring to front................had sent.");
+                    //     }
+                    // }
                     // if let Some(popup_count) = self.debug_session.loaded_by_this_tab_name_count(SHENBIAN_GANDONG_URL) {
                     //     let run_task_queue_manually = popup_count < 2;
                     //     let tab = self.debug_session.find_tab_by_name_mut(SHENBIAN_GANDONG_URL).expect("shenbian gandong page should exists.");

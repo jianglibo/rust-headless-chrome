@@ -30,9 +30,8 @@ impl Future for CaptureScreenShotTest {
                         trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
                     }
                     self.debug_session.browser_contexts().deduplicate();
-                    if let Some(popup_count) =
-                        self.debug_session.loaded_by_this_tab_name_count(HOME_URL)
-                    {
+                    let popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
+                    if popup_count > 0 {
                         let run_task_queue_manually = popup_count < 2;
                         let tab = self
                             .debug_session
@@ -84,7 +83,7 @@ impl Future for CaptureScreenShotTest {
                         break Ok(().into());
                     }
                 } else {
-                    match self.state {
+                    match &mut self.state {
                         PageState::WaitingBlankPage => {
                             self.waiting_blank_page(
                                 maybe_target_id.as_ref(),

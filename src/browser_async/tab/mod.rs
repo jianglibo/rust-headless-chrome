@@ -4,7 +4,7 @@ use crate::browser::tab::point::Point;
 use super::page_message::ChangingFrame;
 use super::task_describe::{
     dom_tasks, network_events, network_tasks, page_tasks, runtime_tasks, target_tasks,
-    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks,
+    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks, page_events,
 };
 use super::{EventName, EventStatistics, TaskQueue};
 use crate::protocol::{self, dom, network, page, runtime, target};
@@ -21,6 +21,7 @@ pub enum WaitingForPageAttachTaskName {
     RuntimeEnable,
     PageEnable,
     NetworkEnable,
+    SetLifecycleEventsEnabled,
     BringToFront,
 }
 
@@ -52,6 +53,7 @@ pub struct Tab {
     pub activating: bool,
     pub closing: bool,
     pub explicitly_close: bool,
+    pub life_cycles: Vec<page_events::LifeCycle>,
 }
 
 impl std::fmt::Display for Tab {
@@ -91,6 +93,7 @@ impl Tab {
             activating: false,
             closing: false,
             explicitly_close: false,
+            life_cycles: Vec::new(),
         }
     }
 
@@ -137,6 +140,18 @@ impl Tab {
         } else {
             self.target_info.url == url
         }
+    }
+
+    pub fn life_cycle_happened(&mut self, life_cycle_event: page_events::LifeCycle) {
+        self.life_cycles.push(life_cycle_event);
+    }
+
+    pub fn last_life_cycle_event(&self) -> &page_events::LifeCycle {
+        self.life_cycles.last().expect("when last_life_cycle_event is called, it should already have events exists.")
+    }
+
+    pub fn life_cycle_event_count(&self, name: &str) -> usize {
+        self.life_cycles.iter().filter(|lc|lc.get_name() == name).count()
     }
 
     pub fn get_url(&self) -> &str {
@@ -739,6 +754,10 @@ impl Tab {
         .into()
     }
 
+    pub fn set_lifecycle_events_enabled_task(&self) -> TaskDescribe {
+        page_tasks::SetLifecycleEventsEnabledTaskBuilder::default().common_fields(self.get_common_field(None)).enabled(true).build().expect("SetRequestInterceptionTaskBuilder should success.").into()
+    }
+
     pub fn runtime_enable_named(&mut self, name: &str) {
         self.runtime_enable_impl(Some(name));
     }
@@ -1032,6 +1051,7 @@ impl Tab {
                 WaitingForPageAttachTaskName::BringToFront => self.bring_to_front_task(),
                 WaitingForPageAttachTaskName::PageEnable => self.page_enable_task(),
                 WaitingForPageAttachTaskName::RuntimeEnable => self.runtime_enable_task(),
+                WaitingForPageAttachTaskName::SetLifecycleEventsEnabled => self.set_lifecycle_events_enabled_task(),
                 WaitingForPageAttachTaskName::NetworkEnable => self.network_enable_task_impl(None),
             })
             .collect();

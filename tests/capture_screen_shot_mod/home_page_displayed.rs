@@ -19,6 +19,15 @@ impl CaptureScreenShotTest {
         match page_response {
             PageResponse::ReceivedEvent(received_event) => {
                 match received_event {
+                    // ReceivedEvent::LifeCycle => {
+                    //     info!("life cycle happend........................");
+                    //     let tab = self
+                    //         .get_tab(maybe_target_id)
+                    //         .expect("tab should exists. LoadEventFired");
+                    //     if tab.life_cycle_event_count("load") == 2 {
+                    //         tab.display_full_page();
+                    //     }
+                    // }
                     ReceivedEvent::LoadEventFired(_t) => {
                         info!("page loaded........................");
                         let tab = self
@@ -27,11 +36,12 @@ impl CaptureScreenShotTest {
                         // tab.capture_screenshot_view_jpeg();
                         // tab.get_layout_metrics();
                         // let task = tab.capture_screenshot_jpeg_task(Some(100), Some(false));
-                        let tasks = tab.capture_screenshot_by_selector_jpeg_task("body", Some(100), None, None);
-                        tab.task_queue.add_delayed_many(tasks, 3);
-                        let set_metrics = tab.set_device_metrics_override_simple_task(1000, 20000);
-                        // tab.can_emulate();
-                        tab.execute_one_task(set_metrics);
+                        // let tasks = tab.capture_screenshot_by_selector_jpeg_task("body", Some(100), None, None);
+                        // tab.task_queue.add_delayed_many(tasks, 3);
+                        // let set_metrics = tab.set_device_metrics_override_simple_task(1000, 20000);
+                        // tab.execute_one_task(set_metrics);
+                        let tasks = tab.display_full_page_task();
+                        tab.task_queue.add_delayed_many(tasks, 6);
                     }
                     ReceivedEvent::FrameStoppedLoading(frame_id) => {
                         let tab = self
@@ -73,38 +83,17 @@ impl CaptureScreenShotTest {
                     MethodCallDone::CanEmulate(task) => {
                         info!("got can_emulate answer: {:?}", task);
                     }
+                    MethodCallDone::SetDeviceMetricsOverride(task) => {
+                        info!("got set_device_metrics_override {:?}", task);
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. FrameStoppedLoading");
+                        tab.capture_screenshot_surface_jpeg(Some(100));
+                    }
                     _ => {
                         error!("got other method_call_done. {:?}", method_call_done);
                     }
                 };
-                // if let MethodCallDone::Evaluate(task) = method_call_done {
-                    // let file_name = "target/qrcode.png";
-                    // let path = Path::new(file_name);
-                    // if path.exists() && path.is_file() {
-                    //     fs::remove_file(file_name).unwrap();
-                    // }
-
-                    // let base64_data = task.get_string_result().and_then(|v| {
-                    //     let mut ss = v.splitn(2, ',').fuse();
-                    //     ss.next();
-                    //     ss.next()
-                    // });
-
-                    // write_base64_str_to(file_name, base64_data)
-                    //     .expect("write_base64_str_to success.");
-                    // assert!(path.exists());
-                    // self.state = PageState::WaitingForQrcodeScan;
-                    // let exe = std::fs::canonicalize("./target/qrcode.png").expect("exists.");
-                    // error!("{:?}", exe);
-                    // std::process::Command::new("cmd")
-                    //     .args(&[
-                    //         "/C",
-                    //         "C:/Program Files/internet explorer/iexplore.exe",
-                    //         exe.to_str().expect("should convert to string."),
-                    //     ])
-                    //     .spawn()
-                    //     .expect("failed to execute process");
-                // }
             }
             _ => {}
         }

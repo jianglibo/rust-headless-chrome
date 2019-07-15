@@ -134,10 +134,10 @@ impl Stream for ChromeBrowser {
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
-                                if msg.contains("Network.requestIntercepted") || msg.len() < 400 {
+                                if msg.contains("Network.requestIntercepted") || msg.len() < 1000 {
                                     trace!("got message (***every message***): {:?}", msg);
                                 } else {
-                                    let (short, _) = msg.split_at(200);
+                                    let (short, _) = msg.split_at(1000);
                                     trace!("got message (***every message***): {:?}", short);
                                 } 
                                 let parsed_message = protocol::parse_raw_message(&msg);

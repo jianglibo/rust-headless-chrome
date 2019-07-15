@@ -63,6 +63,9 @@ impl GetContentInIframe {
                                     .expect("tab should exists. FrameStoppedLoading");
                                 let remote_object_id = task.get_object_id().expect("remote_object_id should exists.");
                                 tab.get_properties_by_object_id_named(remote_object_id, DESCRIBE_ARTICLE_TITLES);
+                        } else if task.task_id_equal("dh") {
+                            
+                        
                         } else {
                             info!("{:?}", task);
                         }
@@ -124,6 +127,7 @@ impl GetContentInIframe {
                             tab.name_the_page(SHENBIAN_GANDONG_URL);
                             let task = tab.evaluate_expression_task_named(r##"document.querySelectorAll("#root div.grid-cell span.text").length"##, SHIPING_CHILDREN_NUM_TASK_NAME);
                             tab.execute_one_task(task);
+                            tab.evaluate_expression_named(r##"document.hidden"##, "dh");
                             // tab.task_queue.add_delayed(task, 3);
                         }
                     }

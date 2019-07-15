@@ -107,7 +107,7 @@ impl ChromeDebugSession {
                 // warn!("ignore LoadingFinished inner event.");
             }
             EmbeddedEvent::RequestWillBeSent(embedded_event) => {
-                // warn!("ignore RequestWillBeSent inner event. {:?}", embedded_event);
+                // trace!("RequestWillBeSent: {:?}", embedded_event);
                 let event = network_events::RequestWillBeSent::new(embedded_event);
                 return TaskDescribe::from(event).into();
             }

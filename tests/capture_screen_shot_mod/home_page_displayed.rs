@@ -42,6 +42,8 @@ impl CaptureScreenShotTest {
                         // tab.execute_one_task(set_metrics);
                         let tasks = tab.display_full_page_task();
                         tab.task_queue.add_delayed_many(tasks, 6);
+                        tab.evaluate_expression_named(r##"document.hidden"##, "document.hidden");
+                        tab.evaluate_expression_named(r##"document.visibilityState"##, "document.visibilityState");
                     }
                     ReceivedEvent::FrameStoppedLoading(frame_id) => {
                         let tab = self
@@ -60,6 +62,9 @@ impl CaptureScreenShotTest {
             }
             PageResponse::MethodCallDone(method_call_done) => {
                 match  method_call_done {
+                    MethodCallDone::Evaluate(task) => {
+                        info!("got document.hidden: {:?}", task);
+                    }
                     MethodCallDone::CaptureScreenshot(capture_screen_shot) => {
                         // info!("got screen shot: {:?}", capture_screen_shot.task_result);
                         info!("got screen shot: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");

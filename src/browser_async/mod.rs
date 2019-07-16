@@ -11,11 +11,13 @@ pub mod task_describe;
 pub mod tab;
 pub mod embedded_events;
 pub mod event_statistics;
+pub mod network_statistics;
 pub mod task_queue;
 pub mod browser_context;
 pub mod task_manager;
 
 pub use event_statistics::{EventStatistics, EventName};
+pub use network_statistics::{NetworkStatistics};
 pub use chrome_debug_session::{ChromeDebugSession};
 pub use task_queue::{TaskQueue};
 pub use debug_session::{DebugSession};

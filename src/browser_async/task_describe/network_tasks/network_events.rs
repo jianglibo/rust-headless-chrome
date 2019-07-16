@@ -64,6 +64,14 @@ impl RequestWillBeSent {
         self.raw_event.params.request_id.clone()
     }
 
+    pub fn get_request_id_ref(&self) -> &network::RequestId {
+        &self.raw_event.params.request_id
+    }
+
+    pub fn get_request_will_sent_params(&self) -> &embedded_events::RequestWillBeSentParams {
+        &self.raw_event.params
+    }
+
     pub fn get_request_object(&self) -> &network::Request {
         &self.raw_event.params.request
     }

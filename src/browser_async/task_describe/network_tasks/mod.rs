@@ -18,7 +18,6 @@ pub use set_request_interception::{SetRequestInterceptionTask, SetRequestInterce
 
 use super::super::protocol::target;
 use crate::browser_async::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
-use log::*;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -61,12 +60,11 @@ pub fn handle_network_event(
                     request_id,
                 )),
             })
-            // warn!("unhandled network_events RequestIntercepted");
         }
         NetworkEvent::RequestWillBeSent(event) => {
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_request_id();
-            tab.request_will_be_sent(event);
+            tab.network_statistics.request_will_be_sent(event);
             Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
@@ -74,7 +72,6 @@ pub fn handle_network_event(
                     request_id,
                 )),
             })
-            // warn!("unhandled network_events RequestWillBeSent");
         }
         NetworkEvent::LoadingFinished(event) => {
             Ok(PageResponseWrapper {
@@ -82,7 +79,6 @@ pub fn handle_network_event(
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::LoadingFinished(event)),
             })
-            // warn!("unhandled network_events LoadingFinished");
         }
         NetworkEvent::DataReceived(event) => {
             Ok(PageResponseWrapper {
@@ -90,20 +86,18 @@ pub fn handle_network_event(
                 task_id: None,
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::DataReceived(event)),
             })
-            // warn!("unhandled network_events DataReceived");
         }
         NetworkEvent::LoadingFailed(event) => {
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-            let request = tab.take_request(&event.get_request_id());
-            error!("failed request: {:?}", request);
-            error!("failed request event: {:?}", event);
+            let request_id = event.get_request_id();
+            tab.network_statistics.loading_failed(event);
             Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: None,
-                page_response: PageResponse::ReceivedEvent(ReceivedEvent::LoadingFailed(event)),
+                page_response: PageResponse::ReceivedEvent(ReceivedEvent::LoadingFailed(
+                    request_id,
+                )),
             })
-            // warn!("unhandled network_events DataReceived");
         }
     }
-    // Ok(PageResponseWrapper::default())
 }

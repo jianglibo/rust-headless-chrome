@@ -27,7 +27,7 @@ impl CaptureScreenShotTest {
                         WaitingForPageAttachTaskName::PageEnable,
                         WaitingForPageAttachTaskName::RuntimeEnable,
                         WaitingForPageAttachTaskName::SetLifecycleEventsEnabled,
-                        // WaitingForPageAttachTaskName::NetworkEnable
+                        WaitingForPageAttachTaskName::NetworkEnable
                     ];
                     tab.attach_to_page_and_then(tasks);
                 }

@@ -61,7 +61,7 @@ pub enum ReceivedEvent {
     RequestWillBeSent(network::RequestId),
     LoadingFinished(network_events::LoadingFinished),
     DataReceived(network_events::DataReceived),
-    LoadingFailed(network_events::LoadingFailed),
+    LoadingFailed(network::RequestId),
 }
 
 #[derive(Debug)]

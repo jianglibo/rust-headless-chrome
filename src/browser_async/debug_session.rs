@@ -35,17 +35,6 @@ impl Stream for Wrapper {
     }
 }
 
-// fn handle_event_return(
-//     maybe_target_id: Option<target::TargetId>,
-//     page_response: PageResponse,
-// ) -> Result<PageResponseWrapper, failure::Error> {
-//     Ok(PageResponseWrapper {
-//         target_id: maybe_target_id,
-//         task_id: None,
-//         page_response: page_response,
-//     })
-// }
-
 /// An adapter for merging the output of two streams.
 ///
 /// The merged stream produces items from either of the underlying streams as
@@ -298,19 +287,6 @@ impl DebugSession {
         self.tabs.get(0)
     }
 
-    // fn send_fail(
-    //     &mut self,
-    //     target_id: Option<target::TargetId>,
-    //     task_id: Option<TaskId>,
-    // ) -> Poll<Option<PageResponseWrapper>, failure::Error> {
-    //     let pr = PageResponseWrapper {
-    //         target_id,
-    //         task_id,
-    //         page_response: PageResponse::Fail,
-    //     };
-    //     Ok(Some(pr).into())
-    // }
-
     pub fn runtime_enable(&mut self) {
         let task = self.runtime_enable_task();
         self.chrome_debug_session
@@ -388,16 +364,6 @@ impl DebugSession {
         SecurityEnableTask { common_fields }.into()
     }
 
-    // fn handle_page_event(
-    //     &mut self,
-    //     page_event: PageEvent,
-    //     maybe_session_id: Option<target::SessionID>,
-    //     maybe_target_id: Option<target::TargetId>,
-    // ) -> Result<PageResponseWrapper, failure::Error> {
-
-    // }
-
-
     pub fn send_page_message(
         &mut self,
         item_tuple: (
@@ -446,10 +412,6 @@ impl DebugSession {
                 Ok(handle_network_event(self, network_event, session_id, target_id)
                 .ok()
                 .into()),
-            // _ => {
-            //     warn!("debug_session got unknown task. {:?}", item);
-            //     self.send_fail(None, None)
-            // }
         }
     }
 }

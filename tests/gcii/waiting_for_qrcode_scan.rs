@@ -96,7 +96,7 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
                         let tasks = tab.display_full_page_task();
-                        tab.task_queue.add_delayed_many(tasks, 3);
+                        tab.execute_tasks_after_secs(tasks, 3);
 
                     }
                     ReceivedEvent::ResponseReceived(_event) => {}

@@ -3,7 +3,7 @@ use crate::protocol::{dom as protocol_dom, runtime, network};
 
 mod network_raw_event;
 
-pub use network_raw_event::{RequestWillBeSent, ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
+pub use network_raw_event::{RequestWillBeSent, RequestWillBeSentParams, ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

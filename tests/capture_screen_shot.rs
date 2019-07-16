@@ -30,6 +30,9 @@ impl Future for CaptureScreenShotTest {
                         trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
                     }
                     self.debug_session.browser_contexts().deduplicate();
+                    if let Ok(tab) = self.debug_session.find_tab_by_name(HOME_URL) {
+                        info!("requested urls: {:?}", tab.network_statistics.list_request_urls_end_with("/pclog"));
+                    }
                     let popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
                     if popup_count > 0 {
                         let run_task_queue_manually = popup_count < 2;

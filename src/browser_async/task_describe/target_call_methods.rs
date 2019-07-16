@@ -113,6 +113,13 @@ pub fn handle_target_method_call(
             });
         }
         TargetCallMethodTask::GetBoxModel(task) => {
+            if task.request_full_page {
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                if let Some(bm) = task.task_result.as_ref().cloned() {
+                    tab.box_model.replace(bm);
+                }
+            }
+
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),

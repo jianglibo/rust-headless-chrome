@@ -1,5 +1,5 @@
-use super::super::browser_async::{create_unique_prefixed_id, embedded_events, TaskId, ChromeDebugSession};
-use crate::browser::tab::point::Point;
+use super::super::browser_async::{create_unique_prefixed_id, embedded_events, TaskId, ChromeDebugSession, NetworkStatistics};
+use super::super::browser::tab::{point::Point, element::BoxModel};
 
 use super::page_message::ChangingFrame;
 use super::task_describe::{
@@ -44,7 +44,7 @@ pub struct Tab {
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
     pub execution_context_descriptions:
         HashMap<page::FrameId, runtime::ExecutionContextDescription>,
-    pub ongoing_request: HashMap<network::RequestId, network_events::RequestWillBeSent>,
+    // pub ongoing_request: HashMap<network::RequestId, network_events::RequestWillBeSent>,
     pub request_intercepted: HashMap<network::RequestId, network_events::RequestIntercepted>,
     pub response_received: HashMap<network::RequestId, network_events::ResponseReceived>,
     pub event_statistics: EventStatistics,
@@ -54,6 +54,8 @@ pub struct Tab {
     pub closing: bool,
     pub explicitly_close: bool,
     pub life_cycles: Vec<page_events::LifeCycle>,
+    pub network_statistics: NetworkStatistics,
+    pub box_model: Option<BoxModel>,
 }
 
 impl std::fmt::Display for Tab {
@@ -82,11 +84,9 @@ impl Tab {
             changing_frames: HashMap::new(),
             temporary_node_holder: HashMap::new(),
             execution_context_descriptions: HashMap::new(),
-            ongoing_request: HashMap::new(),
+            // ongoing_request: HashMap::new(),
             request_intercepted: HashMap::new(),
             response_received: HashMap::new(),
-            event_statistics: EventStatistics::new(),
-            task_queue: TaskQueue::new(),
             created_at: Instant::now(),
             activated_at: None,
             waiting_for_page_attach: HashSet::new(),
@@ -94,6 +94,10 @@ impl Tab {
             closing: false,
             explicitly_close: false,
             life_cycles: Vec::new(),
+            event_statistics: EventStatistics::new(),
+            network_statistics: NetworkStatistics::default(),
+            task_queue: TaskQueue::new(),
+            box_model: None,
         }
     }
 
@@ -118,18 +122,11 @@ impl Tab {
         self.is_at_url("chrome-error://chromewebdata/")
     }
 
-    pub fn request_will_be_sent(&mut self, event: network_events::RequestWillBeSent) {
-        self.ongoing_request.insert(event.get_request_id(), event);
-    }
+    // pub fn request_will_be_sent(&mut self, event: network_events::RequestWillBeSent) {
+    //     self.ongoing_request.insert(event.get_request_id(), event);
+    // }
 
-    pub fn take_request(
-        &mut self,
-        request_id: &str,
-    ) -> network_events::RequestWillBeSent {
-        self.ongoing_request
-            .remove(request_id)
-            .expect("cannot find the request by request_id!")
-    }
+
 
     /// where does page's url attribute live? The page target_info holds the url you intent navigate to,
     /// but if failed cause of some reason, please look into the main frame's url and unreachable_url attributes,
@@ -611,6 +608,32 @@ impl Tab {
             .y(point.map(|p|p.y))
             .build().expect("move_mouse_to_point should build success.");
         task.into()
+    }
+
+    pub fn mouse_move_to_xy_task(&self, x: f64, y: f64) -> TaskDescribe {
+        self.mouse_move_to_point_task(Some(Point {x, y}))
+    }
+
+    pub fn execute_task_after_secs(&mut self, task: TaskDescribe, delay_secs: u64) {
+        self.task_queue.add_delayed(task, delay_secs);
+    }
+
+    pub fn execute_tasks_after_secs(&mut self, tasks: Vec<TaskDescribe>, delay_secs: u64) {
+        self.task_queue.add_delayed_many(tasks, delay_secs);
+    }
+
+    pub fn execute_tasks_in_interval(&mut self, tasks: Vec<TaskDescribe>, delay_secs: u64) {
+        for (idx, v) in tasks.into_iter().enumerate() {
+            self.task_queue.add_delayed(v, delay_secs * ((idx + 1) as u64))
+        }
+    }
+
+    pub fn move_mouse_random_after_secs(&mut self, delay_secs: u64) {
+        self.execute_tasks_after_secs(self.move_mouse_random_tasks(), delay_secs);
+    }
+
+    pub fn move_mouse_random_tasks(&self) -> Vec<TaskDescribe> {
+        vec![self.mouse_move_to_xy_task(100.0, 100.0), self.mouse_move_to_xy_task(200.0, 200.0)]
     }
 
     pub fn mouse_press_at_point_task(&self, point: Option<Point>) -> TaskDescribe {

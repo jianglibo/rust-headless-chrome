@@ -8,14 +8,10 @@
 [Puppeteer](https://github.com/GoogleChrome/puppeteer) for Rust. It looks a little something like this:
 
 ```rust
-use headless_chrome::{browser::default_executable, Browser,
-                      LaunchOptionsBuilder, protocol::page::ScreenshotFormat};
+use headless_chrome::{Browser, protocol::page::ScreenshotFormat};
 
 fn browse_wikipedia() -> Result<(), failure::Error> {
-    let options = LaunchOptionsBuilder::default()
-                      .path(Some(default_executable().unwrap()))
-                      .build().unwrap();
-    let browser = Browser::new(options)?;
+    let browser = Browser::default()?;
 
     let tab = browser.wait_for_initial_tab()?;
 
@@ -52,6 +48,10 @@ assert!(browse_wikipedia().is_ok());
 For fuller examples, take a look at [`tests/simple.rs`](tests/simple.rs) and [`examples/real_world.rs`](examples/real_world.rs).
 
 If you're looking to do general browser testing or scraping (rather than anything specific to Chrome / DevTools), you're probably better off with [fantoccini](https://github.com/jonhoo/fantoccini) for now. It's a lot more feature-complete and stable.
+
+## Version numbers
+
+Starting with v0.2.0, we're trying to follow SemVar strictly.
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
-use serde::{Deserialize, Deserializer};
-use serde::{Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Deserializer};
 
 pub type NodeId = u16;
 
@@ -148,9 +148,10 @@ impl<'a, F: FnMut(&Node) -> bool> SearchVisitor<'a, F> {
 }
 
 pub mod methods {
-    use crate::protocol::Method;
     use serde::{Deserialize, Serialize};
     use crate::protocol::runtime;
+
+    use crate::protocol::Method;
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]

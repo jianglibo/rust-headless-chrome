@@ -1,9 +1,3 @@
-use failure::{format_err, Error, Fail};
-use log::*;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use regex::Regex;
-
 use std::{
     borrow::BorrowMut,
     ffi::OsStr,
@@ -13,15 +7,20 @@ use std::{
     time::Duration,
 };
 
+use failure::{format_err, Fail, Fallible};
+use log::*;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+use regex::Regex;
 #[cfg(windows)]
 use winreg::{enums::HKEY_LOCAL_MACHINE, RegKey};
 
-#[cfg(feature = "fetch")]
-use super::fetcher::{self, Fetcher};
 #[cfg(not(feature = "fetch"))]
 use crate::browser::default_executable;
-
 use crate::util;
+
+#[cfg(feature = "fetch")]
+use super::fetcher::{self, Fetcher};
 
 pub struct Process {
     child_process: TemporaryProcess,
@@ -63,7 +62,12 @@ pub struct LaunchOptions<'a> {
     /// Determintes whether to run headless version of the browser. Defaults to true.
     #[builder(default = "true")]
     headless: bool,
-
+    /// Determines whether to run the browser with a sandbox.
+    #[builder(default = "true")]
+    sandbox: bool,
+    /// Launch the browser with a specific window width and height.
+    #[builder(default = "None")]
+    window_size: Option<(u32, u32)>,
     /// Launch the browser with a specific debugging port.
     #[builder(default = "None")]
     port: Option<u16>,
@@ -100,7 +104,7 @@ impl<'a> LaunchOptionsBuilder<'a> {
 }
 
 impl Process {
-    pub fn new(mut launch_options: LaunchOptions) -> Result<Self, Error> {
+    pub fn new(mut launch_options: LaunchOptions) -> Fallible<Self> {
         if launch_options.path.is_none() {
             #[cfg(feature = "fetch")]
             {
@@ -153,13 +157,19 @@ impl Process {
         })
     }
 
-    fn start_process(launch_options: &LaunchOptions) -> Result<TemporaryProcess, Error> {
+    fn start_process(launch_options: &LaunchOptions) -> Fallible<TemporaryProcess> {
         let debug_port = if let Some(port) = launch_options.port {
             port
         } else {
             get_available_port().ok_or(ChromeLaunchError::NoAvailablePorts {})?
         };
         let port_option = format!("--remote-debugging-port={}", debug_port);
+
+        let window_size_option = if let Some((width, height)) = launch_options.window_size {
+            format!("--window-size={},{}", width, height)
+        } else {
+            String::from("")
+        };
 
         // NOTE: picking random data dir so that each a new browser instance is launched
         // (see man google-chrome)
@@ -176,11 +186,18 @@ impl Process {
             //  "--disable-gpu",
             "--no-first-run",
             data_dir_option.as_str(),
-            //            "--window-size=1920,1080"
         ];
+
+        if !window_size_option.is_empty() {
+            args.extend(&[window_size_option.as_str()]);
+        }
 
         if launch_options.headless {
             args.extend(&["--headless"]);
+        }
+
+        if !launch_options.sandbox {
+            args.extend(&["--no-sandbox"]);
         }
 
         let extension_args: Vec<String> = launch_options
@@ -207,7 +224,7 @@ impl Process {
         Ok(process)
     }
 
-    fn ws_url_from_reader<R>(reader: BufReader<R>) -> Result<Option<String>, Error>
+    fn ws_url_from_reader<R>(reader: BufReader<R>) -> Fallible<Option<String>>
     where
         R: Read,
     {
@@ -237,7 +254,7 @@ impl Process {
         Ok(None)
     }
 
-    fn ws_url_from_output(child_process: &mut Child) -> Result<String, Error> {
+    fn ws_url_from_output(child_process: &mut Child) -> Fallible<String> {
         let chrome_output_result = util::Wait::with_timeout(Duration::from_secs(10)).until(|| {
             let my_stderr = BufReader::new(child_process.stderr.as_mut().unwrap());
             match Self::ws_url_from_reader(my_stderr) {
@@ -276,10 +293,12 @@ fn port_is_available(port: u16) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::browser::default_executable;
     use std::sync::{Once, ONCE_INIT};
     use std::thread;
+
+    use crate::browser::default_executable;
+
+    use super::*;
 
     static INIT: Once = ONCE_INIT;
     fn setup() {

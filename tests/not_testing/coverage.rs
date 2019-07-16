@@ -1,13 +1,13 @@
+use std::sync::Arc;
+
+use failure::Fallible;
+
+use headless_chrome::browser::tab::Tab;
+use headless_chrome::Browser;
+use server::Server;
+
 mod logging;
 mod server;
-
-use failure::Error;
-use headless_chrome::{Browser, LaunchOptionsBuilder};
-
-use headless_chrome::browser::default_executable;
-use headless_chrome::browser::tab::Tab;
-use server::Server;
-use std::sync::Arc;
 
 fn basic_http_response(
     body: &'static str,
@@ -46,17 +46,10 @@ fn server_with_html_and_js() -> Server {
 }
 
 #[test]
-fn returns_actual_coverage() -> Result<(), Error> {
+fn returns_actual_coverage() -> Fallible<()> {
     logging::enable_logging();
     let server = server_with_html_and_js();
-    let browser = Browser::new(
-        LaunchOptionsBuilder::default()
-            .headless(true)
-            .path(Some(default_executable().unwrap()))
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let browser = Browser::default()?;
     let tab: Arc<Tab> = browser.wait_for_initial_tab()?;
 
     tab.enable_profiler()?;
@@ -68,6 +61,8 @@ fn returns_actual_coverage() -> Result<(), Error> {
     tab.wait_until_navigated()?;
 
     let script_coverages = tab.take_precise_js_coverage()?;
+
+    dbg!(&script_coverages);
 
     // our fixtures HTML file (basic_page_with_js_scripts.html) includes two external scripts
     assert_eq!(2, script_coverages.len());
@@ -95,7 +90,15 @@ fn returns_actual_coverage() -> Result<(), Error> {
     let button = tab.wait_for_element("#incrementor")?;
     button.click()?;
 
-    let updated_script_coverages = tab.take_precise_js_coverage()?;
+    let result = tab.take_precise_js_coverage()?;
+
+    let updated_script_coverages: Vec<_> = result
+        .iter()
+        // discludes 'anonymous' scripts we inject into the page
+        .filter(|script_cov| script_cov.url.starts_with("http://"))
+        .collect();
+
+    dbg!(&updated_script_coverages);
 
     // when we clicked the button, code in only one of the scripts was executed, and Chrome
     // only sends back info about code that's been executed since you last "took" the coverage:

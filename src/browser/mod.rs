@@ -1,18 +1,19 @@
 // use crate::browser::process::get_chrome_path_from_registry;
 use std::sync::mpsc;
+use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use failure::Error;
+use failure::Fallible;
 use log::*;
 use serde;
-use which::which;
 
 pub use process::LaunchOptionsBuilder;
 use process::{LaunchOptions, Process};
 pub use tab::Tab;
 use transport::Transport;
+use which::which;
 
 use crate::browser::context::Context;
 use crate::protocol::browser::methods::GetVersion;
@@ -20,7 +21,6 @@ pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 use crate::protocol::target::methods::{CreateTarget, SetDiscoverTargets};
 use crate::protocol::{self, Event};
 use crate::util;
-use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
 
 pub mod context;
 #[cfg(feature = "fetch")]
@@ -36,18 +36,22 @@ pub mod transport;
 ///
 /// A Browser can either manage its own Chrome process or connect to a remote one.
 ///
-/// [LaunchOptions](../process/LaunchOptions.struct.html) will automatically
+/// `Browser::default().unwrap()` will return a headless instance of whatever browser can be found using
+/// `default_executable`, which will search on your PATH for relevant binaries or use the path
+/// specified in the `CHROME` env var.
+///
+/// You can use [LaunchOptions](../process/LaunchOptions.struct.html) to automatically
 /// download a revision of Chromium that has a compatible API into your `$XDG_DATA_DIR`. Alternatively,
 /// you can specify your own path to a binary, or make use of the `default_executable` function to use
 ///  your already-installed copy of Chrome.
 ///
 /// Option 1: Managing a Chrome process
 /// ```rust
-/// # use failure::Error;
-/// # fn main() -> Result<(), Error> {
+/// # use failure::Fallible;
+/// # fn main() -> Fallible<()> {
 /// #
-/// use headless_chrome::{Browser, browser::default_executable, LaunchOptionsBuilder};
-/// let browser = Browser::new(LaunchOptionsBuilder::default().path(Some(default_executable().unwrap())).build().unwrap())?;
+/// use headless_chrome::Browser;
+/// let browser = Browser::default()?;
 /// let first_tab = browser.wait_for_initial_tab()?;
 /// assert_eq!("about:blank", first_tab.get_url());
 /// #
@@ -74,7 +78,7 @@ impl Browser {
     ///
     /// The browser will have its user data (aka "profile") directory stored in a temporary directory.
     /// The browser process will be killed when this struct is dropped.
-    pub fn new(launch_options: LaunchOptions) -> Result<Self, Error> {
+    pub fn new(launch_options: LaunchOptions) -> Fallible<Self> {
         let process = Process::new(launch_options)?;
         let process_id = process.get_id();
 
@@ -86,14 +90,25 @@ impl Browser {
         Self::create_browser(Some(process), transport)
     }
 
-    pub fn connect(debug_ws_url: String) -> Result<Self, Error> {
+    /// Calls [`new`] with options to launch a headless browser using whatever Chrome / Chromium
+    /// binary can be found on the system.
+    pub fn default() -> Fallible<Self> {
+        let launch_options = LaunchOptionsBuilder::default()
+            .path(Some(default_executable().unwrap()))
+            .build()
+            .unwrap();
+        Ok(Self::new(launch_options).unwrap())
+    }
+
+    /// Allows you to drive an externally-launched Chrome process instead of launch one via [`new`].
+    pub fn connect(debug_ws_url: String) -> Fallible<Self> {
         let transport = Arc::new(Transport::new(debug_ws_url, None)?);
         trace!("created transport");
 
         Self::create_browser(None, transport)
     }
 
-    fn create_browser(process: Option<Process>, transport: Arc<Transport>) -> Result<Self, Error> {
+    fn create_browser(process: Option<Process>, transport: Arc<Transport>) -> Fallible<Self> {
         let tabs = Arc::new(Mutex::new(vec![]));
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
@@ -124,7 +139,11 @@ impl Browser {
     }
 
     pub fn get_process_id(&self) -> Option<u32> {
-        self.process.as_ref().map(Process::get_id)
+        if let Some(process) = &self.process {
+            Some(process.get_id())
+        } else {
+            None
+        }
     }
 
     /// The tabs are behind an `Arc` and `Mutex` because they're accessible from multiple threads
@@ -136,7 +155,7 @@ impl Browser {
     /// Chrome always launches with at least one tab. The reason we have to 'wait' is because information
     /// about that tab isn't available *immediately* after starting the process. Tabs are behind `Arc`s
     /// because they each have their own thread which handles events and method responses directed to them.
-    pub fn wait_for_initial_tab(&self) -> Result<Arc<Tab>, Error> {
+    pub fn wait_for_initial_tab(&self) -> Fallible<Arc<Tab>> {
         util::Wait::with_timeout(Duration::from_secs(10))
             .until(|| self.tabs.lock().unwrap().first().map(|tab| Arc::clone(tab)))
             .map_err(Into::into)
@@ -147,11 +166,11 @@ impl Browser {
     /// If you want to specify its starting options, see `new_tab_with_options`.
     ///
     /// ```rust
-    /// # use failure::Error;
-    /// # fn main() -> Result<(), Error> {
+    /// # use failure::Fallible;
+    /// # fn main() -> Fallible<()> {
     /// #
-    /// # use headless_chrome::{Browser, browser::default_executable, LaunchOptionsBuilder};
-    /// # let browser = Browser::new(LaunchOptionsBuilder::default().path(Some(default_executable().unwrap())).build().unwrap())?;
+    /// # use headless_chrome::Browser;
+    /// # let browser = Browser::default()?;
     /// let first_tab = browser.wait_for_initial_tab()?;
     /// let new_tab = browser.new_tab()?;
     /// let num_tabs = browser.get_tabs().lock().unwrap().len();
@@ -160,7 +179,7 @@ impl Browser {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new_tab(&self) -> Result<Arc<Tab>, Error> {
+    pub fn new_tab(&self) -> Fallible<Arc<Tab>> {
         let default_blank_tab = CreateTarget {
             url: "about:blank",
             width: None,
@@ -173,11 +192,11 @@ impl Browser {
 
     /// Create a new tab with a starting url, height / width, context ID and 'frame control'
     /// ```rust
-    /// # use failure::Error;
-    /// # fn main() -> Result<(), Error> {
+    /// # use failure::Fallible;
+    /// # fn main() -> Fallible<()> {
     /// #
-    /// # use headless_chrome::{Browser, browser::default_executable, LaunchOptionsBuilder, protocol::target::methods::CreateTarget};
-    /// # let browser = Browser::new(LaunchOptionsBuilder::default().path(Some(default_executable().unwrap())).build().unwrap())?;
+    /// # use headless_chrome::{Browser, protocol::target::methods::CreateTarget};
+    /// # let browser = Browser::default()?;
     ///    let new_tab = browser.new_tab_with_options(CreateTarget {
     ///    url: "chrome://version",
     ///    width: Some(1024),
@@ -189,25 +208,25 @@ impl Browser {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(clippy::pedantic)]
-    pub fn new_tab_with_options(
-        &self,
-        create_target_params: CreateTarget,
-    ) -> Result<Arc<Tab>, Error> {
+    pub fn new_tab_with_options(&self, create_target_params: CreateTarget) -> Fallible<Arc<Tab>> {
         let target_id = self.call_method(create_target_params)?.target_id;
 
         util::Wait::with_timeout(Duration::from_secs(20))
             .until(|| {
                 let tabs = self.tabs.lock().unwrap();
-                tabs.iter()
-                    .find(|tab| *tab.get_target_id() == target_id)
-                    .map(|tab_ref| Arc::clone(tab_ref))
+                tabs.iter().find_map(|tab| {
+                    if *tab.get_target_id() == target_id {
+                        Some(tab.clone())
+                    } else {
+                        None
+                    }
+                })
             })
             .map_err(Into::into)
     }
 
     /// Creates the equivalent of a new incognito window, AKA a browser context
-    pub fn new_context(&self) -> Result<context::Context, Error> {
+    pub fn new_context(&self) -> Fallible<context::Context> {
         debug!("Creating new browser context");
         let context_id = self
             .call_method(protocol::target::methods::CreateBrowserContext {})?
@@ -219,18 +238,18 @@ impl Browser {
     /// Get version information
     ///
     /// ```rust
-    /// # use failure::Error;
-    /// # fn main() -> Result<(), Error> {
+    /// # use failure::Fallible;
+    /// # fn main() -> Fallible<()> {
     /// #
-    /// # use headless_chrome::{Browser, browser::default_executable, LaunchOptionsBuilder};
-    /// # let browser = Browser::new(LaunchOptionsBuilder::default().path(Some(default_executable().unwrap())).build().unwrap())?;
+    /// # use headless_chrome::Browser;
+    /// # let browser = Browser::default()?;
     /// let version_info = browser.get_version()?;
     /// println!("User-Agent is `{}`", version_info.user_agent);
     /// #
     /// # Ok(())
     /// # }
     /// ```
-    pub fn get_version(&self) -> Result<VersionInformationReturnObject, Error> {
+    pub fn get_version(&self) -> Fallible<VersionInformationReturnObject> {
         self.call_method(GetVersion {})
     }
 
@@ -320,7 +339,7 @@ impl Browser {
     /// Call a browser method.
     ///
     /// See the `cdtp` module documentation for available methods.
-    fn call_method<C>(&self, method: C) -> Result<C::ReturnObject, Error>
+    fn call_method<C>(&self, method: C) -> Fallible<C::ReturnObject>
     where
         C: protocol::Method + serde::Serialize,
     {
@@ -343,12 +362,28 @@ impl Drop for Browser {
     }
 }
 
+/// Returns the path to Chrome's executable.
+///
+/// If the `CHROME` environment variable is set, `default_executable` will
+/// use it as the default path. Otherwise, the filenames `google-chrome-stable`
+/// `chromium`, `chromium-browser`, `chrome` and `chrome-browser` are
+/// searched for in standard places. If that fails,
+/// `/Applications/Google Chrome.app/...` (on MacOS) or the registry (on Windows)
+/// is consulted. If all of the above fail, an error is returned.
 pub fn default_executable() -> Result<std::path::PathBuf, String> {
-    // TODO Look at $BROWSER and if it points to a chrome binary
-    // $BROWSER may also provide default arguments, which we may
-    // or may not override later on.
+    if let Ok(path) = std::env::var("CHROME") {
+        if std::path::Path::new(&path).exists() {
+            return Ok(path.into());
+        }
+    }
 
-    for app in &["google-chrome-stable", "chromium"] {
+    for app in &[
+        "google-chrome-stable",
+        "chromium",
+        "chromium-browser",
+        "chrome",
+        "chrome-browser",
+    ] {
         if let Ok(path) = which(app) {
             return Ok(path);
         }

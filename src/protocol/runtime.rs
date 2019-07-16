@@ -37,6 +37,10 @@
         pub exception: Option<RemoteObject>,
         pub execution_context_id: Option<ExecutionContextId>,
     }
+pub mod methods {
+    use serde::{Deserialize, Serialize};
+
+    use crate::protocol::Method;
 
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]

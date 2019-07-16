@@ -1,10 +1,11 @@
 //! For (de)serializing method calls and events from the Chrome DevTools Protocol.
 
-use failure::{Error, Fail};
+use std::fmt::Debug;
+
+use failure::{Fail, Fallible};
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fmt::Debug;
 
 pub mod browser;
 pub mod debugger;
@@ -51,6 +52,8 @@ pub trait Method: Debug {
 
     type ReturnObject: serde::de::DeserializeOwned + std::fmt::Debug; // have this = something?
 
+    // TODO: Rust IntelliJ says that to_* method calls "usuall take self by reference"
+    //       Maybe that'd be better here?
     fn to_method_call(self, call_id: CallId) -> MethodCall<Self>
     where
         Self: std::marker::Sized,
@@ -78,7 +81,7 @@ pub struct Response {
     pub error: Option<RemoteError>,
 }
 
-pub fn parse_response<T>(response: Response) -> Result<T, Error>
+pub fn parse_response<T>(response: Response) -> Fallible<T>
 where
     T: serde::de::DeserializeOwned + std::fmt::Debug,
 {
@@ -123,6 +126,8 @@ pub enum Event {
     RequestIntercepted(network::events::RequestInterceptedEvent),
     #[serde(rename = "Security.certificateError")]
     SecurityCertificateError(security::events::CertificateError),
+    #[serde(rename = "Network.responseReceived")]
+    ResponseReceived(network::events::ResponseReceivedEvent),
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -242,6 +247,6 @@ mod tests {
     }
 }
 
-pub fn parse_raw_message(raw_message: &str) -> Result<Message, Error> {
+pub fn parse_raw_message(raw_message: &str) -> Fallible<Message> {
     Ok(serde_json::from_str::<Message>(raw_message)?)
 }

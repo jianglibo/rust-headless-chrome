@@ -17,15 +17,15 @@ use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 #[derive(Default)]
-struct RuntimeEvaluateTask {
+struct EvaluateTask {
     debug_session: DebugSession,
     url: &'static str,
 }
 
-impl RuntimeEvaluateTask {
+impl EvaluateTask {
 }
 
-impl Future for RuntimeEvaluateTask {
+impl Future for EvaluateTask {
     type Item = ();
     type Error = failure::Error;
 
@@ -54,7 +54,7 @@ impl Future for RuntimeEvaluateTask {
                         let tab = tab.expect("tab should exists. EvaluateDone");
                         
                         if let Some(oid) = evaluate_result.and_then(|ro| ro.result.object_id) {
-                            tab.runtime_get_properties_by_object_id(oid, Some(111))
+                            tab.get_properties_by_object_id(oid, Some(111))
                         }
                         
                     }
@@ -89,7 +89,7 @@ impl Future for RuntimeEvaluateTask {
                                     .for_each(|oid| {
                                         if let Some(oid) = oid {
                                             info!("oid {:?}", oid);
-                                            t.runtime_get_properties_by_object_id(oid.clone(), None);
+                                            t.get_properties_by_object_id(oid.clone(), None);
                                         }
                                     });
                             } else {
@@ -115,7 +115,7 @@ fn t_runtime_evaluate_task() {
     let url = "https://www.xuexi.cn/";
     // div.text-link-item-title
     // "span:not(.my-points-red).my-points-points"
-    let my_page = RuntimeEvaluateTask {
+    let my_page = EvaluateTask {
         url,
         ..Default::default()
     };

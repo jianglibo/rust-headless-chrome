@@ -5,7 +5,7 @@ use log::*;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
-pub struct RuntimeEvaluateTask {
+pub struct EvaluateTask {
     pub common_fields: CommonDescribeFields,
     pub expression: String,
     #[builder(default = "None")]
@@ -34,7 +34,7 @@ pub struct RuntimeEvaluateTask {
 
 // task_result: Some(EvaluateReturnObject { result: RemoteObject { object_type: "number", subtype: None, class_name: None, value: Some(Number(20)), unserializable_value: None, description: Some("20"), object_id: None, preview: None }, exception_details: None }) }
 // task_result: Some(EvaluateReturnObject { result: RemoteObject { object_type: "object", subtype: Some("array"), class_name: Some("NodeList"), value: None, unserializable_value: None, description: Some("NodeList(16)"), object_id: Some("{\"injectedScriptId\":11,\"id\":1}"), preview: None }, exception_details: None }) }
-impl RuntimeEvaluateTask {
+impl EvaluateTask {
     pub fn get_object_id(&self) -> Option<runtime::RemoteObjectId> {
         if let Some(ero) = self.task_result.as_ref() {
             if let Some(object_id) = ero.result.object_id.as_ref() {
@@ -74,9 +74,9 @@ impl RuntimeEvaluateTask {
     }
 }
 
-impl_has_common_fields!(RuntimeEvaluateTask);
+impl_has_common_fields!(EvaluateTask);
 
-impl AsMethodCallString for RuntimeEvaluateTask {
+impl AsMethodCallString for EvaluateTask {
     fn get_method_str(&self) ->  Result<String, failure::Error>{
         let method = runtime::methods::Evaluate {
             expression: self.expression.as_str(),
@@ -95,4 +95,4 @@ impl AsMethodCallString for RuntimeEvaluateTask {
     }
 }
 
-impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::RuntimeEvaluate, RuntimeEvaluateTask);
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::Evaluate, EvaluateTask);

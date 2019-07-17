@@ -30,12 +30,23 @@ impl Tab {
     }
 
     pub fn display_full_page_task(&mut self) -> Vec<TaskDescribe> {
-        let mut pre_tasks = self.get_body_box_model_task();
-        let task = emulation_tasks::SetDeviceMetricsOverrideTaskBuilder::default()
-            .common_fields(self.get_common_field(None))
-            .build()
-            .expect("SetDeviceMetricsOverrideTaskBuilder should success.");
-        pre_tasks.push(task.into());
-        pre_tasks
+        if let Some(bm) = self.box_model.as_ref() {
+            let wh = bm.border_viewport().u64_width_height();
+            let task = emulation_tasks::SetDeviceMetricsOverrideTaskBuilder::default()
+                .common_fields(self.get_common_field(None))
+                .width(wh.0)
+                .height(wh.1)
+                .build()
+                .expect("SetDeviceMetricsOverrideTaskBuilder should success.");
+            vec![task.into()]
+        } else {
+            let mut pre_tasks = self.get_body_box_model_task();
+            let task = emulation_tasks::SetDeviceMetricsOverrideTaskBuilder::default()
+                .common_fields(self.get_common_field(None))
+                .build()
+                .expect("SetDeviceMetricsOverrideTaskBuilder should success.");
+            pre_tasks.push(task.into());
+            pre_tasks
+        }
     }
 }

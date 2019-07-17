@@ -28,9 +28,9 @@ pub use page_tasks::{
     PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent, handle_page_event,
 };
 pub use runtime_tasks::{
-    RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder, RuntimeEnableTask,
-    RuntimeEnableTaskBuilder, RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder,
-    RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder, runtime_events, RuntimeEvent, handle_runtime_event,
+    CallFunctionOnTask, CallFunctionOnTaskBuilder, RuntimeEnableTask,
+    RuntimeEnableTaskBuilder, EvaluateTask, EvaluateTaskBuilder,
+    GetPropertiesTask, GetPropertiesTaskBuilder, runtime_events, RuntimeEvent, handle_runtime_event,
 };
 pub use security_tasks::{
     SecurityEnableTask, SecurityEnableTaskBuilder,
@@ -145,8 +145,8 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::NavigateTo(task) => task.get_method_str(),
                 TargetCallMethodTask::PageEnable(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeEnable(task) => task.get_method_str(),
-                TargetCallMethodTask::RuntimeEvaluate(task) => task.get_method_str(),
-                TargetCallMethodTask::RuntimeGetProperties(task) => task.get_method_str(),
+                TargetCallMethodTask::Evaluate(task) => task.get_method_str(),
+                TargetCallMethodTask::GetProperties(task) => task.get_method_str(),
                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
                 TargetCallMethodTask::NetworkEnable(task) => task.get_method_str(),
                 TargetCallMethodTask::SetRequestInterception(task) => task.get_method_str(),

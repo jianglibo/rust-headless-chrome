@@ -1,4 +1,4 @@
-use super::super::browser_async::{create_unique_prefixed_id, embedded_events, TaskId, ChromeDebugSession, NetworkStatistics};
+use super::super::browser_async::{embedded_events, TaskId, ChromeDebugSession, NetworkStatistics};
 use super::super::browser::tab::{point::Point, element::BoxModel};
 
 use super::page_message::ChangingFrame;
@@ -7,7 +7,7 @@ use super::task_describe::{
     CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks, page_events,
 };
 use super::{EventName, EventStatistics, TaskQueue};
-use crate::protocol::{self, dom, network, page, runtime, target};
+use super::super::protocol::{self, dom, network, page, runtime, target};
 use log::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -15,6 +15,7 @@ use std::time::Instant;
 mod screen_shot_func;
 mod box_model_func;
 mod emulation_func;
+mod evaluate_func;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum WaitingForPageAttachTaskName {
@@ -666,6 +667,10 @@ impl Tab {
         tasks
     }
 
+    pub fn mouse_click_on_remote_object(&mut self, remote_object_id: runtime::RemoteObjectId) {
+        let tasks = self.mouse_click_on_remote_object_task(remote_object_id);
+        self.execute_tasks(tasks);
+    }
 
     pub fn mouse_click_on_point_task(&self, point: Option<Point>) -> Vec<TaskDescribe> {
         vec![self.mouse_move_to_point_task(point), self.mouse_press_at_point_task(point), self.mouse_release_at_point(point)]
@@ -822,112 +827,11 @@ impl Tab {
         nwe.into()
     }
 
-    pub fn evaluate_expression(&mut self, expression: &str) {
-        let task = self.evaluate_expression_task(expression);
-        self.execute_one_task(task);
-    }
-
-    pub fn evaluate_expression_prefixed(&mut self, expression: &str, prefix: &str) {
-        let name = create_unique_prefixed_id(prefix);
-        self.evaluate_expression_named(expression, name.as_str());
-    }
-
-    pub fn evaluate_expression_named(&mut self, expression: &str, name: &str) {
-        let task = self.evaluate_expression_task_named(expression, name);
-        self.execute_one_task(task);
-    }
-
-    pub fn evaluate_expression_task_named(
-        &mut self,
-        expression: &str,
-        task_id: &str,
-    ) -> TaskDescribe {
-        self.evaluate_expression_task_impl(expression, Some(task_id.to_owned()))
-    }
-
-    pub fn evaluate_expression_task_prefixed(
-        &mut self,
-        expression: &str,
-        prefix: &str,
-    ) -> TaskDescribe {
-        let name = create_unique_prefixed_id(prefix);
-        self.evaluate_expression_task_named(expression, name.as_str())
-    }
-
-    pub fn evaluate_expression_task(&mut self, expression: &str) -> TaskDescribe {
-        self.evaluate_expression_task_impl(expression, None)
-    }
-
-    fn evaluate_expression_task_impl(
-        &mut self,
-        expression: &str,
-        manual_task_id: Option<TaskId>,
-    ) -> TaskDescribe {
-        runtime_tasks::RuntimeEvaluateTaskBuilder::default()
-            .expression(expression.to_string())
-            .common_fields(self.get_common_field(manual_task_id))
-            .build()
-            .expect("build RuntimeEvaluateTaskBuilder should success.")
-            .into()
-    }
-
-    pub fn evaluate_task(
-        &self,
-        evaluate_task_builder: runtime_tasks::RuntimeEvaluateTaskBuilder,
-    ) -> TaskDescribe {
-        self.evaluate_task_impl(evaluate_task_builder, None)
-    }
-
-    pub fn evaluate_task_named(
-        &self,
-        evaluate_task_builder: runtime_tasks::RuntimeEvaluateTaskBuilder,
-        name: &str,
-    ) -> TaskDescribe {
-        self.evaluate_task_impl(evaluate_task_builder, Some(name))
-    }
-
-    fn evaluate_task_impl(
-        &self,
-        mut evaluate_task_builder: runtime_tasks::RuntimeEvaluateTaskBuilder,
-        manual_task_id: Option<&str>,
-    ) -> TaskDescribe {
-        let task = evaluate_task_builder
-            .common_fields(self.get_common_field(manual_task_id.map(Into::into)))
-            .build();
-        match task {
-            Ok(task) => task.into(),
-            Err(err) => {
-                error!("build evaluate task error: {:?}", err);
-                panic!("build evaluate task error: {:?}", err);
-            }
-        }
-    }
-
-    pub fn evaluate(&mut self, evaluate_task_builder: runtime_tasks::RuntimeEvaluateTaskBuilder) {
-        self.evaluate_impl(evaluate_task_builder, None)
-    }
-
-    pub fn evaluate_named(
-        &mut self,
-        evaluate_task_builder: runtime_tasks::RuntimeEvaluateTaskBuilder,
-        name: &str,
-    ) {
-        self.evaluate_impl(evaluate_task_builder, Some(name))
-    }
-
-    fn evaluate_impl(
-        &mut self,
-        evaluate_task_builder: runtime_tasks::RuntimeEvaluateTaskBuilder,
-        manual_task_id: Option<&str>,
-    ) {
-        let task = self.evaluate_task_impl(evaluate_task_builder, manual_task_id);
-        self.execute_one_task(task);
-    }
 
     /// let fnd = "function() {return this.getAttribute('src');}";
     pub fn call_function_on_named(
         &mut self,
-        call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
+        call_function_on_task_builder: runtime_tasks::CallFunctionOnTaskBuilder,
         name: &str,
     ) {
         self.call_function_on_impl(call_function_on_task_builder, Some(name));
@@ -935,7 +839,7 @@ impl Tab {
 
     pub fn call_function_on(
         &mut self,
-        call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
+        call_function_on_task_builder: runtime_tasks::CallFunctionOnTaskBuilder,
     ) {
         self.call_function_on_impl(call_function_on_task_builder, None);
     }
@@ -977,19 +881,19 @@ impl Tab {
         fnd: &str,
         generate_preview: Option<bool>,
         ) -> TaskDescribe {
-        let task = runtime_tasks::RuntimeCallFunctionOnTaskBuilder::default()
+        let task = runtime_tasks::CallFunctionOnTaskBuilder::default()
             .common_fields(self.get_common_field(name.map(Into::into)))
             .object_id(remote_object_id)
             .function_declaration(fnd)
             .generate_preview(generate_preview)
             .build()
-            .expect("RuntimeCallFunctionOnTaskBuilder should work.");
+            .expect("CallFunctionOnTaskBuilder should work.");
         task.into()
     }
 
     fn call_function_on_impl(
         &mut self,
-        call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
+        call_function_on_task_builder: runtime_tasks::CallFunctionOnTaskBuilder,
         name: Option<&str>,
     ) {
         let task = self.call_function_on_task_impl(call_function_on_task_builder, name);
@@ -997,7 +901,7 @@ impl Tab {
     }
 
     fn call_function_on_task_impl(&self,
-        mut call_function_on_task_builder: runtime_tasks::RuntimeCallFunctionOnTaskBuilder,
+        mut call_function_on_task_builder: runtime_tasks::CallFunctionOnTaskBuilder,
         name: Option<&str>) -> TaskDescribe {
         let task = call_function_on_task_builder
             .common_fields(self.get_common_field(name.map(Into::into)))
@@ -1005,40 +909,7 @@ impl Tab {
         task.into()
     }
 
-    fn get_properties_by_object_id_impl(
-        &mut self,
-        object_id: runtime::RemoteObjectId,
-        name: Option<&str>,
-    ) {
-        let task = runtime_tasks::RuntimeGetPropertiesTaskBuilder::default()
-            .object_id(object_id)
-            .common_fields(self.get_common_field(name.map(Into::into)))
-            .build()
-            .expect("build RuntimeGetPropertiesTaskBuilder should success.");
-        self.execute_one_task(task.into());
-    }
 
-    pub fn get_properties_by_object_id(&mut self, object_id: runtime::RemoteObjectId) {
-        self.get_properties_by_object_id_impl(object_id, None);
-    }
-
-    pub fn get_properties_by_object_id_named(&mut self, object_id: runtime::RemoteObjectId, name: &str) {
-        self.get_properties_by_object_id_impl(object_id, Some(name));
-    }
-
-    pub fn runtime_get_properties(
-        &mut self,
-        mut get_properties_task_builder: runtime_tasks::RuntimeGetPropertiesTaskBuilder,
-        manual_task_id: Option<TaskId>,
-    ) {
-        let task = get_properties_task_builder
-            .common_fields(self.get_common_field(manual_task_id))
-            .build();
-        match task {
-            Ok(task) => self.execute_one_task(task.into()),
-            Err(err) => error!("build get_properties_task_builder error: {:?}", err),
-        }
-    }
 
     pub fn name_the_page(&mut self, page_name: &'static str) {
         self.page_name = Some(page_name);

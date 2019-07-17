@@ -5,9 +5,9 @@ pub mod get_properties;
 pub mod runtime_enable;
 pub mod runtime_events;
 
-pub use call_function_on::{RuntimeCallFunctionOnTask, RuntimeCallFunctionOnTaskBuilder};
-pub use evaluate::{RuntimeEvaluateTask, RuntimeEvaluateTaskBuilder};
-pub use get_properties::{RuntimeGetPropertiesTask, RuntimeGetPropertiesTaskBuilder};
+pub use call_function_on::{CallFunctionOnTask, CallFunctionOnTaskBuilder};
+pub use evaluate::{EvaluateTask, EvaluateTaskBuilder};
+pub use get_properties::{GetPropertiesTask, GetPropertiesTaskBuilder};
 pub use runtime_enable::{RuntimeEnableTask, RuntimeEnableTaskBuilder};
 
 use crate::browser_async::{DebugSession};

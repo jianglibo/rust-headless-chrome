@@ -23,9 +23,9 @@ pub enum TargetCallMethodTask {
     BringToFront(page_tasks::BringToFrontTask),
     RuntimeEnable(runtime_tasks::RuntimeEnableTask),
     CaptureScreenshot(page_tasks::CaptureScreenshotTask),
-    RuntimeEvaluate(runtime_tasks::RuntimeEvaluateTask),
-    RuntimeGetProperties(runtime_tasks::RuntimeGetPropertiesTask),
-    RuntimeCallFunctionOn(runtime_tasks::RuntimeCallFunctionOnTask),
+    Evaluate(runtime_tasks::EvaluateTask),
+    GetProperties(runtime_tasks::GetPropertiesTask),
+    RuntimeCallFunctionOn(runtime_tasks::CallFunctionOnTask),
     NetworkEnable(network_tasks::NetworkEnableTask),
     SetRequestInterception(network_tasks::SetRequestInterceptionTask),
     ContinueInterceptedRequest(network_tasks::ContinueInterceptedRequestTask),
@@ -49,8 +49,8 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::PageEnable(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeEnable(task) => task.get_call_id(),
             TargetCallMethodTask::CaptureScreenshot(task) => task.get_call_id(),
-            TargetCallMethodTask::RuntimeEvaluate(task) => task.get_call_id(),
-            TargetCallMethodTask::RuntimeGetProperties(task) => task.get_call_id(),
+            TargetCallMethodTask::Evaluate(task) => task.get_call_id(),
+            TargetCallMethodTask::GetProperties(task) => task.get_call_id(),
             TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_call_id(),
             TargetCallMethodTask::NetworkEnable(task) => task.get_call_id(),
             TargetCallMethodTask::SetRequestInterception(task) => task.get_call_id(),
@@ -159,14 +159,14 @@ pub fn handle_target_method_call(
                 page_response: PageResponse::MethodCallDone(MethodCallDone::CaptureScreenshot(task)),
             });
         }
-        TargetCallMethodTask::RuntimeEvaluate(task) => {
+        TargetCallMethodTask::Evaluate(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::Evaluate(task)),
             });
         }
-        TargetCallMethodTask::RuntimeGetProperties(task) => {
+        TargetCallMethodTask::GetProperties(task) => {
             return Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),

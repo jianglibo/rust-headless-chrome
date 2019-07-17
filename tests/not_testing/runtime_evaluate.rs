@@ -17,7 +17,7 @@ use tokio;
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 #[derive(Default)]
-struct RuntimeEvaluate {
+struct Evaluate {
     debug_session: DebugSession,
     url: &'static str,
     task_100_called: bool,
@@ -26,7 +26,7 @@ struct RuntimeEvaluate {
     ddlogin_frame_stopped_loading: bool,
 }
 
-impl RuntimeEvaluate {
+impl Evaluate {
     fn assert_result(&self) {
         assert!(self.task_100_called);
         assert!(self.task_101_called);
@@ -35,7 +35,7 @@ impl RuntimeEvaluate {
     }
 }
 
-impl Future for RuntimeEvaluate {
+impl Future for Evaluate {
     type Item = ();
     type Error = failure::Error;
 
@@ -132,9 +132,9 @@ impl Future for RuntimeEvaluate {
                             let result = evaluate_result.expect("evaluate_result should exists. 110").result;
                             let tab = tab.expect("tab should exists. EvaluateDone");
                             let object_id = result.object_id.expect("object_id should exists.");
-                            tab.runtime_get_properties_by_object_id(object_id.clone(), Some(111));
+                            tab.get_properties_by_object_id(object_id.clone(), Some(111));
 
-                            let mut task = tasks::RuntimeCallFunctionOnTaskBuilder::default();
+                            let mut task = tasks::CallFunctionOnTaskBuilder::default();
                             let fnd = "function() {return this.getAttribute('src');}";
                             task.object_id(object_id.clone()).function_declaration(fnd);
                             tab.runtime_call_function_on(task, Some(112));
@@ -168,7 +168,7 @@ impl Future for RuntimeEvaluate {
                             if context.is_some() {
                                 info!("execution_context_description: {:?}", context);
                                 self.ddlogin_frame_stopped_loading = true;
-                                let mut tb = tasks::RuntimeEvaluateTaskBuilder::default();
+                                let mut tb = tasks::EvaluateTaskBuilder::default();
                                 tb.expression(r#"document.querySelector("div#qrcode.login_qrcode_content img")"#).context_id(context.unwrap().id);
                                 tab.runtime_evaluate(tb, Some(110));
                             }
@@ -198,7 +198,7 @@ fn t_runtime_evaluate() {
     env_logger::init();
     let url = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 
-    let my_page = RuntimeEvaluate {
+    let my_page = Evaluate {
         url,
         ..Default::default()
     };

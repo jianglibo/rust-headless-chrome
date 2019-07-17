@@ -55,6 +55,13 @@ pub struct Viewport {
     pub scale: f64,
 }
 
+impl Viewport {
+    pub fn u64_width_height(&self) -> (u64, u64) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        (self.width as u64, self.height as u64)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LayoutViewport {

@@ -1,7 +1,7 @@
 use headless_chrome::browser_async::page_message::{
     write_base64_str_to, MethodCallDone, PageResponse, ReceivedEvent,
 };
-use headless_chrome::browser_async::task_describe::RuntimeEvaluateTaskBuilder;
+use headless_chrome::browser_async::task_describe::EvaluateTaskBuilder;
 use headless_chrome::protocol::target;
 use log::*;
 use std::default::Default;
@@ -32,7 +32,7 @@ impl GetContentInIframe {
                                 tab.find_execution_context_id_by_frame_name("ddlogin-iframe")
                             {
                                 info!("execution_context_description: {:?}", context);
-                                let mut tb = RuntimeEvaluateTaskBuilder::default();
+                                let mut tb = EvaluateTaskBuilder::default();
                                 tb.expression(r#"document.querySelector('div#qrcode.login_qrcode_content img').getAttribute('src')"#).context_id(context.id);
                                 let t1 = tab.evaluate_task_named(tb, "get-img-object");
                                 tab.execute_one_task(t1);

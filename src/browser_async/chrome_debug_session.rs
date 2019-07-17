@@ -261,7 +261,7 @@ impl ChromeDebugSession {
                     task.task_result
                         .replace(capture_screenshot_return_object.data);
                 }
-                TargetCallMethodTask::RuntimeEvaluate(task) => {
+                TargetCallMethodTask::Evaluate(task) => {
                     let evaluate_return_object =
                         protocol::parse_response::<runtime::methods::EvaluateReturnObject>(resp)?;
                     task.task_result.replace(evaluate_return_object);
@@ -274,7 +274,7 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::RuntimeEnable(task) => {
                     trace!("runtime enabled: {:?}", task);
                 }
-                TargetCallMethodTask::RuntimeGetProperties(task) => {
+                TargetCallMethodTask::GetProperties(task) => {
                     let return_object = protocol::parse_response::<
                         runtime::methods::GetPropertiesReturnObject,
                     >(resp)?;

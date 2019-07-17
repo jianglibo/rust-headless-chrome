@@ -1,5 +1,5 @@
 use super::super::protocol::CallId;
-use super::task_describe::{dom_tasks, input_tasks, HasCallId, TargetCallMethodTask, TaskDescribe};
+use super::task_describe::{dom_tasks, input_tasks, runtime_tasks, HasCallId, TargetCallMethodTask, TaskDescribe};
 use log::*;
 
 #[derive(Debug)]
@@ -101,6 +101,15 @@ impl TaskGroup {
             }
             _ => None,
         })
+    }
+
+    pub fn find_evaluate_expression_task(&self) -> Option<&runtime_tasks::EvaluateTask> {
+        self.completed_tasks.iter().rev().find_map(|task| match task {
+            TaskDescribe::TargetCallMethod(TargetCallMethodTask::Evaluate(evalute)) => {
+                Some(evalute)
+            }
+            _ => None,
+        })        
     }
 
     pub fn find_get_content_quads_task(&self) -> Option<&dom_tasks::GetContentQuadsTask> {
@@ -230,13 +239,22 @@ impl TaskGroup {
                     .find_get_box_model_task(true)
                     .and_then(|v| v.task_result.as_ref())
                 {
-                    let viewport = mb.border_viewport();
-                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                    let (width, height) = (viewport.width as u64, viewport.height as u64);
-                    task.width.replace(width);
-                    task.height.replace(height);
+                    let wh = mb.border_viewport().u64_width_height();
+                    task.width.replace(wh.0);
+                    task.height.replace(wh.1);
                 } else {
                     error!("found_box is None!");
+                }
+                self.waiting_tasks.insert(0, task.into());
+            }
+            TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetProperties(mut task)) => {
+                if task.object_id.is_none() {
+                    if let Some(object_id) = self.find_evaluate_expression_task()
+                        .and_then(runtime_tasks::EvaluateTask::get_object_id) {
+                        task.object_id.replace(object_id);
+                    } else {
+                        error!("get properties predecessor evalute_expression has no object_id result.");
+                    }
                 }
                 self.waiting_tasks.insert(0, task.into());
             }

@@ -19,15 +19,6 @@ impl CaptureScreenShotTest {
         match page_response {
             PageResponse::ReceivedEvent(received_event) => {
                 match received_event {
-                    // ReceivedEvent::LifeCycle => {
-                    //     info!("life cycle happend........................");
-                    //     let tab = self
-                    //         .get_tab(maybe_target_id)
-                    //         .expect("tab should exists. LoadEventFired");
-                    //     if tab.life_cycle_event_count("load") == 2 {
-                    //         tab.display_full_page();
-                    //     }
-                    // }
                     ReceivedEvent::LoadEventFired(_t) => {
                         info!("page loaded........................");
                         let tab = self
@@ -41,18 +32,12 @@ impl CaptureScreenShotTest {
                         // tab.task_queue.add_delayed_many(tasks, 3);
                         // let set_metrics = tab.set_device_metrics_override_simple_task(1000, 20000);
                         // tab.execute_one_task(set_metrics);
-                        let tasks = tab.display_full_page_task();
+                        let mut tasks = tab.display_full_page_task();
+                        tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None));
                         tab.execute_tasks_after_secs(tasks, 6);
-                        tab.evaluate_expression_named(r##"document.hidden"##, "document.hidden");
-                        tab.evaluate_expression_named(r##"document.visibilityState"##, "document.visibilityState");
+                        // tab.evaluate_expression_named(r##"document.hidden"##, "document.hidden");
+                        // tab.evaluate_expression_named(r##"document.visibilityState"##, "document.visibilityState");
                         tab.move_mouse_random_after_secs(2);
-                    }
-                    ReceivedEvent::FrameStoppedLoading(frame_id) => {
-                        let tab = self
-                            .get_tab(maybe_target_id)
-                            .expect("tab should exists. FrameStoppedLoading");
-                        let _frame = tab.find_frame_by_id(&frame_id).expect("frame should be found by frame_id.");
-                        // if frame.
                     }
                     ReceivedEvent::ResponseReceived(_event) => {}
                     ReceivedEvent::RequestWillBeSent(_event) => {}
@@ -90,13 +75,13 @@ impl CaptureScreenShotTest {
                     MethodCallDone::CanEmulate(task) => {
                         info!("got can_emulate answer: {:?}", task);
                     }
-                    MethodCallDone::SetDeviceMetricsOverride(task) => {
-                        info!("got set_device_metrics_override {:?}", task);
-                        let tab = self
-                            .get_tab(maybe_target_id)
-                            .expect("tab should exists. FrameStoppedLoading");
-                        tab.capture_screenshot_surface_jpeg(Some(100));
-                    }
+                    // MethodCallDone::SetDeviceMetricsOverride(task) => {
+                    //     info!("got set_device_metrics_override {:?}", task);
+                    //     let tab = self
+                    //         .get_tab(maybe_target_id)
+                    //         .expect("tab should exists. FrameStoppedLoading");
+                    //     tab.capture_screenshot_surface_jpeg(Some(100));
+                    // }
                     _ => {
                         error!("got other method_call_done. {:?}", method_call_done);
                     }

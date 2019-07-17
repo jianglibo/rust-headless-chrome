@@ -8,6 +8,7 @@ pub struct TaskItem {
     pub tasks: Vec<TaskDescribe>,
 }
 
+/// The taskQueue keeps task group as when they were put in.
 #[derive(Debug)]
 pub struct TaskQueue {
     task_items: Vec<TaskItem>,

@@ -38,10 +38,6 @@ impl Tab {
         )
     }
 
-    // pub fn get_full_page_screenshot_jpeg_task(&mut self, quality: Option<u8>) -> Vec<TaskDescribe> {
-        
-    // }
-
     pub fn capture_screenshot_by_selector_png_task(
         &mut self,
         selector: &'static str,

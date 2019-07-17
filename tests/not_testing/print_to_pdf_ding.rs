@@ -55,7 +55,7 @@ impl PrintToPdfDing {
     fn handle_expand_node(
         &mut self,
         maybe_target_id: Option<target::TargetId>,
-        task: runtime_tasks::evaluate::RuntimeEvaluateTask,
+        task: runtime_tasks::evaluate::EvaluateTask,
     ) {
         if task.task_id_equal("get-root") {
             if task

@@ -5,7 +5,7 @@ use failure;
 
 #[derive(Debug, Builder, Clone)]
 #[builder(setter(into))]
-pub struct RuntimeCallFunctionOnTask {
+pub struct CallFunctionOnTask {
     pub common_fields: CommonDescribeFields,
     pub function_declaration: String,
     #[builder(default = "None")]
@@ -28,7 +28,7 @@ pub struct RuntimeCallFunctionOnTask {
     pub task_result: Option<runtime::methods::CallFunctionOnReturnObject>,
 }
 
-impl RuntimeCallFunctionOnTask {
+impl CallFunctionOnTask {
     pub fn get_midpoint(&self) -> Option<Point> {
         if let Some(task_return_object) = self.task_result.clone() {
             let properties = task_return_object.result
@@ -52,9 +52,9 @@ impl RuntimeCallFunctionOnTask {
     }
 }
 
-impl_has_common_fields!(RuntimeCallFunctionOnTask);
+impl_has_common_fields!(CallFunctionOnTask);
 
-impl AsMethodCallString for RuntimeCallFunctionOnTask {
+impl AsMethodCallString for CallFunctionOnTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {
         let method = runtime::methods::CallFunctionOn {
                 function_declaration: self.function_declaration.as_ref(),
@@ -71,4 +71,4 @@ impl AsMethodCallString for RuntimeCallFunctionOnTask {
     }
 }
 
-impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::RuntimeCallFunctionOn, RuntimeCallFunctionOnTask);
+impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::RuntimeCallFunctionOn, CallFunctionOnTask);

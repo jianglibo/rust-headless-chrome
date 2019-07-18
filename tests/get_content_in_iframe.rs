@@ -39,13 +39,10 @@ impl Future for GetContentInIframe {
                 info!("{:?}", self.state);
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
-                    // trace!(
-                    //     "seconds elapsed: {},number: {}  ",
-                    //     seconds,
-                    //     self.debug_session.tabs.len()
-                    // );
                     for t in &self.debug_session.tabs {
                         trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
+                        info!("requested urls: {:?}", t.network_statistics.list_request_urls_end_with("/pclog"));
+                        info!("box_model: {:?}", t.box_model);
                     }
                     self.debug_session.browser_contexts().deduplicate();
                     // self.debug_session.activates_next_in_interval(10);
@@ -130,6 +127,12 @@ impl Future for GetContentInIframe {
                         }
                         PageState::WaitingForQrcodeScan => {
                             self.waiting_for_qrcode_scan(
+                                maybe_target_id.as_ref(),
+                                page_response_wrapper.page_response,
+                            );
+                        }
+                        PageState::HomePageFullDisplayed => {
+                            self.home_page_full_displayed(
                                 maybe_target_id.as_ref(),
                                 page_response_wrapper.page_response,
                             );

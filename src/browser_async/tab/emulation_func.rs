@@ -28,6 +28,11 @@ impl Tab {
         let tasks = self.display_full_page_task();
         self.execute_tasks(tasks);
     }
+    /// waiting page to get loaded so can get it's size.
+    pub fn display_full_page_after_secs(&mut self, delay_secs: u64) {
+        let tasks = self.display_full_page_task();
+        self.execute_tasks_after_secs(tasks, delay_secs);
+    }
 
     pub fn display_full_page_task(&mut self) -> Vec<TaskDescribe> {
         if let Some(bm) = self.box_model.as_ref() {

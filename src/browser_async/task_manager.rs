@@ -1,5 +1,7 @@
 use super::super::protocol::CallId;
-use super::task_describe::{dom_tasks, input_tasks, runtime_tasks, HasCallId, TargetCallMethodTask, TaskDescribe};
+use super::task_describe::{
+    dom_tasks, input_tasks, runtime_tasks, HasCallId, TargetCallMethodTask, TaskDescribe,
+};
 use log::*;
 
 #[derive(Debug)]
@@ -90,26 +92,37 @@ impl TaskGroup {
         })
     }
 
-    pub fn find_get_box_model_task(&self, request_full_page: bool) -> Option<&dom_tasks::GetBoxModelTask> {
-        self.completed_tasks.iter().rev().find_map(|task| match task {
-            TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(get_box_model)) => {
-                if get_box_model.request_full_page == request_full_page {
-                    Some(get_box_model)
-                } else {
-                    None
+    pub fn find_get_box_model_task(
+        &self,
+        request_full_page: bool,
+    ) -> Option<&dom_tasks::GetBoxModelTask> {
+        self.completed_tasks
+            .iter()
+            .rev()
+            .find_map(|task| match task {
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(
+                    get_box_model,
+                )) => {
+                    if get_box_model.request_full_page == request_full_page {
+                        Some(get_box_model)
+                    } else {
+                        None
+                    }
                 }
-            }
-            _ => None,
-        })
+                _ => None,
+            })
     }
 
     pub fn find_evaluate_expression_task(&self) -> Option<&runtime_tasks::EvaluateTask> {
-        self.completed_tasks.iter().rev().find_map(|task| match task {
-            TaskDescribe::TargetCallMethod(TargetCallMethodTask::Evaluate(evalute)) => {
-                Some(evalute)
-            }
-            _ => None,
-        })        
+        self.completed_tasks
+            .iter()
+            .rev()
+            .find_map(|task| match task {
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::Evaluate(evalute)) => {
+                    Some(evalute)
+                }
+                _ => None,
+            })
     }
 
     pub fn find_get_content_quads_task(&self) -> Option<&dom_tasks::GetContentQuadsTask> {
@@ -164,8 +177,8 @@ impl TaskGroup {
                     } else {
                         error!("cannot find node_id from query_selector!");
                     }
-                    self.waiting_tasks.insert(0, describe_node.into());
                 }
+                self.waiting_tasks.insert(0, describe_node.into());
             }
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(
                 mut get_box_model,
@@ -179,8 +192,8 @@ impl TaskGroup {
                     } else {
                         error!("cannot find node_id from query_selector!");
                     }
-                    self.waiting_tasks.insert(0, get_box_model.into());
                 }
+                self.waiting_tasks.insert(0, get_box_model.into());
             }
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::CaptureScreenshot(
                 mut screen_shot,
@@ -199,42 +212,51 @@ impl TaskGroup {
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
                 mut dispatch_mouse_event,
             )) => {
-                // if the previous task is dispatch_mouse_event too.
-                if let Some(TaskDescribe::TargetCallMethod(
-                    TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_1),
-                )) = self.completed_tasks.last()
-                {
-                    if dispatch_mouse_event.x.is_none() && dispatch_mouse_event.y.is_none() {
-                        if dispatch_mouse_event_1.x.is_some() && dispatch_mouse_event_1.y.is_some()
-                        {
-                            dispatch_mouse_event.x.replace(
-                                dispatch_mouse_event_1
+                if dispatch_mouse_event.x.and(dispatch_mouse_event.y).is_none() {
+                    match dispatch_mouse_event.event_type {
+                        input_tasks::MouseEventType::Pressed
+                        | input_tasks::MouseEventType::Released => {
+                            // if the previous task is a dispatch_mouse_event too.
+                            if let Some(TaskDescribe::TargetCallMethod(
+                                TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_1),
+                            )) = self.completed_tasks.last()
+                            {
+                                if dispatch_mouse_event_1
                                     .x
-                                    .expect("dispatch_mouse_event_1 missing x."),
-                            );
-                            dispatch_mouse_event.y.replace(
-                                dispatch_mouse_event_1
-                                    .y
-                                    .expect("dispatch_mouse_event_1 missing y."),
-                            );
-                        } else {
-                            warn!("dispatch_mouse_event_2 has part point. missing x or y");
+                                    .and(dispatch_mouse_event_1.y)
+                                    .is_some()
+                                {
+                                    dispatch_mouse_event.x.replace(
+                                        dispatch_mouse_event_1
+                                            .x
+                                            .expect("dispatch_mouse_event_1 missing x."),
+                                    );
+                                    dispatch_mouse_event.y.replace(
+                                        dispatch_mouse_event_1
+                                            .y
+                                            .expect("dispatch_mouse_event_1 missing y."),
+                                    );
+                                } else {
+                                    warn!("dispatch_mouse_event_1 has part point. missing x or y");
+                                }
+                            } else if let Some(mid_point) = self
+                                .find_get_content_quads_task()
+                                .and_then(dom_tasks::GetContentQuadsTask::get_midpoint)
+                            {
+                                dispatch_mouse_event.x.replace(mid_point.x);
+                                dispatch_mouse_event.y.replace(mid_point.y);
+                            } else {
+                                warn!("get_content_quads return empty result.");
+                            }
                         }
-                    } else {
-                        warn!("dispatch_mouse_event_1 has part point. missing x or y.");
+                        _ => {}
                     }
-                } else if let Some(mid_point) = self
-                    .find_get_content_quads_task()
-                    .and_then(dom_tasks::GetContentQuadsTask::get_midpoint)
-                {
-                    dispatch_mouse_event.x.replace(mid_point.x);
-                    dispatch_mouse_event.y.replace(mid_point.y);
-                } else {
-                    warn!("get_content_quads return empty result.");
                 }
                 self.waiting_tasks.insert(0, dispatch_mouse_event.into());
             }
-            TaskDescribe::TargetCallMethod(TargetCallMethodTask::SetDeviceMetricsOverride(mut task)) => {
+            TaskDescribe::TargetCallMethod(TargetCallMethodTask::SetDeviceMetricsOverride(
+                mut task,
+            )) => {
                 if let Some(mb) = self
                     .find_get_box_model_task(true)
                     .and_then(|v| v.task_result.as_ref())
@@ -249,8 +271,10 @@ impl TaskGroup {
             }
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetProperties(mut task)) => {
                 if task.object_id.is_none() {
-                    if let Some(object_id) = self.find_evaluate_expression_task()
-                        .and_then(runtime_tasks::EvaluateTask::get_object_id) {
+                    if let Some(object_id) = self
+                        .find_evaluate_expression_task()
+                        .and_then(runtime_tasks::EvaluateTask::get_object_id)
+                    {
                         task.object_id.replace(object_id);
                     } else {
                         error!("get properties predecessor evalute_expression has no object_id result.");

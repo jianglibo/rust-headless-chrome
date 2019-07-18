@@ -5,6 +5,7 @@ use std::default::Default;
 mod login_page_displayed;
 mod waiting_blank_page;
 mod waiting_for_qrcode_scan;
+mod home_page_full_displayed;
 
 pub const HOME_URL: &str = "https://www.xuexi.cn/";
 pub const LOGIN_URL: &str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
@@ -15,6 +16,7 @@ pub enum PageState {
     WaitingBlankPage,
     LoginPageDisplayed,
     WaitingForQrcodeScan,
+    HomePageFullDisplayed,
 }
 
 

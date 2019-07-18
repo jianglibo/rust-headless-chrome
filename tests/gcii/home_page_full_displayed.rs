@@ -71,7 +71,7 @@ impl GetContentInIframe {
         let shenbian_gandong_task_name = "shenbian-gandong";
         match page_response {
             PageResponse::ReceivedEvent(_received_event) => {
-                info!("skip.");
+                // info!("skip.");
             }
             PageResponse::MethodCallDone(method_call_done) => {
                 match method_call_done {

@@ -110,7 +110,7 @@ impl Future for CaptureScreenShotTest {
 
 #[test]
 fn t_take_screen_shot() {
-    tutil::setup_logger().expect("fern log should work.");
+    tutil::setup_logger(vec![""]).expect("fern log should work.");
 
     let my_page = CaptureScreenShotTest::default();
 

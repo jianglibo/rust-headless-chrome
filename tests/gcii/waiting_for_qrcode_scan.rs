@@ -3,7 +3,7 @@
 use headless_chrome::browser_async::page_message::{PageResponse, ReceivedEvent};
 use headless_chrome::protocol::target;
 
-use super::{GetContentInIframe, PageState};
+use super::{GetContentInIframe, PageState, HOME_URL};
 
 
 impl GetContentInIframe {
@@ -30,6 +30,7 @@ impl GetContentInIframe {
                     let tab = self
                         .get_tab(maybe_target_id)
                         .expect("tab should exists. LoadEventFired");
+                    assert_eq!(tab.get_url(), HOME_URL);
                     tab.network_enable();
                     tab.move_mouse_random_after_secs(4);
                     tab.display_full_page_after_secs(6);

@@ -1,11 +1,21 @@
 use fern::colors::{Color, ColoredLevelConfig};
 
 // "headless_chrome=trace,get_content_in_iframe=trace",
-pub fn setup_logger() -> Result<(), fern::InitError> {
-    let base_config = fern::Dispatch::new()
-        .level(log::LevelFilter::Info)
-        .level_for("headless_chrome", log::LevelFilter::Trace)
-        .level_for("get_content_in_iframe", log::LevelFilter::Trace);
+pub fn setup_logger<T, I>(verbose_modules: T) -> Result<(), fern::InitError> 
+    where
+        I: AsRef<str>,
+        T: IntoIterator<Item=I>, {
+
+    let mut base_config = fern::Dispatch::new()
+        .level(log::LevelFilter::Info);
+    
+    for module_name in verbose_modules {
+        base_config = base_config.level_for(
+            format!("headless_chrome::{}", module_name.as_ref()),
+            log::LevelFilter::Trace);
+    }
+    // base_config.level_for("headless_chrome", log::LevelFilter::Trace);
+    // base_config.level_for("get_content_in_iframe", log::LevelFilter::Trace);
 
 
     let colors = ColoredLevelConfig::new().info(Color::Green);

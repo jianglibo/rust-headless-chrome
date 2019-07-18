@@ -85,7 +85,6 @@ impl Tab {
             changing_frames: HashMap::new(),
             temporary_node_holder: HashMap::new(),
             execution_context_descriptions: HashMap::new(),
-            // ongoing_request: HashMap::new(),
             request_intercepted: HashMap::new(),
             response_received: HashMap::new(),
             created_at: Instant::now(),
@@ -102,10 +101,11 @@ impl Tab {
         }
     }
 
+    /// invoking mulitiple tasks and one event loop may lost response. So flatten the tasks.
     pub fn run_task_queue_delayed(&mut self) {
-        let tasks = self.task_queue.retrieve_delayed_task_to_run();
-        for tv in tasks {
-            self.execute_tasks(tv);
+        let tasks = self.task_queue.retrieve_delayed_task_to_run().into_iter().flatten().collect::<Vec<TaskDescribe>>();
+        if !tasks.is_empty() {
+            self.execute_tasks(tasks);
         }
     }
 
@@ -126,8 +126,6 @@ impl Tab {
     // pub fn request_will_be_sent(&mut self, event: network_events::RequestWillBeSent) {
     //     self.ongoing_request.insert(event.get_request_id(), event);
     // }
-
-
 
     /// where does page's url attribute live? The page target_info holds the url you intent navigate to,
     /// but if failed cause of some reason, please look into the main frame's url and unreachable_url attributes,

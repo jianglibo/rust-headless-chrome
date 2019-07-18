@@ -134,6 +134,27 @@ impl TaskGroup {
         })
     }
 
+    pub fn find_dispatch_mouse_event_task_by_type(
+        &self,
+        event_type: input_tasks::MouseEventType,
+    ) -> Option<&input_tasks::DispatchMouseEventTask> {
+        self.completed_tasks
+            .iter()
+            .rev()
+            .find_map(|task| match task {
+                TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
+                    dispatch_mouse_event,
+                )) => {
+                    if event_type == dispatch_mouse_event.event_type {
+                        Some(dispatch_mouse_event)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+    }
+
     pub fn find_dispatch_mouse_event_task(&self) -> Option<&input_tasks::DispatchMouseEventTask> {
         self.completed_tasks
             .iter()
@@ -144,6 +165,62 @@ impl TaskGroup {
                 )) => Some(dispatch_mouse_event),
                 _ => None,
             })
+    }
+
+    fn full_fill_mouse_dispatch_event(
+        &mut self,
+        mut dispatch_mouse_event: input_tasks::DispatchMouseEventTask,
+    ) {
+        if dispatch_mouse_event.x.and(dispatch_mouse_event.y).is_none() {
+            match dispatch_mouse_event.event_type {
+                input_tasks::MouseEventType::Moved => {
+                    // If it's a Moved event, We should look for some task return model_box.
+                    if let Some(mid_point) = self
+                        .find_get_content_quads_task()
+                        .and_then(dom_tasks::GetContentQuadsTask::get_midpoint)
+                    {
+                        dispatch_mouse_event.x.replace(mid_point.x);
+                        dispatch_mouse_event.y.replace(mid_point.y);
+                    } else {
+                        warn!("get_content_quads return empty result.");
+                    }
+                }
+                input_tasks::MouseEventType::Pressed => {
+                    // The most possible task before Pressed is a moved task;
+                    if let Some(move_task) = self
+                        .find_dispatch_mouse_event_task_by_type(input_tasks::MouseEventType::Moved)
+                    {
+                        if let (Some(x), Some(y)) = (move_task.x, move_task.y) {
+                            dispatch_mouse_event.x.replace(x);
+                            dispatch_mouse_event.y.replace(y);
+                        } else {
+                            warn!("find Moved task, but x or y is missing.");
+                        }
+                    } else {
+                        warn!("got mouse Pressed, but can't find Moved task.");
+                    }
+                }
+                input_tasks::MouseEventType::Released => {
+                    // The most possile task before Released is a Pressed task.
+                    if let Some(press_task) = self.find_dispatch_mouse_event_task_by_type(
+                        input_tasks::MouseEventType::Pressed,
+                    ) {
+                        if let (Some(x), Some(y)) = (press_task.x, press_task.y) {
+                            dispatch_mouse_event.x.replace(x);
+                            dispatch_mouse_event.y.replace(y);
+                        } else {
+                            warn!("find Pressed task, but x or y is missing.");
+                        }
+                    } else {
+                        warn!("got mouse Released, but can't find Pressed task.");
+                    }
+                }
+                _ => {
+                    // Other events should lookup for mouse move tasks.
+                }
+            }
+        }
+        self.waiting_tasks.insert(0, dispatch_mouse_event.into());
     }
 
     pub fn full_fill_next_task(&mut self) {
@@ -210,49 +287,9 @@ impl TaskGroup {
                 self.waiting_tasks.insert(0, screen_shot.into());
             }
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::DispatchMouseEvent(
-                mut dispatch_mouse_event,
+                dispatch_mouse_event,
             )) => {
-                if dispatch_mouse_event.x.and(dispatch_mouse_event.y).is_none() {
-                    match dispatch_mouse_event.event_type {
-                        input_tasks::MouseEventType::Pressed
-                        | input_tasks::MouseEventType::Released => {
-                            // if the previous task is a dispatch_mouse_event too.
-                            if let Some(TaskDescribe::TargetCallMethod(
-                                TargetCallMethodTask::DispatchMouseEvent(dispatch_mouse_event_1),
-                            )) = self.completed_tasks.last()
-                            {
-                                if dispatch_mouse_event_1
-                                    .x
-                                    .and(dispatch_mouse_event_1.y)
-                                    .is_some()
-                                {
-                                    dispatch_mouse_event.x.replace(
-                                        dispatch_mouse_event_1
-                                            .x
-                                            .expect("dispatch_mouse_event_1 missing x."),
-                                    );
-                                    dispatch_mouse_event.y.replace(
-                                        dispatch_mouse_event_1
-                                            .y
-                                            .expect("dispatch_mouse_event_1 missing y."),
-                                    );
-                                } else {
-                                    warn!("dispatch_mouse_event_1 has part point. missing x or y");
-                                }
-                            } else if let Some(mid_point) = self
-                                .find_get_content_quads_task()
-                                .and_then(dom_tasks::GetContentQuadsTask::get_midpoint)
-                            {
-                                dispatch_mouse_event.x.replace(mid_point.x);
-                                dispatch_mouse_event.y.replace(mid_point.y);
-                            } else {
-                                warn!("get_content_quads return empty result.");
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                self.waiting_tasks.insert(0, dispatch_mouse_event.into());
+                self.full_fill_mouse_dispatch_event(dispatch_mouse_event);
             }
             TaskDescribe::TargetCallMethod(TargetCallMethodTask::SetDeviceMetricsOverride(
                 mut task,

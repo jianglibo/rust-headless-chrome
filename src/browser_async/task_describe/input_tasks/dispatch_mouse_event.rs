@@ -25,7 +25,7 @@ impl From<MouseButton> for &'static str {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MouseEventType {
     Pressed,
     Released,

@@ -2,6 +2,7 @@
 
 use headless_chrome::browser_async::page_message::{PageResponse, ReceivedEvent};
 use headless_chrome::protocol::target;
+use log::*;
 
 use super::{GetContentInIframe, PageState, HOME_URL};
 
@@ -26,15 +27,23 @@ impl GetContentInIframe {
                     // ];
                     // tab.attach_to_page_and_then(tasks);
                 }
-                ReceivedEvent::LoadEventFired(_t) => {
+                // ReceivedEvent::LoadEventFired(_t) => {
+                ReceivedEvent::LifeCycle => {
                     let tab = self
                         .get_tab(maybe_target_id)
                         .expect("tab should exists. LoadEventFired");
-                    assert_eq!(tab.get_url(), HOME_URL);
-                    tab.network_enable();
-                    tab.move_mouse_random_after_secs(4);
-                    tab.display_full_page_after_secs(6);
-                    self.state = PageState::HomePageFullDisplayed;
+                    if tab.is_at_url(HOME_URL) {
+                        if tab.last_life_cycle_event().is_network_almost_idle() {
+                            tab.network_enable();
+                            tab.move_mouse_random_after_secs(10);
+                            tab.display_full_page_after_secs(16);
+                            self.state = PageState::HomePageFullDisplayed;
+                        } else {
+                            info!("got lifecycleEvent: {:?}", tab.last_life_cycle_event());
+                        }
+                    } else {
+                        warn!("at state: {:?}", PageState::WaitingForQrcodeScan);
+                    }
                 }
                 ReceivedEvent::ResponseReceived(_event) => {}
                 _ => {

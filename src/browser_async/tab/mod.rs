@@ -632,7 +632,10 @@ impl Tab {
     }
 
     pub fn move_mouse_random_tasks(&self) -> Vec<TaskDescribe> {
-        vec![self.mouse_move_to_xy_task(100.0, 100.0), self.mouse_move_to_xy_task(200.0, 200.0)]
+        vec![self.mouse_move_to_xy_task(100.0, 100.0),
+             self.mouse_move_to_xy_task(200.0, 200.0),
+             self.mouse_move_to_xy_task(300.0, 300.0),
+             ]
     }
 
     pub fn mouse_press_at_point_task(&self, point: Option<Point>) -> TaskDescribe {
@@ -780,7 +783,12 @@ impl Tab {
         .into()
     }
 
-    pub fn set_lifecycle_events_enabled_task(&self) -> TaskDescribe {
+    pub fn lifecycle_events_enable(&mut self) {
+        let task = self.lifecycle_events_enable_task();
+        self.execute_one_task(task);
+    }
+
+    pub fn lifecycle_events_enable_task(&self) -> TaskDescribe {
         page_tasks::SetLifecycleEventsEnabledTaskBuilder::default().common_fields(self.get_common_field(None)).enabled(true).build().expect("SetRequestInterceptionTaskBuilder should success.").into()
     }
 
@@ -943,7 +951,7 @@ impl Tab {
                 WaitingForPageAttachTaskName::BringToFront => self.bring_to_front_task(),
                 WaitingForPageAttachTaskName::PageEnable => self.page_enable_task(),
                 WaitingForPageAttachTaskName::RuntimeEnable => self.runtime_enable_task(),
-                WaitingForPageAttachTaskName::SetLifecycleEventsEnabled => self.set_lifecycle_events_enabled_task(),
+                WaitingForPageAttachTaskName::SetLifecycleEventsEnabled => self.lifecycle_events_enable_task(),
                 WaitingForPageAttachTaskName::NetworkEnable => self.network_enable_task_impl(None),
             })
             .collect();

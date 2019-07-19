@@ -24,6 +24,8 @@ impl GetContentInIframe {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
+                        tab.lifecycle_events_enable();
+                        
                         if let Some(_frame) = tab
                             .find_frame_by_id(&frame_id)
                             .filter(|f| f.name == Some("ddlogin-iframe".into()))
@@ -69,7 +71,6 @@ impl GetContentInIframe {
                     assert!(path.exists());
                     self.state = PageState::WaitingForQrcodeScan;
                     let exe = std::fs::canonicalize("./target/qrcode.png").expect("exists.");
-                    error!("{:?}", exe);
                     std::process::Command::new("cmd")
                         .args(&[
                             "/C",

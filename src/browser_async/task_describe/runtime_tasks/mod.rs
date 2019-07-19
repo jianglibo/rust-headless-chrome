@@ -37,26 +37,35 @@ pub    fn handle_runtime_event(
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let console_call_parameters = event.into_raw_parameters();
                 tab.verify_execution_context_id(&console_call_parameters);
+                Ok(PageResponseWrapper::default())
             }
-            RuntimeEvent::ExceptionRevoked(_event) => {}
-            RuntimeEvent::ExceptionThrown(_event) => {}
+            RuntimeEvent::ExceptionRevoked(_event) => {
+                Ok(PageResponseWrapper::default())
+            }
+            RuntimeEvent::ExceptionThrown(event) => {
+                warn!("ExceptionThrown: {:?}", event);
+                Ok(PageResponseWrapper::default())
+            }
             RuntimeEvent::ExecutionContextCreated(event) => {
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.runtime_execution_context_created(event.get_execution_context_description());
-                return Ok(PageResponseWrapper {
+                Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: None,
                     page_response: PageResponse::ReceivedEvent(ReceivedEvent::ExecutionContextCreated(event)),
-                });
+                })
             }
             RuntimeEvent::ExecutionContextDestroyed(event) => {
                 let execution_context_id = event.into_execution_context_id();
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.runtime_execution_context_destroyed(execution_context_id);
+                Ok(PageResponseWrapper::default())
             }
-            RuntimeEvent::ExecutionContextsCleared(_event) => {}
-            RuntimeEvent::InspectRequested(_event) => {}
+            RuntimeEvent::ExecutionContextsCleared(_event) => {
+                Ok(PageResponseWrapper::default())
+            }
+            RuntimeEvent::InspectRequested(_event) => {
+                Ok(PageResponseWrapper::default())
+            }
         }
-        warn!("unhandled branch handle_runtime_event");
-        Ok(PageResponseWrapper::default())
     }

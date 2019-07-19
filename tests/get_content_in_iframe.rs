@@ -40,9 +40,12 @@ impl Future for GetContentInIframe {
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
                     info!("{:?}", self.state);
                     for t in &self.debug_session.tabs {
-                        trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
-                        info!("requested urls: {:?}", t.network_statistics.list_request_urls_end_with("/pclog"));
-                        info!("box_model: {:?}", t.box_model);
+                        let rs = t.network_statistics.list_request_urls_end_with("/pclog");
+                        if !rs.is_empty() {
+                            info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
+                            info!("requested urls: {:?}", rs);
+                            info!("box_model: {:?}", t.box_model);
+                        }
                     }
                     self.debug_session.browser_contexts().deduplicate();
                     // self.debug_session.activates_next_in_interval(10);
@@ -59,7 +62,9 @@ impl Future for GetContentInIframe {
                             tab.run_task_queue_manually();
                         }
                     }
-                    info!("popup_count is {}", popup_count);
+                    if popup_count > 0 {
+                        info!("popup_count is {}", popup_count);
+                    }
                     self.debug_session.activates_next_in_interval(3);
                     // if let Some(tab) = self
                     //     .debug_session
@@ -154,7 +159,7 @@ impl Future for GetContentInIframe {
 // post to: https://iflow-api.xuexi.cn/logflow/api/v1/pclog
 #[test]
 fn t_get_content_in_iframe() {
-    tutil::setup_logger(vec!["task_queue", "chrome_browser"]).expect("fern log should work.");
+    tutil::setup_logger(vec!["browser_async::task_queue", "browser_async::chrome_browser"]).expect("fern log should work.");
 
     let my_page = GetContentInIframe::default();
 

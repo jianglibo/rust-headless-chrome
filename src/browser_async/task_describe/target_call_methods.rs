@@ -86,31 +86,28 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::NavigateTo(task) => {
             trace!("navigate_to task returned: {:?}", task);
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::QuerySelector(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::QuerySelector(task)),
-            });
+            })
         }
         TargetCallMethodTask::DescribeNode(task) => {
-            // let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-            // let node_id = task.task_result.as_ref().and_then(|n| Some(n.node_id));
-
-            let v = Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::DescribeNode(task)),
-            });
-            return v;
+            })
         }
         TargetCallMethodTask::PrintToPDF(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::PrintToPdf(task)),
-            });
+            })
         }
         TargetCallMethodTask::GetBoxModel(task) => {
             if task.request_full_page {
@@ -120,127 +117,125 @@ pub fn handle_target_method_call(
                 }
             }
 
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetBoxModel(task)),
-            });
+            })
         }
         TargetCallMethodTask::GetContentQuads(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetContentQuads(task)),
-            });
+            })
         }
         TargetCallMethodTask::PageEnable(task) => {
             info!("page_enabled: {:?}", task);
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::PageEnabled(task)),
-            });
+            })
         }
         TargetCallMethodTask::PageClose(task) => {
             info!("page_closed: {:?}", task);
-            return Ok(PageResponseWrapper::default());
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::RuntimeEnable(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::RuntimeEnabled(task)),
-            });
+            })
         }
         TargetCallMethodTask::CaptureScreenshot(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::CaptureScreenshot(task)),
-            });
+            })
         }
         TargetCallMethodTask::Evaluate(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::Evaluate(task)),
-            });
+            })
         }
         TargetCallMethodTask::GetProperties(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetProperties(task)),
-            });
+            })
         }
         TargetCallMethodTask::RuntimeCallFunctionOn(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::CallFunctionOn(task)),
-            });
+            })
         }
         TargetCallMethodTask::SetRequestInterception(_task) => {
-            warn!("ignored method return SetRequestInterception");
+            trace!("ignored method return SetRequestInterception");
             return Ok(PageResponseWrapper::default());
         }
         TargetCallMethodTask::NetworkEnable(_task) => {
-            warn!("ignored method return. NetworkEnable");
-            return Ok(PageResponseWrapper::default());
+            trace!("ignored method return. NetworkEnable");
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::ContinueInterceptedRequest(_task) => {
-            warn!("ignored method return. ContinueInterceptedRequest");
-            return Ok(PageResponseWrapper::default());
+            trace!("ignored method return. ContinueInterceptedRequest");
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::PageReload(_task) => {
-            warn!("ignored method return. PageReload");
-            return Ok(PageResponseWrapper::default());
+            trace!("ignored method return. PageReload");
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::SetLifecycleEventsEnabled(_task) => {
-            warn!("ignored method return. SetLifecycleEventsEnabled");
-            return Ok(PageResponseWrapper::default());
+            trace!("ignored method return. SetLifecycleEventsEnabled");
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::GetLayoutMetrics(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetLayoutMetrics(task)),
-            });
+            })
         }
         TargetCallMethodTask::DispatchMouseEvent(_task) => {
-            warn!("ignored method return. DispatchMouseEvent");
-            return Ok(PageResponseWrapper::default());
+            trace!("ignored method return. DispatchMouseEvent");
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::BringToFront(task) => {
             debug_session.bring_to_front_responded(maybe_target_id.clone())?;
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::BringToFront(task)),
-            });
+            })
         }
         TargetCallMethodTask::GetResponseBodyForInterception(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetResponseBodyForInterception(task)),
-            });
+            })
         }
         TargetCallMethodTask::CanEmulate(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::CanEmulate(task)),
-            });
+            })
         }
         TargetCallMethodTask::SetDeviceMetricsOverride(task) => {
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::SetDeviceMetricsOverride(task)),
-            });
+            })
         }
     } 
-    warn!("unhandled branch handle_target_method_call");
-    Ok(PageResponseWrapper::default())
 }

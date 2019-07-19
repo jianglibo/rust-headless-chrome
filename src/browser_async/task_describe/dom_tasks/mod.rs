@@ -36,24 +36,43 @@ pub    fn handle_dom_event(
         maybe_target_id: Option<target::TargetId>,
     ) -> Result<PageResponseWrapper, failure::Error> {
         match dom_event {
-            DomEvent::AttributeModified(_event) => {}
-            DomEvent::AttributeRemoved(_event) => {}
-            DomEvent::CharacterDataModified(_event) => {}
-            DomEvent::ChildNodeCountUpdated(_event) => {}
-            DomEvent::ChildNodeInserted(_event) => {}
-            DomEvent::ChildNodeRemoved(_event) => {}
-            DomEvent::DocumentUpdated(_event) => {}
+            DomEvent::AttributeModified(_event) => {
+                trace!("AttributeModified event.");
+                Ok(PageResponseWrapper::default())
+            }
+            DomEvent::AttributeRemoved(_event) => {
+                trace!("AttributeRemoved event.");
+                Ok(PageResponseWrapper::default())
+            }
+            DomEvent::CharacterDataModified(_event) => {
+                trace!("CharacterDataModified event.");
+                Ok(PageResponseWrapper::default())
+            }
+            DomEvent::ChildNodeCountUpdated(_event) => {
+                trace!("ChildNodeCountUpdated event.");
+                Ok(PageResponseWrapper::default())
+            }
+            DomEvent::ChildNodeInserted(_event) => {
+                trace!("ChildNodeInserted event.");
+                Ok(PageResponseWrapper::default())
+            }
+            DomEvent::ChildNodeRemoved(_event) => {
+                trace!("ChildNodeRemovedevent.");
+                Ok(PageResponseWrapper::default())
+            }
+            DomEvent::DocumentUpdated(_event) => {
+                trace!("DocumentUpdated event.");
+                Ok(PageResponseWrapper::default())
+            }
             DomEvent::SetChildNodes(event) => {
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let (parent_id, nodes) = event.into_parent_children();
                 tab.node_arrived(parent_id, nodes);
-                return Ok(PageResponseWrapper {
+                Ok(PageResponseWrapper {
                     target_id: maybe_target_id,
                     task_id: None,
                     page_response: PageResponse::ReceivedEvent(ReceivedEvent::SetChildNodesOccurred(parent_id)),
-                });
+                })
             }
         }
-        warn!("unhandled branch handle_dom_event");
-        Ok(PageResponseWrapper::default())
     }

@@ -39,13 +39,9 @@ impl ChromeDebugSession {
 
     pub fn execute_task(&mut self, task_vec: Vec<TaskDescribe>) {
             if let Some(task_ref) = task_vec.get(0) {
-                match String::try_from(task_ref) {
-                    Ok(method_str) => {
-                        self.task_manager.push_task_vec(task_vec);
-                        self.chrome_browser.send_message(method_str);
-                    }
-                    Err(err) => error!("first task deserialize fail: {:?}", err),
-                }
+                let method_str = String::try_from(task_ref).expect("to method_str should always work.");
+                self.task_manager.push_task_vec(task_vec);
+                self.chrome_browser.send_message(method_str);
             } else {
                 error!("empty tasks list.")
             }

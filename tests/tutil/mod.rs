@@ -1,4 +1,6 @@
 use fern::colors::{Color, ColoredLevelConfig};
+use std::fs;
+use std::path::Path;
 
 // "headless_chrome=trace,get_content_in_iframe=trace",
 pub fn setup_logger<T, I>(verbose_modules: T) -> Result<(), fern::InitError> 
@@ -22,8 +24,8 @@ pub fn setup_logger<T, I>(verbose_modules: T) -> Result<(), fern::InitError>
     let std_out_config = fern::Dispatch::new()
         .format(move |out, message, record| {
             out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                "[{}][{}] {}",
+                // chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
                 record.target(),
                 colors.color(record.level()),
                 message
@@ -31,17 +33,25 @@ pub fn setup_logger<T, I>(verbose_modules: T) -> Result<(), fern::InitError>
         })
         .chain(std::io::stdout());
 
+
+        let log_file_name = "output.log";
+
+        let path = Path::new(log_file_name);
+        if path.exists() && path.is_file() {
+            fs::remove_file(log_file_name).unwrap();
+        }    
+
     let file_config = fern::Dispatch::new()
         .format(move |out, message, record| {
             out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                "[{}][{}] {}",
+                // chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
                 record.target(),
                 record.level(),
                 message
             ))
         })
-        .chain(fern::log_file("output.log")?);
+        .chain(fern::log_file(log_file_name)?);
 
     base_config
         .chain(std_out_config)

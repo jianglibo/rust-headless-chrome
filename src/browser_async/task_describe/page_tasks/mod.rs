@@ -59,7 +59,10 @@ pub fn handle_page_event(
     maybe_target_id: Option<target::TargetId>,
 ) -> Result<PageResponseWrapper, failure::Error> {
         match page_event {
-            PageEvent::DomContentEventFired(_event) => {}
+            PageEvent::DomContentEventFired(event) => {
+                trace!("unhandled DomContentEventFired: {:?}", event);
+                Ok(PageResponseWrapper::default())
+            }
             // attached may not invoke, if invoked it's the first. then started, navigated, stopped.
             PageEvent::FrameAttached(event) => {
                 let raw_parameters = event.into_raw_parameters();
@@ -70,7 +73,7 @@ pub fn handle_page_event(
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_attached(raw_parameters);
-                return handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)));
+                handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)))
             }
             PageEvent::FrameDetached(event) => {
                 let frame_id = event.into_frame_id();
@@ -80,6 +83,7 @@ pub fn handle_page_event(
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_detached(&frame_id);
+                Ok(PageResponseWrapper::default())
             }
             PageEvent::FrameStartedLoading(event) => {
                 let frame_id = event.into_frame_id();
@@ -90,27 +94,25 @@ pub fn handle_page_event(
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab._frame_started_loading(frame_id.clone());
-                return handle_event_return(
+                handle_event_return(
                     maybe_target_id,
                     PageResponse::ReceivedEvent(ReceivedEvent::FrameStartedLoading(frame_id)),
-                );
+                )
             }
             PageEvent::FrameNavigated(event) => {
                 info!(
                     "-----------------frame_navigated-----------------{:?}",
                     event
                 );
-                // let frame = event.get_frame();
                 debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())
                     .expect("FrameNavigated event should have target_id.")
                     ._frame_navigated(event.clone_frame());
-                return handle_event_return(
+                handle_event_return(
                     maybe_target_id,
                     PageResponse::ReceivedEvent(ReceivedEvent::FrameNavigated(event)),
-                );
+                )
             }
             PageEvent::FrameStoppedLoading(event) => {
-                // TaskDescribe::FrameStoppedLoading(frame_id, common_fields) => {
                 info!(
                     "-----------------frame_stopped_loading-----------------{:?}",
                     event
@@ -118,23 +120,21 @@ pub fn handle_page_event(
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let frame_id = event.into_frame_id();
                 tab._frame_stopped_loading(frame_id.clone());
-                return handle_event_return(
+                handle_event_return(
                     maybe_target_id,
                     PageResponse::ReceivedEvent(ReceivedEvent::FrameStoppedLoading(frame_id)),
-                );
+                )
             }
             PageEvent::LoadEventFired(event) => {
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.event_statistics.event_happened(EventName::LoadEventFired);
-                return handle_event_return(maybe_target_id, event.into_page_response());
+                handle_event_return(maybe_target_id, event.into_page_response())
             }
             PageEvent::LifeCycle(event) => {
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 tab.life_cycle_happened(event);
-                return handle_event_return(maybe_target_id, 
-                PageResponse::ReceivedEvent(ReceivedEvent::LifeCycle));
+                handle_event_return(maybe_target_id, 
+                PageResponse::ReceivedEvent(ReceivedEvent::LifeCycle))
             }
         }
-        warn!("unhandled branch handle_page_event");
-        Ok(PageResponseWrapper::default())
 }

@@ -63,7 +63,9 @@ impl TaskQueue {
                 Some(ti)
             }
         }).collect();
-        trace!("got delayed to run: {:?}", to_run);
+        if !to_run.is_empty() {
+            trace!("got delayed to run: {:?}", to_run);
+        }
         to_run.into_iter().map(|it|it.tasks).collect()
     }
 

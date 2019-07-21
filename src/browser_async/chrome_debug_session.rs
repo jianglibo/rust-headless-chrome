@@ -37,14 +37,31 @@ impl ChromeDebugSession {
         self.task_manager.tasks_count()
     }
 
+    /// execute_task causes sending a message to the chrome. This drive the program to run.
+    /// invoking multiple times cause sending message in parrallel.
     pub fn execute_task(&mut self, task_vec: Vec<TaskDescribe>) {
-            if let Some(task_ref) = task_vec.get(0) {
-                let method_str = String::try_from(task_ref).expect("to method_str should always work.");
-                self.task_manager.push_task_vec(task_vec);
-                self.chrome_browser.send_message(method_str);
-            } else {
-                error!("empty tasks list.")
-            }
+        // self.task_manager.push_task_vec(task_vec);
+        self.execute_next_and_return_remains(task_manager::TaskGroup::new(task_vec));
+        // if let Some(task_ref) = task_vec.get(0) {
+        //     let method_str = String::try_from(task_ref).expect("to method_str should always work.");
+        //     self.task_manager.push_task_vec(task_vec);
+        //     self.chrome_browser.send_message(method_str);
+        // } else {
+        //     error!("empty tasks list.")
+        // }
+    }
+
+    fn execute_next_and_return_remains(&mut self, task_group: task_manager::TaskGroup) {
+        let next_task = task_group.get_first_task_ref();
+        if let Ok(method_str) = String::try_from(next_task) {
+            self.task_manager.push_task_group(task_group);
+            self.send_message_direct(method_str);
+        } else {
+            error!(
+                "execute_next_and_return_remains to_method_str failed. {:?}",
+                next_task
+            );
+        }
     }
 
     pub fn send_message_direct(&mut self, method_str: String) {
@@ -193,18 +210,6 @@ impl ChromeDebugSession {
         None
     }
 
-    fn execute_next_and_return_remains(&mut self, task_group: task_manager::TaskGroup) {
-        let next_task = task_group.get_first_task_ref();
-        if let Ok(method_str) = String::try_from(next_task) {
-            self.task_manager.push_task_group(task_group);
-            self.send_message_direct(method_str);
-        } else {
-            error!(
-                "execute_next_and_return_remains to_method_str failed. {:?}",
-                next_task
-            );
-        }
-    }
 
     fn full_fill_current_task(
         &self,

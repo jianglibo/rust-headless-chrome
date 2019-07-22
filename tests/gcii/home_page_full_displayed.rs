@@ -70,8 +70,13 @@ impl GetContentInIframe {
         // let expression = r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text').length"##;
         let shenbian_gandong_task_name = "shenbian-gandong";
         match page_response {
-            PageResponse::ReceivedEvent(_received_event) => {
-                // info!("skip.");
+            PageResponse::ReceivedEvent(received_event) => {
+                if let ReceivedEvent::LoadEventFired(_task) = received_event {
+                    let tab = self
+                        .get_tab(maybe_target_id)
+                        .expect("tab should exists. LoadEventFired");
+                    tab.move_mouse_random_after_secs(2);
+                }
             }
             PageResponse::MethodCallDone(method_call_done) => {
                 match method_call_done {

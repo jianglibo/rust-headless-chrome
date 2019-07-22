@@ -101,11 +101,17 @@ impl Tab {
         }
     }
 
-    /// invoking mulitiple tasks and one event loop may lost response. So flatten the tasks.
+    /// invoking mulitiple tasks and one event loop may lost response. So flatten the tasks. No!!!
+    /// spliting tasks to groups to get each last task to respose to caller.
     pub fn run_task_queue_delayed(&mut self) {
-        let tasks = self.task_queue.retrieve_delayed_task_to_run().into_iter().flatten().collect::<Vec<TaskDescribe>>();
-        if !tasks.is_empty() {
-            self.execute_tasks(tasks);
+        // let tasks = self.task_queue.retrieve_delayed_task_to_run().into_iter().flatten().collect::<Vec<TaskDescribe>>();
+        // if !tasks.is_empty() {
+        //     self.execute_tasks(tasks);
+        // }
+        for task_vec in self.task_queue.retrieve_delayed_task_to_run() {
+            if !task_vec.is_empty() {
+                self.execute_tasks(task_vec);
+            }
         }
     }
 

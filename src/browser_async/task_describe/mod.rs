@@ -4,7 +4,6 @@ use crate::browser_async::{
 };
 use crate::protocol::{self, target};
 use log::*;
-use std::time::{Instant};
 
 pub mod dom_tasks;
 pub mod other_tasks;
@@ -199,14 +198,14 @@ pub struct CommonDescribeFields {
     pub task_id: TaskId,
     #[builder(default = "next_call_id()")]
     pub call_id: usize,
-    #[builder(default = "0")]
-    pub max_retry: u16,
-    #[builder(default = "0")]
-    pub retried: u16,
-    #[builder(default = "false")]
-    pub completed: bool,
-    #[builder(default = "None")]
-    pub next_invoke_at: Option<Instant>,
+    // #[builder(default = "0")]
+    // pub max_retry: u16,
+    // #[builder(default = "0")]
+    // pub retried: u16,
+    // #[builder(default = "false")]
+    // pub completed: bool,
+    // #[builder(default = "None")]
+    // pub next_invoke_at: Option<Instant>,
 }
 
 impl From<(Option<String>, Option<String>)> for CommonDescribeFields {

@@ -40,15 +40,14 @@ impl ChromeDebugSession {
     /// execute_task causes sending a message to the chrome. This drive the program to run.
     /// invoking multiple times cause sending message in parrallel.
     pub fn execute_task(&mut self, task_vec: Vec<TaskDescribe>) {
-        // self.task_manager.push_task_vec(task_vec);
         self.execute_next_and_return_remains(task_manager::TaskGroup::new(task_vec));
-        // if let Some(task_ref) = task_vec.get(0) {
-        //     let method_str = String::try_from(task_ref).expect("to method_str should always work.");
-        //     self.task_manager.push_task_vec(task_vec);
-        //     self.chrome_browser.send_message(method_str);
-        // } else {
-        //     error!("empty tasks list.")
-        // }
+    }
+
+    pub fn check_stalled_tasks(&mut self) {
+        if let Some(tg) = self.task_manager.get_stalled_task_group(45) {
+            warn!("rerun stalled task group: {:?}", tg);
+            self.execute_next_and_return_remains(tg);
+        }
     }
 
     fn execute_next_and_return_remains(&mut self, task_group: task_manager::TaskGroup) {
@@ -157,7 +156,7 @@ impl ChromeDebugSession {
         }
         let call_id = resp.call_id;
         if let Some(idx) = self.task_manager.find_task_vec_by_call_id(call_id) {
-            let mut task_group = self.task_manager.remove_task_vec(idx);
+            let mut task_group = self.task_manager.take_task_group(idx);
             let mut current_task = task_group.get_first_task();
 
             // if has remote error.

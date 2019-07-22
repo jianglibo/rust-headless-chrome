@@ -3,9 +3,11 @@ use super::task_describe::{
     dom_tasks, input_tasks, runtime_tasks, HasCallId, TargetCallMethodTask, TaskDescribe,
 };
 use log::*;
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct TaskGroup {
+    issued_at: Instant,
     waiting_tasks: Vec<TaskDescribe>,
     completed_tasks: Vec<TaskDescribe>,
 }
@@ -19,6 +21,7 @@ impl std::default::Default for TaskGroup {
 impl TaskGroup {
     pub fn new(waiting_tasks: Vec<TaskDescribe>) -> Self {
         Self {
+            issued_at: Instant::now(),
             waiting_tasks,
             completed_tasks: Vec::new(),
         }
@@ -69,7 +72,7 @@ impl TaskGroup {
     pub fn is_empty(&self) -> bool {
         self.waiting_tasks.is_empty()
     }
-
+    /// If task didn't get responsed, the method will never got called.
     pub fn push_completed_task(&mut self, task_describe: TaskDescribe) {
         self.completed_tasks.push(task_describe);
     }
@@ -335,7 +338,7 @@ impl TaskGroup {
 
 #[derive(Debug)]
 pub struct TaskManager {
-    tasks_waiting_for_response: Vec<TaskGroup>,
+    task_groups_waiting_for_response: Vec<TaskGroup>,
 }
 
 impl std::default::Default for TaskManager {
@@ -347,30 +350,39 @@ impl std::default::Default for TaskManager {
 impl TaskManager {
     pub fn new() -> Self {
         Self {
-            tasks_waiting_for_response: Vec::new(),
+            task_groups_waiting_for_response: Vec::new(),
         }
     }
 
     pub fn tasks_count(&self) -> usize {
-        self.tasks_waiting_for_response.len()
+        self.task_groups_waiting_for_response.len()
     }
 
     pub fn find_task_vec_by_call_id(&self, call_id: usize) -> Option<usize> {
-        self.tasks_waiting_for_response
+        self.task_groups_waiting_for_response
             .iter()
             .position(|task_group| task_group.contains_call_id(call_id))
     }
 
-    pub fn remove_task_vec(&mut self, idx: usize) -> TaskGroup {
-        self.tasks_waiting_for_response.remove(idx)
+    pub fn take_task_group(&mut self, idx: usize) -> TaskGroup {
+        self.task_groups_waiting_for_response.remove(idx)
     }
 
-    pub fn push_task_vec(&mut self, task_vec: Vec<TaskDescribe>) {
-        let tg = TaskGroup::new(task_vec);
-        self.tasks_waiting_for_response.push(tg);
+    pub fn get_stalled_task_group(&mut self, issued_at_before_secs: u64) -> Option<TaskGroup> {
+        let idx_op = self.task_groups_waiting_for_response.iter().position(|tg|tg.issued_at.elapsed().as_secs() > issued_at_before_secs);
+
+        if let Some(idx) = idx_op {
+            Some(self.task_groups_waiting_for_response.remove(idx))
+        } else {
+            None
+        }
+        // self.task_groups_waiting_for_response.iter().find(|tg|tg.issued_at.elapsed().as_secs() > issued_at_before_secs)
     }
 
-    pub fn push_task_group(&mut self, task_group: TaskGroup) {
-        self.tasks_waiting_for_response.push(task_group);
+    /// When push the task_group, the first task of the group is already send to chrome.
+    /// If the task does't get responesed, this group of task will hang on, and the process will stop going.
+    pub fn push_task_group(&mut self,mut task_group: TaskGroup) {
+        task_group.issued_at = Instant::now();
+        self.task_groups_waiting_for_response.push(task_group);
     }
 }

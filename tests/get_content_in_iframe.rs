@@ -39,7 +39,8 @@ impl Future for GetContentInIframe {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
                     info!("{:?}", self.state);
-                    for t in &self.debug_session.tabs {
+                    for t in self.debug_session.tabs.iter_mut() {
+                        // t.move_mouse_random_after_secs(1);
                         let rs = t.network_statistics.list_request_urls_end_with("/pclog");
                         if !rs.is_empty() {
                             info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);

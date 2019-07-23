@@ -6,9 +6,6 @@ use headless_chrome::protocol::target;
 use super::{GetContentInIframe, PageState, LOGIN_URL};
 
 impl GetContentInIframe {
-    pub fn get_tab(&mut self, target_id: Option<&target::TargetId>) -> Option<&mut Tab> {
-        self.debug_session.find_tab_by_id_mut(target_id).ok()
-    }
 
     pub fn waiting_blank_page(
         &mut self,

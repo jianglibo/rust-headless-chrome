@@ -57,19 +57,3 @@ macro_rules! impl_has_common_fields {
         }
     };
 }
-
-// #[cfg(test)]
-// mod tests {
-//     // use super::*;
-//     // use log::*;
-//     // use crate::browser_async::task_describe::{TaskDescribe, PageEvent};
-//     // use crate::browser_async::task_describe::page_events::PageCreated;
-
-
-//     #[test]
-//     fn test_impl_into_task_describe_macro() {
-//         // let () = PageEvent::PageCreated;
-//         // impl_into_task_describe!(TaskDescribe::PageEvent, PageEvent::PageCreated, PageCreated);
-//         assert!(true);
-//     }
-// }

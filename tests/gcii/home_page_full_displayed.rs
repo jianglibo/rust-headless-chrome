@@ -71,11 +71,34 @@ impl GetContentInIframe {
         let shenbian_gandong_task_name = "shenbian-gandong";
         match page_response {
             PageResponse::ReceivedEvent(received_event) => {
-                if let ReceivedEvent::LoadEventFired(_task) = received_event {
-                    let tab = self
-                        .get_tab(maybe_target_id)
-                        .expect("tab should exists. LoadEventFired");
-                    tab.move_mouse_random_after_secs(2);
+                match received_event {
+                    ReceivedEvent::LoadEventFired(_task) => {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. LoadEventFired");
+                        info!("---------> url: {:?}", tab.get_url());
+                        tab.move_mouse_random_after_secs(2);
+                    }
+                    // ReceivedEvent::ContentEventFired(_task) => {
+                    //     let tab = self
+                    //         .get_tab(maybe_target_id)
+                    //         .expect("tab should exists. LoadEventFired");
+                    //     info!("--------->1 url: {:?}", tab.get_url());
+                    // }
+                    ReceivedEvent::PageCreated(page_idx) => {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. PageCreated.");
+                        assert!(tab.session_id.is_none());
+                        info!("page created: {:?}", tab);
+                        tab.attach_to_page();
+                    }
+                    evv => {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. LoadEventFired");
+                        info!("--------->2 url: {:?}, {:?}", tab.get_url(), evv);
+                    }
                 }
             }
             PageResponse::MethodCallDone(method_call_done) => {

@@ -191,6 +191,11 @@ impl ChromeDebugSession {
                 TaskDescribe::TargetCallMethod(TargetCallMethodTask::NetworkEnable(_task)) => {
                     return_task = true;
                 }
+                // TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(task)) => {
+                //     if task.request_full_page {
+                //         return_task = true;
+                //     }
+                // }
                 _ => {}
             }
 

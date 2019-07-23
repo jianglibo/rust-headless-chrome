@@ -75,27 +75,23 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. LoadEventFired");
                         info!("---------> url: {:?}", tab.get_url());
-                        tab.move_mouse_random_after_secs(2);
+                        tab.move_mouse_random_after_secs(6);
                     }
-                    // ReceivedEvent::ContentEventFired(_task) => {
-                    //     let tab = self
-                    //         .get_tab(maybe_target_id)
-                    //         .expect("tab should exists. LoadEventFired");
-                    //     info!("--------->1 url: {:?}", tab.get_url());
-                    // }
                     ReceivedEvent::PageCreated => {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. PageCreated.");
                         assert!(tab.session_id.is_none());
                         info!("page created: {:?}", tab);
+                        tab.page_enable();
+                        tab.network_enable();
                         tab.attach_to_page();
                     }
                     evv => {
-                        let tab = self
-                            .get_tab(maybe_target_id)
-                            .expect("tab should exists. LoadEventFired");
-                        info!("--------->2 url: {:?}, {:?}", tab.get_url(), evv);
+                        // let tab = self
+                        //     .get_tab(maybe_target_id)
+                        //     .expect("tab should exists. LoadEventFired");
+                        // info!("--------->2 url: {:?}, {:?}", tab.get_url(), evv);
                     }
                 }
             }

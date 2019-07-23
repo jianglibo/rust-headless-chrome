@@ -817,12 +817,11 @@ impl Tab {
 
     pub fn page_enable(&mut self) {
         let task = self.page_enable_task();
-        if self.session_id.is_some() {
-            self.execute_one_task(task);
-        } else {
+        if self.session_id.is_none() {
             self.waiting_for_page_attach_tasks.push(task);
+        } else {
+            self.execute_one_task(task);
         }
-        
     }
 
     fn page_enable_task(&self) -> TaskDescribe {
@@ -850,10 +849,6 @@ impl Tab {
             .into()
     }
 
-    // pub fn runtime_enable_named(&mut self, name: &str) {
-    //     self.runtime_enable_impl(Some(name));
-    // }
-
     pub fn runtime_enable(&mut self) {
         let task = self.runtime_enable_task_impl(None);
         if self.session_id.is_none() {
@@ -861,7 +856,6 @@ impl Tab {
         } else {
             self.execute_one_task(task);
         }
-        // self.runtime_enable_impl(None);
     }
 
     pub fn runtime_enable_task(&mut self) -> TaskDescribe {
@@ -872,11 +866,6 @@ impl Tab {
         let common_fields = self.get_common_field(name.map(Into::into));
         runtime_tasks::RuntimeEnableTask { common_fields }.into()
     }
-
-    // fn runtime_enable_impl(&mut self, name: Option<&str>) {
-    //     let task = self.runtime_enable_task_impl(name);
-    //     self.execute_one_task(task);
-    // }
 
     pub fn network_enable(&mut self) {
         let task = self.network_enable_task_impl(None);
@@ -1007,16 +996,18 @@ impl Tab {
     pub fn page_attached(&mut self, session_id: target::SessionID) {
         let session_id_cloned = session_id.clone();
         self.session_id.replace(session_id);
-
-        let tasks: Vec<TaskDescribe> = self.waiting_for_page_attach_tasks.drain(..).into_iter()
-            .filter_map(|td| if let TaskDescribe::TargetCallMethod(mut task) = td {
-                    task.set_session_id(session_id_cloned.clone());
-                    Some(task.into())
-                } else {
-                    None
-                }
-            )
-            .collect();
+        if !self.waiting_for_page_attach_tasks.is_empty() {
+            let tasks: Vec<TaskDescribe> = self.waiting_for_page_attach_tasks.drain(..).into_iter()
+                .filter_map(|td| if let TaskDescribe::TargetCallMethod(mut task) = td {
+                        task.set_session_id(session_id_cloned.clone());
+                        Some(task.into())
+                    } else {
+                        None
+                    }
+                )
+                .collect();
+            self.execute_tasks(tasks);
+        }
 
         // let task_names: Vec<WaitingForPageAttachTaskName> =
         //     self.waiting_for_page_attach.drain().collect();
@@ -1033,7 +1024,6 @@ impl Tab {
         //         WaitingForPageAttachTaskName::NetworkEnable => self.network_enable_task_impl(None),
         //     })
         //     .collect();
-        self.execute_tasks(tasks);
     }
 
     pub fn attach_to_page(&mut self) {

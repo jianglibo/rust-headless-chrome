@@ -19,7 +19,7 @@ pub mod task_manager;
 pub use event_statistics::{EventStatistics, EventName};
 pub use network_statistics::{NetworkStatistics};
 pub use chrome_debug_session::{ChromeDebugSession};
-pub use task_queue::{TaskQueue};
+pub use task_queue::{TaskQueue, TaskQueueItem};
 pub use debug_session::{DebugSession};
 
 use failure;

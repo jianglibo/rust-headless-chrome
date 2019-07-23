@@ -65,7 +65,7 @@ impl From<PointerType> for &'static str {
     }
 }
 
-#[derive(Debug, Builder, Default)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
 pub struct DispatchMouseEventTask {
     pub common_fields: CommonDescribeFields,

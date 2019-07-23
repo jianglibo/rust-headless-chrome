@@ -4,7 +4,7 @@ use super::super::{
 use crate::protocol::{emulation, page};
 use failure;
 
-#[derive(Debug, Builder, Default)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
 pub struct SetDeviceMetricsOverrideTask {
     pub common_fields: CommonDescribeFields,

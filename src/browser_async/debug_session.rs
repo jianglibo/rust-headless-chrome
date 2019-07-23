@@ -377,6 +377,7 @@ impl DebugSession {
             TaskDescribe::Interval => {
                 self.seconds_from_start += 1;
                 self.tabs.iter_mut().for_each(Tab::run_task_queue_delayed);
+                self.tabs.iter_mut().for_each(Tab::move_mouse_random_interval);
                 self.chrome_debug_session.lock().expect("obtain chrome_debug_session should success.").check_stalled_tasks();
                 Ok(Some(PageResponseWrapper::new(PageResponse::SecondsElapsed(
                     self.seconds_from_start,

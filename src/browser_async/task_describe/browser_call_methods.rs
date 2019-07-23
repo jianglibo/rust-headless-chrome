@@ -1,11 +1,10 @@
-use super::{target_tasks, security_tasks, page_tasks};
-use super::{HasCallId, HasTaskId};
+use super::{target_tasks, security_tasks, page_tasks, HasCallId, HasTaskId, TaskDescribe};
 use super::super::page_message::{PageResponseWrapper, PageResponse, MethodCallDone,};
-use crate::protocol::target;
+use super::super::protocol::target;
 use failure;
 use log::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BrowserCallMethodTask {
     CreateTarget(target_tasks::CreateTargetTask),
     SetDiscoverTargets(target_tasks::SetDiscoverTargetsTask),
@@ -25,6 +24,12 @@ impl HasCallId for BrowserCallMethodTask {
             BrowserCallMethodTask::AttachedToTarget(task) => task.get_call_id(),
             BrowserCallMethodTask::CloseTarget(task) => task.get_call_id(),
         }
+    }
+}
+
+impl std::convert::From<BrowserCallMethodTask> for TaskDescribe {
+    fn from(task: BrowserCallMethodTask) -> Self {
+        TaskDescribe::BrowserCallMethod(task)
     }
 }
 

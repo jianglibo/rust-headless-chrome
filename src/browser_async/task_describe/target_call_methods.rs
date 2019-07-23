@@ -1,14 +1,12 @@
-use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks, emulation_tasks};
+use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks, emulation_tasks, TaskDescribe, HasCallId, HasTaskId, HasSessionId, HasCommonField};
 
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{PageResponse, PageResponseWrapper, MethodCallDone};
 use super::super::protocol::target;
-use super::{TaskDescribe};
 use log::*;
 
-use super::{HasCallId, HasTaskId, HasSessionId, HasCommonField};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TargetCallMethodTask {
     NavigateTo(page_tasks::NavigateToTask),
     QuerySelector(dom_tasks::QuerySelectorTask),
@@ -38,8 +36,8 @@ pub enum TargetCallMethodTask {
 }
 
 impl std::convert::From<TargetCallMethodTask> for TaskDescribe {
-    fn from(event: TargetCallMethodTask) -> Self {
-        TaskDescribe::TargetCallMethod(event)
+    fn from(task: TargetCallMethodTask) -> Self {
+        TaskDescribe::TargetCallMethod(task)
     }
 }
 

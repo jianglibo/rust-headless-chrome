@@ -5,7 +5,7 @@ use crate::browser::tab::element::{ElementQuad};
 use failure;
 
 
-#[derive(Debug, Builder, Default)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
 pub struct GetContentQuadsTask {
     pub common_fields: CommonDescribeFields,

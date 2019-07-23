@@ -2,7 +2,7 @@ use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, Targe
 use crate::protocol::{dom};
 use failure;
 
-#[derive(Debug, Builder, Default)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
 pub struct GetDocumentTask {
     pub common_fields: CommonDescribeFields,

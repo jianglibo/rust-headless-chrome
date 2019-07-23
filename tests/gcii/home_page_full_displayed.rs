@@ -85,6 +85,7 @@ impl GetContentInIframe {
                         info!("page created: {:?}", tab);
                         tab.page_enable();
                         tab.network_enable();
+                        tab.set_move_mouse_random_interval(8, 20);
                         tab.attach_to_page();
                     }
                     evv => {

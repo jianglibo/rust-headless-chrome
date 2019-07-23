@@ -179,35 +179,48 @@ impl ChromeDebugSession {
                 return Some(current_task);
             }
 
-            // some task we should always return to user.
-            let mut return_task = false;
-            match &current_task {
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::PageEnable(_task)) => {
-                    return_task = true;
+            let cloned_task: TaskDescribe = match &current_task {
+                TaskDescribe::TargetCallMethod(target_task) => {
+                    target_task.clone().into()
                 }
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::RuntimeEnable(_task)) => {
-                    return_task = true;
+                TaskDescribe::BrowserCallMethod(browser_task) => {
+                    browser_task.clone().into()
                 }
-                TaskDescribe::TargetCallMethod(TargetCallMethodTask::NetworkEnable(_task)) => {
-                    return_task = true;
+                _ => {
+                    error!("got impossible task type: {:?}", &current_task);
+                    panic!("got impossible response.");
                 }
-                // TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(task)) => {
-                //     if task.request_full_page {
-                //         return_task = true;
-                //     }
-                // }
-                _ => {}
-            }
+            };
 
-            if return_task {
-                self.execute_next_and_return_remains(task_group);
-                return Some(current_task);
-            } else {
+            // // some task we should always return to user.
+            // let mut return_task = false;
+            // match &current_task {
+            //     TaskDescribe::TargetCallMethod(TargetCallMethodTask::PageEnable(_task)) => {
+            //         return_task = true;
+            //     }
+            //     TaskDescribe::TargetCallMethod(TargetCallMethodTask::RuntimeEnable(_task)) => {
+            //         return_task = true;
+            //     }
+            //     TaskDescribe::TargetCallMethod(TargetCallMethodTask::NetworkEnable(_task)) => {
+            //         return_task = true;
+            //     }
+            //     // TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(task)) => {
+            //     //     if task.request_full_page {
+            //     //         return_task = true;
+            //     //     }
+            //     // }
+            //     _ => {}
+            // }
+
+            // if return_task {
+            //     self.execute_next_and_return_remains(task_group);
+            //     return Some(current_task);
+            // } else {
                 task_group.push_completed_task(current_task);
                 task_group.full_fill_next_task();
                 self.execute_next_and_return_remains(task_group);
-                return None;
-            }
+                return Some(cloned_task);
+            // }
         } else {
             error!("no matching task for call_id: {:?}", resp);
         }

@@ -10,6 +10,7 @@ pub struct TaskGroup {
     issued_at: Instant,
     waiting_tasks: Vec<TaskDescribe>,
     completed_tasks: Vec<TaskDescribe>,
+    retried: u64,
 }
 
 impl std::default::Default for TaskGroup {
@@ -24,6 +25,7 @@ impl TaskGroup {
             issued_at: Instant::now(),
             waiting_tasks,
             completed_tasks: Vec::new(),
+            retried: 0,
         }
     }
 
@@ -369,19 +371,24 @@ impl TaskManager {
     }
 
     pub fn get_stalled_task_group(&mut self, issued_at_before_secs: u64) -> Option<TaskGroup> {
-        let idx_op = self.task_groups_waiting_for_response.iter().position(|tg|tg.issued_at.elapsed().as_secs() > issued_at_before_secs);
-
+        let idx_op = self
+            .task_groups_waiting_for_response
+            .iter()
+            .position(|tg| tg.issued_at.elapsed().as_secs() > issued_at_before_secs);
         if let Some(idx) = idx_op {
-            Some(self.task_groups_waiting_for_response.remove(idx))
-        } else {
-            None
+            let mut tg = self.task_groups_waiting_for_response.remove(idx);
+            if tg.retried < 10 {
+                tg.retried += 1;
+                return Some(tg);
+            }
         }
+        None
         // self.task_groups_waiting_for_response.iter().find(|tg|tg.issued_at.elapsed().as_secs() > issued_at_before_secs)
     }
 
     /// When push the task_group, the first task of the group is already send to chrome.
     /// If the task does't get responesed, this group of task will hang on, and the process will stop going.
-    pub fn push_task_group(&mut self,mut task_group: TaskGroup) {
+    pub fn push_task_group(&mut self, mut task_group: TaskGroup) {
         task_group.issued_at = Instant::now();
         self.task_groups_waiting_for_response.push(task_group);
     }

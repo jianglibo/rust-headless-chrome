@@ -2,14 +2,11 @@ use super::super::{
     CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,
 };
 use crate::protocol::{dom, runtime};
-use serde::{Deserialize, Serialize};
 use failure;
 
-#[derive(Debug, Builder, Default, Deserialize, Serialize)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
-#[serde(rename_all = "camelCase")]
 pub struct DescribeNodeTask {
-    #[serde(skip)]
     pub common_fields: CommonDescribeFields,
     #[builder(default = "None")]
     pub node_id: Option<dom::NodeId>,
@@ -24,7 +21,6 @@ pub struct DescribeNodeTask {
     #[builder(default = "false")]
     pub pierce: bool,
     #[builder(default = "None")]
-    #[serde(skip)]
     pub task_result: Option<dom::Node>,
 }
 
@@ -61,19 +57,19 @@ mod tests {
         ::std::env::set_var("RUST_LOG", "headless_chrome=trace,browser_async=debug");
         env_logger::init();
         {
-            let common_fields = CommonDescribeFieldsBuilder::default().build().expect("default common_fields should success");
-            let task = DescribeNodeTaskBuilder::default()
-                .common_fields(common_fields)
-                .build()
-                .expect("build DescribeNodeTask should success.");
+            // let common_fields = CommonDescribeFieldsBuilder::default().build().expect("default common_fields should success");
+            // let task = DescribeNodeTaskBuilder::default()
+            //     .common_fields(common_fields)
+            //     .build()
+            //     .expect("build DescribeNodeTask should success.");
                 
             
-            let serialized = serde_json::to_string(&task).expect("serialized should success.");
-            info!("{:?}", serialized);
+            // let serialized = serde_json::to_string(&task).expect("serialized should success.");
+            // info!("{:?}", serialized);
 
-            // let ss = "{\"nodeId\":null,\"backendNodeId\":null,\"selector\":null,\"depth\":0,\"objectId\":null,\"pierce\":false}";
-            let deserialized: DescribeNodeTask = serde_json::from_str(&serialized).expect("deserialized should success");
-            println!("deserialized = {:?}", deserialized);
+            // // let ss = "{\"nodeId\":null,\"backendNodeId\":null,\"selector\":null,\"depth\":0,\"objectId\":null,\"pierce\":false}";
+            // let deserialized: DescribeNodeTask = serde_json::from_str(&serialized).expect("deserialized should success");
+            // println!("deserialized = {:?}", deserialized);
         }
     }
 }

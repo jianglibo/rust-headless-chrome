@@ -2,7 +2,7 @@ use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, AsMe
 use crate::protocol::{dom};
 use failure;
 
-#[derive(Debug, Builder, Default)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
 pub struct QuerySelectorTask {
     pub common_fields: CommonDescribeFields,

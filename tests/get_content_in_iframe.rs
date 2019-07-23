@@ -38,34 +38,37 @@ impl Future for GetContentInIframe {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
-                    info!("{:?}", self.state);
-                    for t in self.debug_session.tabs.iter_mut() {
-                        // t.move_mouse_random_after_secs(1);
-                        let rs = t.network_statistics.list_request_urls_end_with("/pclog");
-                        if !rs.is_empty() {
-                            info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
-                            info!("requested urls: {:?}", rs);
-                            info!("box_model: {:?}", t.box_model);
+                    if seconds % 20 == 0 {
+                        info!("{:?}", self.state);
+                        for t in self.debug_session.tabs.iter_mut() {
+                            // t.move_mouse_random_after_secs(1);
+                            let rs = t.network_statistics.list_request_urls_end_with("/pclog");
+                            if !rs.is_empty() {
+                                info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
+                                info!("requested urls: {:?}", rs);
+                                info!("box_model: {:?}", t.box_model);
+                            }
+                        }
+                        self.debug_session.browser_contexts().deduplicate();
+                        // self.debug_session.activates_next_in_interval(10);
+                        // self.debug_session.activate_last_opened_tab();
+                        let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
+                        if popup_count > 0 { //when popup_count > 0, home tab should exist.
+                            let run_task_queue_manually = popup_count < 2;
+                            let tab = self
+                                .debug_session
+                                .find_tab_by_name_mut(HOME_URL)
+                                .expect("home page should exists.");
+                            if run_task_queue_manually {
+                                // info!("run_task_queue_manually.");
+                                tab.run_task_queue_manually();
+                            }
+                        }
+                        if popup_count > 0 {
+                            info!("popup_count is {}", popup_count);
                         }
                     }
-                    self.debug_session.browser_contexts().deduplicate();
-                    // self.debug_session.activates_next_in_interval(10);
-                    // self.debug_session.activate_last_opened_tab();
-                    let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
-                    if popup_count > 0 { //when popup_count > 0, home tab should exist.
-                        let run_task_queue_manually = popup_count < 2;
-                        let tab = self
-                            .debug_session
-                            .find_tab_by_name_mut(HOME_URL)
-                            .expect("home page should exists.");
-                        if run_task_queue_manually {
-                            // info!("run_task_queue_manually.");
-                            tab.run_task_queue_manually();
-                        }
-                    }
-                    if popup_count > 0 {
-                        info!("popup_count is {}", popup_count);
-                    }
+
                     self.debug_session.activates_next_in_interval(3);
                     // if let Some(tab) = self
                     //     .debug_session

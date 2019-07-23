@@ -4,7 +4,7 @@ use crate::browser::tab::element::BoxModel;
 use failure;
 
 
-#[derive(Debug, Builder, Default)]
+#[derive(Debug, Builder, Default, Clone)]
 #[builder(setter(into))]
 pub struct GetBoxModelTask {
     pub common_fields: CommonDescribeFields,

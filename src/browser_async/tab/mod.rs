@@ -5,13 +5,16 @@ use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
     dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks, HasSessionId,
-    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, TargetCallMethodTask,
+    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe,
 };
-use super::{EventName, EventStatistics, TaskQueue};
+use super::{EventName, EventStatistics, TaskQueue, TaskQueueItem};
 use log::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use rand::{thread_rng, Rng};
+
+
 mod box_model_func;
 mod emulation_func;
 mod evaluate_func;
@@ -45,12 +48,10 @@ pub struct Tab {
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
     pub execution_context_descriptions:
         HashMap<page::FrameId, runtime::ExecutionContextDescription>,
-    // pub ongoing_request: HashMap<network::RequestId, network_events::RequestWillBeSent>,
     pub request_intercepted: HashMap<network::RequestId, network_events::RequestIntercepted>,
     pub response_received: HashMap<network::RequestId, network_events::ResponseReceived>,
     pub event_statistics: EventStatistics,
     pub task_queue: TaskQueue,
-    // pub waiting_for_page_attach: HashSet<WaitingForPageAttachTaskName>,
     pub waiting_for_page_attach_tasks: Vec<TaskDescribe>,
     pub activating: bool,
     pub closing: bool,
@@ -58,6 +59,8 @@ pub struct Tab {
     pub life_cycles: Vec<page_events::LifeCycle>,
     pub network_statistics: NetworkStatistics,
     pub box_model: Option<BoxModel>,
+    mouse_random_move_limit: Option<(u64, u64)>,
+    next_mouse_move_task: Option<TaskQueueItem>,
 }
 
 impl std::fmt::Display for Tab {
@@ -100,6 +103,8 @@ impl Tab {
             network_statistics: NetworkStatistics::default(),
             task_queue: TaskQueue::new(),
             box_model: None,
+            mouse_random_move_limit: None,
+            next_mouse_move_task: None,
         }
     }
 
@@ -648,6 +653,33 @@ impl Tab {
 
     pub fn move_mouse_random_after_secs(&mut self, delay_secs: u64) {
         self.execute_tasks_after_secs(self.move_mouse_random_tasks(), delay_secs);
+    }
+
+    fn generate_new_mouse_move_task(&mut self) {
+        if let Some((low, high)) = self.mouse_random_move_limit {
+            let delay_secs: u64 = thread_rng().gen_range(low, high);
+            let ti = TaskQueueItem::new_delayed(delay_secs, self.move_mouse_random_tasks());
+            self.next_mouse_move_task.replace(ti);
+        }
+    }
+
+    pub fn move_mouse_random_interval(&mut self) {
+        if self.mouse_random_move_limit.is_some() {
+            if let Some(task_item) = self.next_mouse_move_task.as_ref() {
+                if task_item.is_time_out() {
+                   let ti = self.next_mouse_move_task.take().expect("I have check exists first.");
+                   self.execute_tasks(ti.tasks);
+                   self.generate_new_mouse_move_task();
+                }
+            } else {
+                self.generate_new_mouse_move_task();                
+            }
+        }
+    }
+
+    pub fn set_move_mouse_random_interval(&mut self,min_delay_secs: u64, max_delay_secs: u64) {
+        // let n: u32 = thread_rng().gen_range(0, 10);
+        self.mouse_random_move_limit.replace((min_delay_secs, max_delay_secs));
     }
 
     pub fn move_mouse_random_tasks(&self) -> Vec<TaskDescribe> {

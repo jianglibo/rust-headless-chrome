@@ -43,11 +43,10 @@ pub  fn handle_target_event(
                     let target_id = target_info.target_id.clone();
                     let tab = Tab::new(target_info, Arc::clone(&debug_session.chrome_debug_session));
                     debug_session.tabs.push(tab);
-                    let idx = debug_session.tabs.len() - 1;
                     Ok(PageResponseWrapper {
                         target_id: Some(target_id),
                         task_id: None,
-                        page_response: PageResponse::ReceivedEvent(ReceivedEvent::PageCreated(idx)),
+                        page_response: PageResponse::ReceivedEvent(ReceivedEvent::PageCreated),
                     })
                 } else {
                     info!("got other target_event: {:?}", event);

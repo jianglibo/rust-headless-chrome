@@ -1,5 +1,3 @@
-use headless_chrome::browser_async::{Tab, WaitingForPageAttachTaskName};
-
 use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
 use headless_chrome::protocol::target;
 
@@ -18,13 +16,11 @@ impl GetContentInIframe {
                 self.debug_session.set_ignore_certificate_errors(true);
             }
             PageResponse::ReceivedEvent(received_event) => {
-                if let ReceivedEvent::PageCreated(_page_idx) = received_event {
+                if let ReceivedEvent::PageCreated = received_event {
                     let tab = self.get_tab(maybe_target_id).expect("tab should exists.");
-                    let tasks = vec![
-                        WaitingForPageAttachTaskName::PageEnable,
-                        WaitingForPageAttachTaskName::RuntimeEnable,
-                    ];
-                    tab.attach_to_page_and_then(tasks);
+                    tab.page_enable();
+                    tab.runtime_enable();
+                    tab.attach_to_page();
                 }
             }
             PageResponse::MethodCallDone(method_call_done) => {

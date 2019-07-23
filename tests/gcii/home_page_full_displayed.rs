@@ -1,5 +1,3 @@
-use headless_chrome::browser_async::WaitingForPageAttachTaskName;
-
 use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
 use headless_chrome::browser_async::task_describe::{runtime_tasks, HasTaskId};
 use headless_chrome::protocol::target;
@@ -85,7 +83,7 @@ impl GetContentInIframe {
                     //         .expect("tab should exists. LoadEventFired");
                     //     info!("--------->1 url: {:?}", tab.get_url());
                     // }
-                    ReceivedEvent::PageCreated(page_idx) => {
+                    ReceivedEvent::PageCreated => {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. PageCreated.");

@@ -50,7 +50,8 @@ pub use browser_call_methods::{BrowserCallMethodTask, handle_browser_method_call
 
 
 pub trait HasSessionId {
-    fn get_session_id(&self) -> target::SessionID;
+    // fn get_session_id(&self) -> target::SessionID;
+    fn set_session_id(&mut self, session_id: target::SessionID);
 }
 
 pub trait HasCallId {
@@ -61,11 +62,11 @@ pub trait HasTaskId {
     fn get_task_id(&self) -> TaskId;
     fn task_id_equal(&self, pattern: &str) -> bool;
     fn task_id_starts_with(&self, pattern: &str) -> bool;
-    // fn set_task_id(&mut self) -> &mut Self;
 }
 
 pub trait HasCommonField {
     fn get_common_fields(&self) -> &CommonDescribeFields;
+    fn get_common_fields_mut(&mut self) -> &mut CommonDescribeFields;
 }
 
 impl<T> HasCallId for T where T: HasCommonField {
@@ -198,14 +199,6 @@ pub struct CommonDescribeFields {
     pub task_id: TaskId,
     #[builder(default = "next_call_id()")]
     pub call_id: usize,
-    // #[builder(default = "0")]
-    // pub max_retry: u16,
-    // #[builder(default = "0")]
-    // pub retried: u16,
-    // #[builder(default = "false")]
-    // pub completed: bool,
-    // #[builder(default = "None")]
-    // pub next_invoke_at: Option<Instant>,
 }
 
 impl From<(Option<String>, Option<String>)> for CommonDescribeFields {

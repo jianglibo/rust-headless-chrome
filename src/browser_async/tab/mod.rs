@@ -1,30 +1,30 @@
-use super::super::browser_async::{embedded_events, TaskId, ChromeDebugSession, NetworkStatistics};
-use super::super::browser::tab::{point::Point, element::BoxModel};
+use super::super::browser::tab::{element::BoxModel, point::Point};
+use super::super::browser_async::{embedded_events, ChromeDebugSession, NetworkStatistics, TaskId};
 
+use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
-    dom_tasks, network_events, network_tasks, page_tasks, runtime_tasks, target_tasks,
-    CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, input_tasks, page_events,
+    dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks, HasSessionId,
+    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe, TargetCallMethodTask,
 };
 use super::{EventName, EventStatistics, TaskQueue};
-use super::super::protocol::{self, dom, network, page, runtime, target};
 use log::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-mod screen_shot_func;
 mod box_model_func;
 mod emulation_func;
 mod evaluate_func;
+mod screen_shot_func;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum WaitingForPageAttachTaskName {
-    RuntimeEnable,
-    PageEnable,
-    NetworkEnable,
-    SetLifecycleEventsEnabled,
-    BringToFront,
-}
+// #[derive(Debug, PartialEq, Eq, Hash)]
+// pub enum WaitingForPageAttachTaskName {
+//     RuntimeEnable,
+//     PageEnable,
+//     NetworkEnable,
+//     SetLifecycleEventsEnabled,
+//     BringToFront,
+// }
 
 // #[derive(Debug)]
 // enum TabState {
@@ -50,7 +50,8 @@ pub struct Tab {
     pub response_received: HashMap<network::RequestId, network_events::ResponseReceived>,
     pub event_statistics: EventStatistics,
     pub task_queue: TaskQueue,
-    pub waiting_for_page_attach: HashSet<WaitingForPageAttachTaskName>,
+    // pub waiting_for_page_attach: HashSet<WaitingForPageAttachTaskName>,
+    pub waiting_for_page_attach_tasks: Vec<TaskDescribe>,
     pub activating: bool,
     pub closing: bool,
     pub explicitly_close: bool,
@@ -89,7 +90,8 @@ impl Tab {
             response_received: HashMap::new(),
             created_at: Instant::now(),
             activated_at: None,
-            waiting_for_page_attach: HashSet::new(),
+            // waiting_for_page_attach: HashSet::new(),
+            waiting_for_page_attach_tasks: Vec::new(),
             activating: false,
             closing: false,
             explicitly_close: false,
@@ -149,11 +151,16 @@ impl Tab {
     }
 
     pub fn last_life_cycle_event(&self) -> &page_events::LifeCycle {
-        self.life_cycles.last().expect("when last_life_cycle_event is called, it should already have events exists.")
+        self.life_cycles
+            .last()
+            .expect("when last_life_cycle_event is called, it should already have events exists.")
     }
 
     pub fn life_cycle_event_count(&self, name: &str) -> usize {
-        self.life_cycles.iter().filter(|lc|lc.get_name() == name).count()
+        self.life_cycles
+            .iter()
+            .filter(|lc| lc.get_name() == name)
+            .count()
     }
 
     pub fn get_url(&self) -> &str {
@@ -199,13 +206,13 @@ impl Tab {
             return false;
         }
         self.activating = true;
+        let task = self.bring_to_front_task();
         if self.session_id.is_some() {
-            let task = self.bring_to_front_task();
             self.execute_one_task(task);
         } else {
-            self.waiting_for_page_attach
-                .insert(WaitingForPageAttachTaskName::BringToFront);
-            self.attach_to_page();
+            self.waiting_for_page_attach_tasks.push(task);
+                // .insert(WaitingForPageAttachTaskName::BringToFront);
+            // self.attach_to_page();
         }
         true
     }
@@ -506,7 +513,11 @@ impl Tab {
         self.get_document_task_impl(depth, Some(name.into()))
     }
 
-    fn get_document_task_impl(&mut self, depth: Option<u8>, manual_task_id: Option<TaskId>) -> TaskDescribe {
+    fn get_document_task_impl(
+        &mut self,
+        depth: Option<u8>,
+        manual_task_id: Option<TaskId>,
+    ) -> TaskDescribe {
         let task = dom_tasks::GetDocumentTaskBuilder::default()
             .common_fields(self.get_common_field(manual_task_id))
             .depth(depth)
@@ -609,14 +620,15 @@ impl Tab {
         let task = input_tasks::DispatchMouseEventTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .event_type(input_tasks::MouseEventType::Moved)
-            .x(point.map(|p|p.x))
-            .y(point.map(|p|p.y))
-            .build().expect("move_mouse_to_point should build success.");
+            .x(point.map(|p| p.x))
+            .y(point.map(|p| p.y))
+            .build()
+            .expect("move_mouse_to_point should build success.");
         task.into()
     }
 
     pub fn mouse_move_to_xy_task(&self, x: f64, y: f64) -> TaskDescribe {
-        self.mouse_move_to_point_task(Some(Point {x, y}))
+        self.mouse_move_to_point_task(Some(Point { x, y }))
     }
 
     pub fn execute_task_after_secs(&mut self, task: TaskDescribe, delay_secs: u64) {
@@ -629,7 +641,8 @@ impl Tab {
 
     pub fn execute_tasks_in_interval(&mut self, tasks: Vec<TaskDescribe>, delay_secs: u64) {
         for (idx, v) in tasks.into_iter().enumerate() {
-            self.task_queue.add_delayed(v, delay_secs * ((idx + 1) as u64))
+            self.task_queue
+                .add_delayed(v, delay_secs * ((idx + 1) as u64))
         }
     }
 
@@ -638,39 +651,47 @@ impl Tab {
     }
 
     pub fn move_mouse_random_tasks(&self) -> Vec<TaskDescribe> {
-        vec![self.mouse_move_to_xy_task(100.0, 100.0),
-             self.mouse_move_to_xy_task(200.0, 200.0),
-             self.mouse_move_to_xy_task(300.0, 300.0),
-             ]
+        vec![
+            self.mouse_move_to_xy_task(100.0, 100.0),
+            self.mouse_move_to_xy_task(200.0, 200.0),
+            self.mouse_move_to_xy_task(300.0, 300.0),
+        ]
     }
 
     pub fn mouse_press_at_point_task(&self, point: Option<Point>) -> TaskDescribe {
         let task = input_tasks::DispatchMouseEventTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .event_type(input_tasks::MouseEventType::Pressed)
-            .x(point.map(|p|p.x))
-            .y(point.map(|p|p.y))
+            .x(point.map(|p| p.x))
+            .y(point.map(|p| p.y))
             .button(input_tasks::MouseButton::Left)
             .click_count(1)
-            .build().expect("mouse_press_at_point_task should build success.");
+            .build()
+            .expect("mouse_press_at_point_task should build success.");
         task.into()
     }
-    
     pub fn mouse_release_at_point(&self, point: Option<Point>) -> TaskDescribe {
         let task = input_tasks::DispatchMouseEventTaskBuilder::default()
             .common_fields(self.get_common_field(None))
             .event_type(input_tasks::MouseEventType::Released)
-            .x(point.map(|p|p.x))
-            .y(point.map(|p|p.y))
+            .x(point.map(|p| p.x))
+            .y(point.map(|p| p.y))
             .button(input_tasks::MouseButton::Left)
             .click_count(1)
-            .build().expect("mouse_press_at_point_task should build success.");
+            .build()
+            .expect("mouse_press_at_point_task should build success.");
         task.into()
     }
 
-    pub fn mouse_click_on_remote_object_task(&self, remote_object_id: runtime::RemoteObjectId) -> Vec<TaskDescribe> {
+    pub fn mouse_click_on_remote_object_task(
+        &self,
+        remote_object_id: runtime::RemoteObjectId,
+    ) -> Vec<TaskDescribe> {
         let mut tasks = self.mouse_click_on_point_task(None);
-        tasks.insert(0, self.get_content_quads_by_object_id_task(remote_object_id));
+        tasks.insert(
+            0,
+            self.get_content_quads_by_object_id_task(remote_object_id),
+        );
         tasks
     }
 
@@ -680,52 +701,69 @@ impl Tab {
     }
 
     pub fn mouse_click_on_point_task(&self, point: Option<Point>) -> Vec<TaskDescribe> {
-        vec![self.mouse_move_to_point_task(point), self.mouse_press_at_point_task(point), self.mouse_release_at_point(point)]
+        vec![
+            self.mouse_move_to_point_task(point),
+            self.mouse_press_at_point_task(point),
+            self.mouse_release_at_point(point),
+        ]
     }
 
-    pub fn get_content_quads_by_object_id_task_named(&self, remote_object_id: runtime::RemoteObjectId, name: &str) -> TaskDescribe {
+    pub fn get_content_quads_by_object_id_task_named(
+        &self,
+        remote_object_id: runtime::RemoteObjectId,
+        name: &str,
+    ) -> TaskDescribe {
         let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
-            builder.common_fields(self.get_common_field(Some(name.into())))
+        builder
+            .common_fields(self.get_common_field(Some(name.into())))
             .object_id(remote_object_id);
         self.get_content_quads_task(builder)
     }
 
-    pub fn get_content_quads_by_object_id_task(&self, remote_object_id: runtime::RemoteObjectId) -> TaskDescribe {
+    pub fn get_content_quads_by_object_id_task(
+        &self,
+        remote_object_id: runtime::RemoteObjectId,
+    ) -> TaskDescribe {
         let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
-            builder.common_fields(self.get_common_field(None))
+        builder
+            .common_fields(self.get_common_field(None))
             .object_id(remote_object_id);
         self.get_content_quads_task(builder)
     }
 
-    pub fn get_content_quads_by_backend_node_id_task(&self, backend_node_id: dom::NodeId) -> TaskDescribe {
+    pub fn get_content_quads_by_backend_node_id_task(
+        &self,
+        backend_node_id: dom::NodeId,
+    ) -> TaskDescribe {
         let mut builder = dom_tasks::GetContentQuadsTaskBuilder::default();
-            builder.common_fields(self.get_common_field(None))
+        builder
+            .common_fields(self.get_common_field(None))
             .backend_node_id(backend_node_id);
         self.get_content_quads_task(builder)
     }
 
-    pub fn get_content_quads_task(&self, mut get_content_quads_task_builder: dom_tasks::GetContentQuadsTaskBuilder) -> TaskDescribe {
-        let task = get_content_quads_task_builder.common_fields(self.get_common_field(None)).build().expect("GetContentQuadsTaskBuilder should success.");
+    pub fn get_content_quads_task(
+        &self,
+        mut get_content_quads_task_builder: dom_tasks::GetContentQuadsTaskBuilder,
+    ) -> TaskDescribe {
+        let task = get_content_quads_task_builder
+            .common_fields(self.get_common_field(None))
+            .build()
+            .expect("GetContentQuadsTaskBuilder should success.");
         task.into()
     }
-
-
 
     pub fn get_layout_metrics(&mut self) {
         self.get_layout_metrics_impl(None);
     }
 
-    fn get_layout_metrics_impl(&mut self,
-        name: Option<&str>,
-    ) {
+    fn get_layout_metrics_impl(&mut self, name: Option<&str>) {
         let task = page_tasks::GetLayoutMetricsTaskBuilder::default()
             .common_fields(self.get_common_field(name.map(Into::into)))
             .build()
             .expect("build GetLayoutMetricsTaskBuilder should success.");
         self.execute_one_task(task.into());
     }
-
-
 
     pub fn get_common_field(&self, manual_task_id: Option<TaskId>) -> CommonDescribeFields {
         CommonDescribeFieldsBuilder::default()
@@ -779,10 +817,15 @@ impl Tab {
 
     pub fn page_enable(&mut self) {
         let task = self.page_enable_task();
-        self.execute_one_task(task);
+        if self.session_id.is_some() {
+            self.execute_one_task(task);
+        } else {
+            self.waiting_for_page_attach_tasks.push(task);
+        }
+        
     }
 
-    pub fn page_enable_task(&self) -> TaskDescribe {
+    fn page_enable_task(&self) -> TaskDescribe {
         page_tasks::PageEnableTask {
             common_fields: self.get_common_field(None),
         }
@@ -791,19 +834,34 @@ impl Tab {
 
     pub fn lifecycle_events_enable(&mut self) {
         let task = self.lifecycle_events_enable_task();
-        self.execute_one_task(task);
+        if self.session_id.is_none() {
+            self.waiting_for_page_attach_tasks.push(task);
+        } else {
+            self.execute_one_task(task);
+        }
     }
 
-    pub fn lifecycle_events_enable_task(&self) -> TaskDescribe {
-        page_tasks::SetLifecycleEventsEnabledTaskBuilder::default().common_fields(self.get_common_field(None)).enabled(true).build().expect("SetRequestInterceptionTaskBuilder should success.").into()
+    fn lifecycle_events_enable_task(&self) -> TaskDescribe {
+        page_tasks::SetLifecycleEventsEnabledTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .enabled(true)
+            .build()
+            .expect("SetRequestInterceptionTaskBuilder should success.")
+            .into()
     }
 
-    pub fn runtime_enable_named(&mut self, name: &str) {
-        self.runtime_enable_impl(Some(name));
-    }
+    // pub fn runtime_enable_named(&mut self, name: &str) {
+    //     self.runtime_enable_impl(Some(name));
+    // }
 
     pub fn runtime_enable(&mut self) {
-        self.runtime_enable_impl(None);
+        let task = self.runtime_enable_task_impl(None);
+        if self.session_id.is_none() {
+            self.waiting_for_page_attach_tasks.push(task);
+        } else {
+            self.execute_one_task(task);
+        }
+        // self.runtime_enable_impl(None);
     }
 
     pub fn runtime_enable_task(&mut self) -> TaskDescribe {
@@ -815,14 +873,18 @@ impl Tab {
         runtime_tasks::RuntimeEnableTask { common_fields }.into()
     }
 
-    fn runtime_enable_impl(&mut self, name: Option<&str>) {
-        let task = self.runtime_enable_task_impl(name);
-        self.execute_one_task(task);
-    }
+    // fn runtime_enable_impl(&mut self, name: Option<&str>) {
+    //     let task = self.runtime_enable_task_impl(name);
+    //     self.execute_one_task(task);
+    // }
 
     pub fn network_enable(&mut self) {
         let task = self.network_enable_task_impl(None);
-        self.execute_one_task(task);
+        if self.session_id.is_none() {
+            self.waiting_for_page_attach_tasks.push(task);
+        } else {
+            self.execute_one_task(task);
+        }
     }
 
     pub fn network_enable_named(&mut self, name: &str) {
@@ -838,7 +900,6 @@ impl Tab {
             .expect("NetworkEnableTaskBuilder should work.");
         nwe.into()
     }
-
 
     /// let fnd = "function() {return this.getAttribute('src');}";
     pub fn call_function_on_named(
@@ -856,8 +917,17 @@ impl Tab {
         self.call_function_on_impl(call_function_on_task_builder, None);
     }
 
-    pub fn get_js_midpoint_task(&self, remote_object_id: runtime::RemoteObjectId, name: Option<&str>) -> TaskDescribe {
-        self.call_function_on_remote_object_task(name, remote_object_id, "function(){ return this.getBoundingClientRect();}", Some(true))
+    pub fn get_js_midpoint_task(
+        &self,
+        remote_object_id: runtime::RemoteObjectId,
+        name: Option<&str>,
+    ) -> TaskDescribe {
+        self.call_function_on_remote_object_task(
+            name,
+            remote_object_id,
+            "function(){ return this.getBoundingClientRect();}",
+            Some(true),
+        )
     }
     // pub fn call_js_fn(
     //     &self,
@@ -878,21 +948,23 @@ impl Tab {
     //         .result;
     //     Ok(result)
     // }
-    pub fn call_function_on_remote_object_task(&self, 
+    pub fn call_function_on_remote_object_task(
+        &self,
         name: Option<&str>,
         remote_object_id: runtime::RemoteObjectId,
         fnd: &str,
         generate_preview: Option<bool>,
-        ) -> TaskDescribe {
-            self.call_function_on_remote_object_task_impl(name, remote_object_id, fnd, generate_preview)
-        }
+    ) -> TaskDescribe {
+        self.call_function_on_remote_object_task_impl(name, remote_object_id, fnd, generate_preview)
+    }
 
-    fn call_function_on_remote_object_task_impl(&self, 
+    fn call_function_on_remote_object_task_impl(
+        &self,
         name: Option<&str>,
         remote_object_id: runtime::RemoteObjectId,
         fnd: &str,
         generate_preview: Option<bool>,
-        ) -> TaskDescribe {
+    ) -> TaskDescribe {
         let task = runtime_tasks::CallFunctionOnTaskBuilder::default()
             .common_fields(self.get_common_field(name.map(Into::into)))
             .object_id(remote_object_id)
@@ -912,16 +984,17 @@ impl Tab {
         self.execute_one_task(task);
     }
 
-    fn call_function_on_task_impl(&self,
+    fn call_function_on_task_impl(
+        &self,
         mut call_function_on_task_builder: runtime_tasks::CallFunctionOnTaskBuilder,
-        name: Option<&str>) -> TaskDescribe {
+        name: Option<&str>,
+    ) -> TaskDescribe {
         let task = call_function_on_task_builder
             .common_fields(self.get_common_field(name.map(Into::into)))
-            .build().expect("build call_function_on task error.");
+            .build()
+            .expect("build call_function_on task error.");
         task.into()
     }
-
-
 
     pub fn name_the_page(&mut self, page_name: &'static str) {
         self.page_name = Some(page_name);
@@ -931,36 +1004,35 @@ impl Tab {
         self.page_name == Some(page_name)
     }
 
-    // pub fn attach_to_page(&mut self) {
-    //     let method_str = create_msg_to_send(
-    //         target::methods::AttachToTarget {
-    //             target_id: &(self.target_info.target_id),
-    //             flatten: None,
-    //         },
-    //         MethodDestination::Browser,
-    //         next_call_id(),
-    //     );
-    //     self.chrome_session
-    //         .lock()
-    //         .expect("obtain chrome_session should success.")
-    //         .send_message_direct(method_str);
-    // }
-
     pub fn page_attached(&mut self, session_id: target::SessionID) {
+        let session_id_cloned = session_id.clone();
         self.session_id.replace(session_id);
-        let task_names: Vec<WaitingForPageAttachTaskName> =
-            self.waiting_for_page_attach.drain().collect();
 
-        let tasks: Vec<TaskDescribe> = task_names
-            .iter()
-            .map(|n| match n {
-                WaitingForPageAttachTaskName::BringToFront => self.bring_to_front_task(),
-                WaitingForPageAttachTaskName::PageEnable => self.page_enable_task(),
-                WaitingForPageAttachTaskName::RuntimeEnable => self.runtime_enable_task(),
-                WaitingForPageAttachTaskName::SetLifecycleEventsEnabled => self.lifecycle_events_enable_task(),
-                WaitingForPageAttachTaskName::NetworkEnable => self.network_enable_task_impl(None),
-            })
+        let tasks: Vec<TaskDescribe> = self.waiting_for_page_attach_tasks.drain(..).into_iter()
+            .filter_map(|td| if let TaskDescribe::TargetCallMethod(mut task) = td {
+                    task.set_session_id(session_id_cloned.clone());
+                    Some(task.into())
+                } else {
+                    None
+                }
+            )
             .collect();
+
+        // let task_names: Vec<WaitingForPageAttachTaskName> =
+        //     self.waiting_for_page_attach.drain().collect();
+
+        // let tasks: Vec<TaskDescribe> = task_names
+        //     .iter()
+        //     .map(|n| match n {
+        //         WaitingForPageAttachTaskName::BringToFront => self.bring_to_front_task(),
+        //         WaitingForPageAttachTaskName::PageEnable => self.page_enable_task(),
+        //         WaitingForPageAttachTaskName::RuntimeEnable => self.runtime_enable_task(),
+        //         WaitingForPageAttachTaskName::SetLifecycleEventsEnabled => {
+        //             self.lifecycle_events_enable_task()
+        //         }
+        //         WaitingForPageAttachTaskName::NetworkEnable => self.network_enable_task_impl(None),
+        //     })
+        //     .collect();
         self.execute_tasks(tasks);
     }
 
@@ -969,12 +1041,12 @@ impl Tab {
         self.execute_one_task(task);
     }
 
-    pub fn attach_to_page_and_then(&mut self, tasks: Vec<WaitingForPageAttachTaskName>) {
-        tasks.into_iter().for_each(|it| {
-            self.waiting_for_page_attach.insert(it);
-        });
-        self.attach_to_page();
-    }
+    // pub fn attach_to_page_and_then(&mut self, tasks: Vec<WaitingForPageAttachTaskName>) {
+    //     tasks.into_iter().for_each(|it| {
+    //         self.waiting_for_page_attach.insert(it);
+    //     });
+    //     self.attach_to_page();
+    // }
 
     pub fn attach_to_page_task(&mut self) -> TaskDescribe {
         let task = page_tasks::AttachToTargetTaskBuilder::default()

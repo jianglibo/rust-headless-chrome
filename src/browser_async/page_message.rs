@@ -46,7 +46,7 @@ impl std::default::Default for PageResponseWrapper {
 
 #[derive(Debug)]
 pub enum ReceivedEvent {
-    PageCreated(usize),
+    PageCreated,
     PageAttached(target::TargetInfo, target::SessionID),
     LifeCycle,
     FrameAttached(page::FrameId),

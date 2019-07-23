@@ -28,7 +28,7 @@ use crate::protocol::{self, target};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use log::*;
 
-pub use tab::{Tab, WaitingForPageAttachTaskName};
+pub use tab::{Tab};
 pub use browser_context::{BrowserContext, BrowserContexts};
 
 pub type TaskId = String;

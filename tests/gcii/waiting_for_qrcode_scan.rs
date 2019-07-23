@@ -18,7 +18,7 @@ impl GetContentInIframe {
         if let PageResponse::ReceivedEvent(received_event) = page_response {
             match received_event {
                 // be carefull, this PageCreated event may not fire.
-                ReceivedEvent::PageCreated(_page_idx) => {
+                ReceivedEvent::PageCreated => {
                     // let tab = self.get_tab(maybe_target_id).expect("tab should exists.");
                     // let tasks = vec![
                     //     WaitingForPageAttachTaskName::PageEnable,

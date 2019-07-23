@@ -2,10 +2,11 @@ use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks, emu
 
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{PageResponse, PageResponseWrapper, MethodCallDone};
-use crate::protocol::target;
+use super::super::protocol::target;
+use super::{TaskDescribe};
 use log::*;
 
-use super::{HasCallId, HasTaskId};
+use super::{HasCallId, HasTaskId, HasSessionId, HasCommonField};
 
 #[derive(Debug)]
 pub enum TargetCallMethodTask {
@@ -35,6 +36,45 @@ pub enum TargetCallMethodTask {
     CanEmulate(emulation_tasks::CanEmulateTask),
     SetDeviceMetricsOverride(emulation_tasks::SetDeviceMetricsOverrideTask),
 }
+
+impl std::convert::From<TargetCallMethodTask> for TaskDescribe {
+    fn from(event: TargetCallMethodTask) -> Self {
+        TaskDescribe::TargetCallMethod(event)
+    }
+}
+
+impl HasSessionId for TargetCallMethodTask {
+    fn set_session_id(&mut self, session_id: target::SessionID) {
+        match self {
+            TargetCallMethodTask::NavigateTo(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::QuerySelector(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::DescribeNode(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::PrintToPDF(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::GetBoxModel(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::GetContentQuads(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::GetDocument(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::PageEnable(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::RuntimeEnable(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::CaptureScreenshot(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::Evaluate(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::GetProperties(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::RuntimeCallFunctionOn(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::NetworkEnable(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::SetRequestInterception(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::ContinueInterceptedRequest(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::GetResponseBodyForInterception(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::PageReload(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::GetLayoutMetrics(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::BringToFront(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::PageClose(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::DispatchMouseEvent(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::CanEmulate(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::SetDeviceMetricsOverride(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::SetLifecycleEventsEnabled(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+        }
+    }
+}
+
 
 impl HasCallId for TargetCallMethodTask {
     fn get_call_id(&self) -> usize {

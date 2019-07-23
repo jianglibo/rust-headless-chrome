@@ -54,6 +54,9 @@ macro_rules! impl_has_common_fields {
             fn get_common_fields(&self) -> &CommonDescribeFields {
                 &self.common_fields
             }
+            fn get_common_fields_mut(&mut self) -> &mut CommonDescribeFields {
+                &mut self.common_fields
+            }
         }
     };
 }

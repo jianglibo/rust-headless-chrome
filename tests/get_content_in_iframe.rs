@@ -38,6 +38,13 @@ impl Future for GetContentInIframe {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
+
+                    if seconds % 30 == 0 {
+                        self.debug_session.close_tab_old_than(600);
+                        if self.debug_session.tab_count() < 2 {
+                            self.debug_session.run_manually_tasks();
+                        }
+                    }
                     if seconds % 20 == 0 {
                         info!("{:?}", self.state);
                         for t in self.debug_session.tabs.iter_mut() {

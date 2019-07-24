@@ -131,13 +131,20 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
 
-                        let object_id = task
+                        // let object_id = 
+                        task
                             .get_array_of_remote_object_id()
-                            .get(0)
-                            .cloned()
-                            .cloned()
-                            .expect("object_id should exists.");
-                        tab.mouse_click_on_remote_object(object_id);
+                            .iter()
+                            .map(|&oid|oid.to_string())
+                            .for_each(|oid|{
+                                let task = tab.mouse_click_on_remote_object_task(oid);
+                                tab.execute_task_manually_later(task);
+                            });
+                            // .get(0)
+                            // .cloned()
+                            // .cloned()
+                            // .expect("object_id should exists.");
+                        // tab.mouse_click_on_remote_object(object_id);
                     }
                     MethodCallDone::GetContentQuads(task) => {
                         info!("-------------{:?}", task);

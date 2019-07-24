@@ -89,6 +89,14 @@ impl DebugSession {
         }
     }
 
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+
+    pub fn run_manually_tasks(&mut self) {
+        self.tabs.iter_mut().for_each(Tab::run_task_queue_manually);
+    }
+
     pub fn loaded_by_this_tab_name_mut(&mut self, name: &str) -> Vec<&mut Tab> {
         if let Ok(tab) = self.find_tab_by_name(name) {
             let target_id = tab.target_info.target_id.clone();
@@ -108,6 +116,10 @@ impl DebugSession {
 
     pub fn find_tabs_old_than(&mut self, secs: u64) -> Vec<&mut Tab> {
         self.tabs.iter_mut().filter(|tb|!tb.explicitly_close).filter(|tb|tb.created_at.elapsed().as_secs() > secs).collect()
+    }
+
+    pub fn close_tab_old_than(&mut self, secs: u64) {
+        self.find_tabs_old_than(secs).into_iter().for_each(Tab::page_close);
     }
 
     pub fn find_last_opened_tab(&mut self) -> Option<&mut Tab> {
@@ -213,18 +225,6 @@ impl DebugSession {
     pub fn tab_closed(&mut self, target_id: &str) {
         self.tabs.retain(|tb|tb.target_info.target_id != target_id);
     }
-
-    // pub fn tab_closed(&mut self, maybe_target_id: Option<&target::TargetId>, task_result: Option<bool>) {
-    //     if let Some(yes) = task_result {
-    //         if yes {
-    //             self.tabs.retain(|tb|Some(&tb.target_info.target_id) != maybe_target_id);
-    //         } else {
-    //             error!("close tab return false.");
-    //         }
-    //     } else {
-    //         error!("close tab return empty reuslt.");
-    //     }
-    // }
 
     pub fn bring_to_front_responded(&mut self, maybe_target_id: Option<target::TargetId>) -> Result<(), failure::Error> {
         self.tabs.iter_mut().for_each(|tb|{tb.activated_at.take();});

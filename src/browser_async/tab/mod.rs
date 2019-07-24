@@ -640,6 +640,10 @@ impl Tab {
         self.task_queue.add_delayed(task, delay_secs);
     }
 
+    pub fn execute_task_manually_later(&mut self, tasks: Vec<TaskDescribe>) {
+        self.task_queue.add_manually_many(tasks);
+    }
+
     pub fn execute_tasks_after_secs(&mut self, tasks: Vec<TaskDescribe>, delay_secs: u64) {
         self.task_queue.add_delayed_many(tasks, delay_secs);
     }

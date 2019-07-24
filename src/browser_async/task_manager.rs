@@ -377,8 +377,9 @@ impl TaskManager {
             .position(|tg| tg.issued_at.elapsed().as_secs() > issued_at_before_secs);
         if let Some(idx) = idx_op {
             let mut tg = self.task_groups_waiting_for_response.remove(idx);
-            if tg.retried < 10 {
+            if tg.retried < 3 {
                 tg.retried += 1;
+                tg.issued_at = Instant::now();
                 return Some(tg);
             }
         }

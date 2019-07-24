@@ -40,9 +40,12 @@ impl Future for GetContentInIframe {
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
 
                     if seconds % 30 == 0 {
-                        self.debug_session.close_tab_old_than(600);
+                        self.debug_session.close_tab_old_than(100);
                         if self.debug_session.tab_count() < 2 {
+                            info!("************** tab_count: {:?}", self.debug_session.tab_count());
                             self.debug_session.run_manually_tasks();
+                        } else {
+                            info!("************** tab_count: {:?}", self.debug_session.tab_count());
                         }
                     }
                     if seconds % 20 == 0 {
@@ -56,7 +59,7 @@ impl Future for GetContentInIframe {
                                 info!("box_model: {:?}", t.box_model);
                             }
                         }
-                        self.debug_session.browser_contexts().deduplicate();
+                        // self.debug_session.browser_contexts().deduplicate();
                         // self.debug_session.activates_next_in_interval(10);
                         // self.debug_session.activate_last_opened_tab();
                         let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
@@ -76,7 +79,11 @@ impl Future for GetContentInIframe {
                         }
                     }
 
-                    self.debug_session.activates_next_in_interval(3);
+
+                    if let Ok(tab) = self.debug_session.find_tab_not_in_name_mut(HOME_URL) {
+                        tab.bring_to_front();
+                    }
+                    // self.debug_session.activates_next_in_interval(3);
                     // if let Some(tab) = self
                     //     .debug_session
                     //     .loaded_by_this_tab_name_mut(HOME_URL)

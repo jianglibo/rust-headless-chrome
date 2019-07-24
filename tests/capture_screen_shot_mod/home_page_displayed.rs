@@ -33,7 +33,7 @@ impl CaptureScreenShotTest {
                         // let set_metrics = tab.set_device_metrics_override_simple_task(1000, 20000);
                         // tab.execute_one_task(set_metrics);
                         let mut tasks = tab.display_full_page_task();
-                        tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None));
+                        tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/abc.jpeg")));
                         tab.execute_tasks_after_secs(tasks, 6);
                         // tab.evaluate_expression_named(r##"document.hidden"##, "document.hidden");
                         // tab.evaluate_expression_named(r##"document.visibilityState"##, "document.visibilityState");
@@ -63,10 +63,10 @@ impl CaptureScreenShotTest {
                             "target/abc.jpeg"
                         };
                         let path = Path::new(file_name);
-                        if path.exists() && path.is_file() {
-                            fs::remove_file(file_name).unwrap();
-                        }
-                        write_base64_str_to(file_name, capture_screen_shot.task_result).expect("write success.");
+                        // if path.exists() && path.is_file() {
+                        //     fs::remove_file(file_name).unwrap();
+                        // }
+                        // write_base64_str_to(file_name, capture_screen_shot.task_result).expect("write success.");
                         assert!(path.exists());
                     }
                     MethodCallDone::GetLayoutMetrics(task) => {

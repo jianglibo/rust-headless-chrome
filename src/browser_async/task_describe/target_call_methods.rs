@@ -116,11 +116,11 @@ pub fn handle_target_method_call(
         TargetCallMethodTask::GetDocument(task) => {
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             tab.root_node = task.task_result.clone();
-            return Ok(PageResponseWrapper {
+            Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
                 page_response: PageResponse::MethodCallDone(MethodCallDone::GetDocument(task)),
-            });
+            })
         }
         TargetCallMethodTask::NavigateTo(task) => {
             trace!("navigate_to task returned: {:?}", task);
@@ -188,6 +188,7 @@ pub fn handle_target_method_call(
             })
         }
         TargetCallMethodTask::CaptureScreenshot(task) => {
+            task.save()?;
             Ok(PageResponseWrapper {
                 target_id: maybe_target_id,
                 task_id: Some(task.get_task_id()),
@@ -217,7 +218,7 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::SetRequestInterception(_task) => {
             trace!("ignored method return SetRequestInterception");
-            return Ok(PageResponseWrapper::default());
+            Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::NetworkEnable(_task) => {
             trace!("ignored method return. NetworkEnable");

@@ -1,6 +1,8 @@
-use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
+use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent, write_base64_str_to};
 use headless_chrome::browser_async::task_describe::{runtime_tasks, HasTaskId};
-use headless_chrome::protocol::target;
+use headless_chrome::protocol::{target, page};
+use std::fs;
+use std::path::Path;
 use log::*;
 
 use super::{GetContentInIframe, HOME_URL, SHENBIAN_GANDONG_URL};
@@ -75,7 +77,9 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. LoadEventFired");
                         info!("---------> url: {:?}", tab.get_url());
-                        tab.move_mouse_random_after_secs(6);
+                        // tab.move_mouse_random_after_secs(6);
+                        let tasks = vec![tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg"))];
+                        tab.execute_tasks_after_secs(tasks, 6);
                     }
                     ReceivedEvent::PageCreated => {
                         let tab = self
@@ -84,11 +88,12 @@ impl GetContentInIframe {
                         assert!(tab.session_id.is_none());
                         info!("page created: {:?}", tab);
                         tab.page_enable();
+                        tab.runtime_enable();
                         tab.network_enable();
-                        tab.set_move_mouse_random_interval(8, 20);
+                        // tab.set_move_mouse_random_interval(8, 20);
                         tab.attach_to_page();
                     }
-                    evv => {
+                    _evv => {
                         // let tab = self
                         //     .get_tab(maybe_target_id)
                         //     .expect("tab should exists. LoadEventFired");
@@ -122,6 +127,14 @@ impl GetContentInIframe {
                             tab.evaluate_expression_named(r##"document.hidden"##, "dh");
                             // tab.task_queue.add_delayed(task, 3);
                         }
+                    }
+
+                    MethodCallDone::CaptureScreenshot(capture_screen_shot) => {
+                        // info!("got screen shot: {:?}", capture_screen_shot.task_result);
+                        info!("got screen shot: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                        assert!(capture_screen_shot.task_result.is_some());
+                        let path = Path::new("target/gcii.jpeg");
+                        assert!(path.exists());
                     }
                     MethodCallDone::GetProperties(task) => {
                         info!("{:?}", task);

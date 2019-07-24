@@ -207,6 +207,18 @@ impl DebugSession {
         }
     }
 
+    pub fn find_tab_not_in_name_mut(&mut self, name: &str) -> Result<&mut Tab, failure::Error> {
+        if let Some(tab) = self
+            .tabs
+            .iter_mut()
+            .find(|t| t.page_name != Some(name))
+        {
+            Ok(tab)
+        } else {
+            Err(ChromePageError::TabNotFound.into())
+        }  
+    }
+
     pub fn find_tab_by_name_mut(
         &mut self,
         name: &str,

@@ -660,10 +660,12 @@ impl Tab {
     }
 
     fn generate_new_mouse_move_task(&mut self) {
-        if let Some((low, high)) = self.mouse_random_move_limit {
-            let delay_secs: u64 = thread_rng().gen_range(low, high);
-            let ti = TaskQueueItem::new_delayed(delay_secs, self.move_mouse_random_tasks());
-            self.next_mouse_move_task.replace(ti);
+        if self.session_id.is_some() {
+            if let Some((low, high)) = self.mouse_random_move_limit {
+                let delay_secs: u64 = thread_rng().gen_range(low, high);
+                let ti = TaskQueueItem::new_delayed(delay_secs, self.move_mouse_random_tasks());
+                self.next_mouse_move_task.replace(ti);
+            }
         }
     }
 
@@ -676,7 +678,7 @@ impl Tab {
                    self.generate_new_mouse_move_task();
                 }
             } else {
-                self.generate_new_mouse_move_task();                
+                self.generate_new_mouse_move_task();
             }
         }
     }

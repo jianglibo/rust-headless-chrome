@@ -79,8 +79,9 @@ impl GetContentInIframe {
                         info!("---------> url: {:?}", tab.get_url());
                         assert!(tab.get_url().contains("/lgpage/detail/"));
                         assert_eq!(tab.page_name, Some(DETAIL_PAGE));
-                        let tt = tab.mouse_move_to_xy_task(101.0, 101.0);
-                        tab.execute_tasks_after_secs(vec![tt], 66);
+                        // let tt = tab.mouse_move_to_xy_task(101.0, 101.0);
+                        // tab.execute_tasks_after_secs(vec![tt], 66);
+                        tab.move_mouse_random_after_secs(60);
                         // let tasks = vec![tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg"))];
                         let mut tasks = tab.display_full_page_task();
                         tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg")));

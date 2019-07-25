@@ -707,7 +707,6 @@ impl Tab {
         vec![
             self.mouse_move_to_xy_task(100.0, 100.0),
             self.mouse_move_to_xy_task(200.0, 200.0),
-            self.mouse_move_to_xy_task(300.0, 300.0),
         ]
     }
 

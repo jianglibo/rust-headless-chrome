@@ -224,6 +224,8 @@ impl TaskGroup {
                     // Other events should lookup for mouse move tasks.
                 }
             }
+        } else {
+            trace!("mouse dispatch alreay has x and y.");
         }
         self.waiting_tasks.insert(0, dispatch_mouse_event.into());
     }

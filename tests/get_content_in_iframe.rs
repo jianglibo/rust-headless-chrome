@@ -49,16 +49,17 @@ impl Future for GetContentInIframe {
                             info!("************** tab_count: {:?}", self.debug_session.tab_count());
                         }
                     }
-                    if seconds % 20 == 0 {
+                    if seconds % 30 == 0 {
                         info!("{:?}", self.state);
                         for t in self.debug_session.tabs.iter_mut() {
                             // t.move_mouse_random_after_secs(1);
-                            let rs = t.network_statistics.list_request_urls_end_with("/pclog");
-                            if !rs.is_empty() {
+                            let rs = t.network_statistics.list_request_urls();
+                            // if !rs.is_empty() {
                                 info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
-                                info!("requested urls: {:?}", rs);
+                                info!("requested urls {:?}: {:?}",rs.len(), rs);
                                 info!("box_model: {:?}", t.box_model.as_ref().and_then(|_|Some("exists.")));
-                            }
+                                info!("task queue {:?}, {:?}: {:?}", t.task_queue.vec_len(), t.task_queue.item_len(), t.task_queue);
+                            // }
                         }
                         // self.debug_session.browser_contexts().deduplicate();
                         // self.debug_session.activates_next_in_interval(10);
@@ -84,9 +85,9 @@ impl Future for GetContentInIframe {
                             info!("activating {:?}", tab);
                         }
 
-                        if seconds % 100 == 0 {
-                            info!("detail page: {:?}", tab);
-                        }
+                        // if seconds % 100 == 0 {
+                        //     info!("detail page: {:?}", tab);
+                        // }
                         // if seconds > 100 && seconds % 20 == 0 && tab.session_id.is_some() {
                         //     // let mut rng = rand::thread_rng();
                         //     // let (x, y): (u64, u64) = (rng.gen_range(0, 300), rng.gen_range(0, 300));

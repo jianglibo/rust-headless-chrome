@@ -18,6 +18,14 @@ impl TaskQueueItem {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.tasks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
+
     pub fn new_mannuly(tasks: Vec<TaskDescribe>) -> Self {
         Self {
             issued_at: Instant::now(),
@@ -56,6 +64,14 @@ impl TaskQueue {
         Self {
             task_items: Vec::new(),
         }
+    }
+
+    pub fn vec_len(&self) -> usize {
+        self.task_items.len()
+    }
+
+    pub fn item_len(&self) -> usize {
+        self.task_items.iter().map(TaskQueueItem::len).sum()
     }
 
     pub fn add_manually_many(&mut self, tasks: Vec<TaskDescribe>) {
@@ -98,8 +114,6 @@ impl TaskQueue {
             None
         }
     }
-
-
 }
 
 // #[cfg(test)]

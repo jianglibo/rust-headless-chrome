@@ -2,10 +2,12 @@ pub mod create_target;
 pub mod set_discover_target_task;
 pub mod target_events;
 pub mod close_target;
+pub mod activate_target;
 
 pub use create_target::{CreateTargetTask, CreateTargetTaskBuilder};
 pub use close_target::{CloseTargetTask, CloseTargetTaskBuilder};
 pub use set_discover_target_task::{SetDiscoverTargetsTask, SetDiscoverTargetsTaskBuilder};
+pub use activate_target::{ActivateTargetTask, ActivateTargetTaskBuilder};
 
 use crate::browser_async::{DebugSession, Tab};
 use crate::browser_async::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};

@@ -12,6 +12,7 @@ mod home_page_full_displayed;
 pub const HOME_URL: &str = "https://www.xuexi.cn/";
 pub const LOGIN_URL: &str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 pub const SHENBIAN_GANDONG_URL: &str = "https://www.xuexi.cn/2b50c77aa08a2621e69cdc7cb29e7d4b/b87d700beee2c44826a9202c75d18c85.html";
+pub const DETAIL_PAGE: &str = "detail_page";
 
 #[derive(Debug)]
 pub enum PageState {

@@ -1,11 +1,10 @@
 use headless_chrome::browser_async::page_message::{
-    write_base64_str_to, MethodCallDone, PageResponse, ReceivedEvent,
+    MethodCallDone, PageResponse, ReceivedEvent,
 };
 
 use headless_chrome::protocol::{target, page};
 use log::*;
 
-use std::fs;
 use std::path::Path;
 
 use super::{CaptureScreenShotTest, HOME_URL};

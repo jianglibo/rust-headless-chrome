@@ -114,7 +114,18 @@ pub mod events {
 pub mod methods {
     use serde::{Deserialize, Serialize};
 
-    use crate::protocol::Method;
+    use super::super::{Method, EmptyReturnObject};
+
+    #[derive(Serialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ActivateTarget {
+        pub target_id: super::TargetId,
+    }
+
+    impl Method for ActivateTarget {
+        const NAME: &'static str = "Target.activateTarget";
+        type ReturnObject = EmptyReturnObject;
+    }
 
     #[derive(Serialize, Debug)]
     pub struct GetTargets {}

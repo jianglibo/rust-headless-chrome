@@ -354,19 +354,22 @@ impl ChromeDebugSession {
             },
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => {
-                    info!("nothing to full fill: {:?}", task);
+                    info!("nothing to full fill CreateTarget:: {:?}", task);
                 }
                 BrowserCallMethodTask::SetDiscoverTargets(task) => {
-                    info!("nothing to full fill:: {:?}", task);
+                    info!("nothing to full fill SetDiscoverTargets:: {:?}", task);
                 }
                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => {
-                    info!("nothing to full fill:: {:?}", task);
+                    info!("nothing to full fill SetIgnoreCertificateErrors:: {:?}", task);
                 }
                 BrowserCallMethodTask::SecurityEnable(task) => {
-                    info!("nothing to full fill:: {:?}", task);
+                    info!("nothing to full fill SecurityEnable:: {:?}", task);
                 }
                 BrowserCallMethodTask::AttachedToTarget(task) => {
-                    info!("nothing to full fill:: {:?}", task);
+                    info!("nothing to full fill AttachedToTarget:: {:?}", task);
+                }
+                BrowserCallMethodTask::ActivateTarget(task) => {
+                    info!("nothing to full fill ActivateTarget:: {:?}", task);
                 }
                 BrowserCallMethodTask::CloseTarget(task) => {
                     let task_return_object =

@@ -37,7 +37,7 @@ pub use security_tasks::{
 };
 
 pub use target_tasks::{
-    CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
+    CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask, ActivateTargetTask, ActivateTargetTaskBuilder,
     SetDiscoverTargetsTaskBuilder, target_events, TargetEvent, handle_target_event,
 };
 
@@ -168,6 +168,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 BrowserCallMethodTask::SecurityEnable(task) => task.get_method_str(),
                 BrowserCallMethodTask::AttachedToTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::CloseTarget(task) => task.get_method_str(),
+                BrowserCallMethodTask::ActivateTarget(task) => task.get_method_str(),
             }
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);

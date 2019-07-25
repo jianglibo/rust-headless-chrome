@@ -6,6 +6,7 @@ use log::*;
 
 #[derive(Debug, Clone)]
 pub enum BrowserCallMethodTask {
+    ActivateTarget(target_tasks::ActivateTargetTask),
     CreateTarget(target_tasks::CreateTargetTask),
     SetDiscoverTargets(target_tasks::SetDiscoverTargetsTask),
     SetIgnoreCertificateErrors(security_tasks::SetIgnoreCertificateErrorsTask),
@@ -23,6 +24,7 @@ impl HasCallId for BrowserCallMethodTask {
             BrowserCallMethodTask::SecurityEnable(task) => task.get_call_id(),
             BrowserCallMethodTask::AttachedToTarget(task) => task.get_call_id(),
             BrowserCallMethodTask::CloseTarget(task) => task.get_call_id(),
+            BrowserCallMethodTask::ActivateTarget(task) => task.get_call_id(),
         }
     }
 }
@@ -41,26 +43,33 @@ pub fn handle_browser_method_call(
         match browser_call_method_task {
             BrowserCallMethodTask::SetDiscoverTargets(task) => {
                 trace!("TargetSetDiscoverTargets returned. {:?}", task);
+                Ok(PageResponseWrapper::default())
             }
             BrowserCallMethodTask::CreateTarget(task) => {
                 trace!("CreateTarget returned. {:?}", task);
+                Ok(PageResponseWrapper::default())
             }
             BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => {
-                return Ok(PageResponseWrapper{
+                Ok(PageResponseWrapper{
                     target_id: maybe_target_id,
                     task_id: Some(task.get_task_id()),
                     page_response: PageResponse::MethodCallDone(MethodCallDone::SetIgnoreCertificateErrors(task.ignore)),
-                });
+                })
             }
             BrowserCallMethodTask::SecurityEnable(task) => {
                 trace!("SecurityEnable returned. {:?}", task);
+                Ok(PageResponseWrapper::default())
+            }
+            BrowserCallMethodTask::ActivateTarget(task) => {
+                trace!("ActivateTarget returned. {:?}", task);
+                Ok(PageResponseWrapper::default())
             }
             BrowserCallMethodTask::AttachedToTarget(task) => {
-                return Ok(PageResponseWrapper{
+                Ok(PageResponseWrapper{
                     target_id: maybe_target_id,
                     task_id: Some(task.get_task_id()),
                     page_response: PageResponse::MethodCallDone(MethodCallDone::TargetAttached(task)),
-                });
+                })
             }
             BrowserCallMethodTask::CloseTarget(task) => {
                 if let Some(r) = task.task_result {
@@ -72,7 +81,7 @@ pub fn handle_browser_method_call(
                 } else {
                     error!("tab close method call returned. close failed. {:?}", task);
                 }
+                Ok(PageResponseWrapper::default())
             }
         }
-        Ok(PageResponseWrapper::default())
     }

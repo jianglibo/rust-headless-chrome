@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 use log::*;
 
-use super::{GetContentInIframe, HOME_URL, SHENBIAN_GANDONG_URL};
+use super::{GetContentInIframe, HOME_URL, SHENBIAN_GANDONG_URL, DETAIL_PAGE};
 
 const QUERY_ARTICLE_TITLES: &str = "query-article-titles";
 const SHIPING_CHILDREN_NUM_TASK_NAME: &str = "shiping-children-num";
@@ -77,9 +77,16 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. LoadEventFired");
                         info!("---------> url: {:?}", tab.get_url());
-                        // tab.move_mouse_random_after_secs(6);
-                        let tasks = vec![tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg"))];
+                        assert!(tab.get_url().contains("/lgpage/detail/"));
+                        assert_eq!(tab.page_name, Some(DETAIL_PAGE));
+                        let tt = tab.mouse_move_to_xy_task(101.0, 101.0);
+                        tab.execute_tasks_after_secs(vec![tt], 66);
+                        // let tasks = vec![tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg"))];
+                        let mut tasks = tab.display_full_page_task();
+                        tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg")));
                         tab.execute_tasks_after_secs(tasks, 6);
+                        tab.activate_page();
+                        // tab.set_move_mouse_random_interval(8, 20);
                     }
                     ReceivedEvent::PageCreated => {
                         let tab = self
@@ -87,10 +94,10 @@ impl GetContentInIframe {
                             .expect("tab should exists. PageCreated.");
                         assert!(tab.session_id.is_none());
                         info!("page created: {:?}", tab);
+                        tab.name_the_page(DETAIL_PAGE);
                         tab.page_enable();
                         tab.runtime_enable();
                         tab.network_enable();
-                        // tab.set_move_mouse_random_interval(8, 20);
                         tab.attach_to_page();
                     }
                     _evv => {

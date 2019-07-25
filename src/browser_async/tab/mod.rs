@@ -4,16 +4,15 @@ use super::super::browser_async::{embedded_events, ChromeDebugSession, NetworkSt
 use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
-    dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks, HasSessionId,
-    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, TaskDescribe,
+    dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks,
+    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, HasSessionId, TaskDescribe, ActivateTargetTask, ActivateTargetTaskBuilder,
 };
 use super::{EventName, EventStatistics, TaskQueue, TaskQueueItem};
 use log::*;
-use std::collections::{HashMap};
+use rand::{thread_rng, Rng};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use rand::{thread_rng, Rng};
-
 
 mod box_model_func;
 mod emulation_func;
@@ -216,7 +215,7 @@ impl Tab {
             self.execute_one_task(task);
         } else {
             self.waiting_for_page_attach_tasks.push(task);
-                // .insert(WaitingForPageAttachTaskName::BringToFront);
+            // .insert(WaitingForPageAttachTaskName::BringToFront);
             // self.attach_to_page();
         }
         true
@@ -489,6 +488,11 @@ impl Tab {
         }
     }
 
+    pub fn activate_page(&mut self) {
+        let b = ActivateTargetTaskBuilder::default().common_fields(self.get_common_field(None)).target_id(self.target_info.target_id.clone()).build().expect("ActivateTargetTaskBuilder should success.");
+        self.execute_one_task(b.into());
+    }
+
     pub fn _frame_attached(&mut self, frame_attached_params: page::events::FrameAttachedParams) {
         let frame_id = frame_attached_params.frame_id.clone();
         self.changing_frames.insert(
@@ -636,6 +640,11 @@ impl Tab {
         self.mouse_move_to_point_task(Some(Point { x, y }))
     }
 
+    pub fn mouse_move_to_xy(&mut self, x: f64, y: f64) {
+        let task = self.mouse_move_to_xy_task(x, y);
+        self.execute_one_task(task);
+    }
+
     pub fn execute_task_after_secs(&mut self, task: TaskDescribe, delay_secs: u64) {
         self.task_queue.add_delayed(task, delay_secs);
     }
@@ -673,9 +682,14 @@ impl Tab {
         if self.mouse_random_move_limit.is_some() {
             if let Some(task_item) = self.next_mouse_move_task.as_ref() {
                 if task_item.is_time_out() {
-                   let ti = self.next_mouse_move_task.take().expect("I have check exists first.");
-                   self.execute_tasks(ti.tasks);
-                   self.generate_new_mouse_move_task();
+                    let ti = self
+                        .next_mouse_move_task
+                        .take()
+                        .expect("I have check exists first.");
+                    if self.activated_at.is_some() {
+                        self.execute_tasks(ti.tasks);
+                        self.generate_new_mouse_move_task();
+                    }
                 }
             } else {
                 self.generate_new_mouse_move_task();
@@ -683,9 +697,10 @@ impl Tab {
         }
     }
 
-    pub fn set_move_mouse_random_interval(&mut self,min_delay_secs: u64, max_delay_secs: u64) {
+    pub fn set_move_mouse_random_interval(&mut self, min_delay_secs: u64, max_delay_secs: u64) {
         // let n: u32 = thread_rng().gen_range(0, 10);
-        self.mouse_random_move_limit.replace((min_delay_secs, max_delay_secs));
+        self.mouse_random_move_limit
+            .replace((min_delay_secs, max_delay_secs));
     }
 
     pub fn move_mouse_random_tasks(&self) -> Vec<TaskDescribe> {
@@ -1035,14 +1050,18 @@ impl Tab {
         let session_id_cloned = session_id.clone();
         self.session_id.replace(session_id);
         if !self.waiting_for_page_attach_tasks.is_empty() {
-            let tasks: Vec<TaskDescribe> = self.waiting_for_page_attach_tasks.drain(..).into_iter()
-                .filter_map(|td| if let TaskDescribe::TargetCallMethod(mut task) = td {
+            let tasks: Vec<TaskDescribe> = self
+                .waiting_for_page_attach_tasks
+                .drain(..)
+                .into_iter()
+                .filter_map(|td| {
+                    if let TaskDescribe::TargetCallMethod(mut task) = td {
                         task.set_session_id(session_id_cloned.clone());
                         Some(task.into())
                     } else {
                         None
                     }
-                )
+                })
                 .collect();
             self.execute_tasks(tasks);
         }

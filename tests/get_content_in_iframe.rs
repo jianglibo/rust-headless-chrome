@@ -4,6 +4,7 @@
 extern crate chrono;
 extern crate fern;
 extern crate log;
+use rand::prelude::*;
 
 #[macro_use]
 extern crate futures;
@@ -20,7 +21,7 @@ use std::default::Default;
 
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
-use gcii::{GetContentInIframe, PageState, HOME_URL, SHENBIAN_GANDONG_URL};
+use gcii::{GetContentInIframe, PageState, HOME_URL, SHENBIAN_GANDONG_URL, DETAIL_PAGE};
 
 impl GetContentInIframe {
     fn assert_result(&self) {
@@ -40,7 +41,7 @@ impl Future for GetContentInIframe {
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
 
                     if seconds % 30 == 0 {
-                        self.debug_session.close_tab_old_than(100);
+                        self.debug_session.close_tab_old_than(600);
                         if self.debug_session.tab_count() < 2 {
                             info!("************** tab_count: {:?}", self.debug_session.tab_count());
                             self.debug_session.run_manually_tasks();
@@ -56,7 +57,7 @@ impl Future for GetContentInIframe {
                             if !rs.is_empty() {
                                 info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
                                 info!("requested urls: {:?}", rs);
-                                info!("box_model: {:?}", t.box_model);
+                                info!("box_model: {:?}", t.box_model.as_ref().and_then(|_|Some("exists.")));
                             }
                         }
                         // self.debug_session.browser_contexts().deduplicate();
@@ -64,13 +65,12 @@ impl Future for GetContentInIframe {
                         // self.debug_session.activate_last_opened_tab();
                         let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
                         if popup_count > 0 { //when popup_count > 0, home tab should exist.
-                            let run_task_queue_manually = popup_count < 2;
+                            let run_task_queue_manually = popup_count < 1;
                             let tab = self
                                 .debug_session
                                 .find_tab_by_name_mut(HOME_URL)
                                 .expect("home page should exists.");
                             if run_task_queue_manually {
-                                // info!("run_task_queue_manually.");
                                 tab.run_task_queue_manually();
                             }
                         }
@@ -79,9 +79,22 @@ impl Future for GetContentInIframe {
                         }
                     }
 
+                    if let Ok(tab) = self.debug_session.find_tab_by_name_mut(DETAIL_PAGE) {
+                        if tab.bring_to_front() {
+                            info!("activating {:?}", tab);
+                        }
 
-                    if let Ok(tab) = self.debug_session.find_tab_not_in_name_mut(HOME_URL) {
-                        tab.bring_to_front();
+                        if seconds % 100 == 0 {
+                            info!("detail page: {:?}", tab);
+                        }
+                        // if seconds > 100 && seconds % 20 == 0 && tab.session_id.is_some() {
+                        //     // let mut rng = rand::thread_rng();
+                        //     // let (x, y): (u64, u64) = (rng.gen_range(0, 300), rng.gen_range(0, 300));
+                        //     let t1 = tab.mouse_move_to_xy_task(10.0, 10.0);
+                        //     // let (x1, y1): (u64, u64) = (rng.gen_range(0, 300), rng.gen_range(0, 300));
+                        //     let t2 = tab.mouse_move_to_xy_task(20.0, 20.0);
+                        //     tab.execute_tasks(vec![t1, t2]);
+                        // }
                     }
                     // self.debug_session.activates_next_in_interval(3);
                     // if let Some(tab) = self
@@ -186,4 +199,3 @@ fn t_get_content_in_iframe() {
         .block_on(my_page.into_future())
         .expect("tokio should success.");
 }
-

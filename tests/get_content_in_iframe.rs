@@ -41,7 +41,7 @@ impl Future for GetContentInIframe {
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
 
                     if seconds % 30 == 0 {
-                        self.debug_session.close_tab_old_than(600);
+                        self.debug_session.close_tab_by_close_target_old_than(600);
                         if self.debug_session.tab_count() < 2 {
                             info!("************** tab_count: {:?}", self.debug_session.tab_count());
                             self.debug_session.run_manually_tasks();
@@ -117,11 +117,11 @@ impl Future for GetContentInIframe {
                     //     }
                     // }
 
-                    self.debug_session
-                        .find_tabs_old_than(600)
-                        .into_iter()
-                        .filter(|tb| !tb.is_at_url(HOME_URL))
-                        .for_each(Tab::page_close);
+                    // self.debug_session
+                    //     .find_tabs_old_than(600)
+                    //     .into_iter()
+                    //     .filter(|tb| !tb.is_at_url(HOME_URL))
+                    //     .for_each(Tab::page_close);
                     if seconds > 12_0000 {
                         self.debug_session
                             .tabs

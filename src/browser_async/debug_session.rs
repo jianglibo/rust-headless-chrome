@@ -122,6 +122,10 @@ impl DebugSession {
         self.find_tabs_old_than(secs).into_iter().for_each(Tab::page_close);
     }
 
+    pub fn close_tab_by_close_target_old_than(&mut self, secs: u64) {
+        self.find_tabs_old_than(secs).into_iter().for_each(Tab::close);
+    }
+
     pub fn find_last_opened_tab(&mut self) -> Option<&mut Tab> {
         if let Some((first, rest)) = self.tabs.split_first_mut() {
             let mut last_opened = first;

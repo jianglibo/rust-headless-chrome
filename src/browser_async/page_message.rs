@@ -67,6 +67,7 @@ pub enum ReceivedEvent {
 #[derive(Debug)]
 pub enum MethodCallDone {
     PageEnabled(page_tasks::PageEnableTask),
+    PageClosed(bool), // running its beforeunload hooks by Page.close or close by Target.closeTarget.
     RuntimeEnabled(runtime_tasks::RuntimeEnableTask),
     QuerySelector(dom_tasks::QuerySelectorTask),
     PrintToPdf(page_tasks::PrintToPdfTask),

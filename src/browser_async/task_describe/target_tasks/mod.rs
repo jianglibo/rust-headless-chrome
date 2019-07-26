@@ -87,7 +87,8 @@ pub  fn handle_target_event(
             }
             TargetEvent::TargetDestroyed(event) => {
                 let target_id = event.get_target_id();
-                if let Ok(_tab) = debug_session.find_tab_by_id_mut(Some(target_id)) {
+                if let Ok(tab) = debug_session.find_tab_by_id_mut(Some(target_id)) {
+                    info!("page destroyed: {:?}", tab);
                     debug_session.tab_closed(target_id);
                 } else {
                     warn!("target destroyed, no correspond tab. {:?}", event);

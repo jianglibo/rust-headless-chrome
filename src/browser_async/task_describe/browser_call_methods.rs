@@ -72,16 +72,22 @@ pub fn handle_browser_method_call(
                 })
             }
             BrowserCallMethodTask::CloseTarget(task) => {
+                let mut success = false;
                 if let Some(r) = task.task_result {
                     if r {
                         info!("tab close method call returned. close successfully.");
+                        success = true;
                     } else {
                         error!("tab close method call returned. close failed.");
                     }
                 } else {
-                    error!("tab close method call returned. close failed. {:?}", task);
+                    error!("tab close method call may not returned. {:?}", task);
                 }
-                Ok(PageResponseWrapper::default())
+                Ok(PageResponseWrapper{
+                    target_id: maybe_target_id,
+                    task_id: Some(task.get_task_id()),
+                    page_response: PageResponse::MethodCallDone(MethodCallDone::PageClosed(success)),
+                })
             }
         }
     }

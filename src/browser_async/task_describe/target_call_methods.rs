@@ -178,7 +178,11 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::PageClose(task) => {
             info!("page_closed: {:?}", task);
-            Ok(PageResponseWrapper::default())
+            Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: Some(task.get_task_id()),
+                page_response: PageResponse::MethodCallDone(MethodCallDone::PageClosed(true)),
+            })
         }
         TargetCallMethodTask::RuntimeEnable(task) => {
             Ok(PageResponseWrapper {

@@ -5,7 +5,7 @@ use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
     dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks,
-    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, HasSessionId, TaskDescribe, ActivateTargetTask, ActivateTargetTaskBuilder,
+    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, HasSessionId, TaskDescribe, ActivateTargetTaskBuilder,
 };
 use super::{EventName, EventStatistics, TaskQueue, TaskQueueItem};
 use log::*;
@@ -19,20 +19,26 @@ mod emulation_func;
 mod evaluate_func;
 mod screen_shot_func;
 
-// #[derive(Debug, PartialEq, Eq, Hash)]
-// pub enum WaitingForPageAttachTaskName {
-//     RuntimeEnable,
-//     PageEnable,
-//     NetworkEnable,
-//     SetLifecycleEventsEnabled,
-//     BringToFront,
-// }
+#[derive(Debug)]
+pub struct ClosingState {
+    issued_at: Option<Instant>,
+}
 
-// #[derive(Debug)]
-// enum TabState {
-//     Normal,
-//     // Closing,
-// }
+impl ClosingState {
+    pub fn continue_sending(&mut self) -> bool {
+        if let Some(start) = self.issued_at {
+            if start.elapsed().as_secs() > 30 {
+                self.issued_at.replace(Instant::now());
+                true
+            } else {
+                false
+            }
+        } else {
+            self.issued_at.replace(Instant::now());
+            true
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Tab {
@@ -53,7 +59,7 @@ pub struct Tab {
     pub task_queue: TaskQueue,
     pub waiting_for_page_attach_tasks: Vec<TaskDescribe>,
     pub activating: bool,
-    pub closing: bool,
+    pub closing: ClosingState,
     pub explicitly_close: bool,
     pub life_cycles: Vec<page_events::LifeCycle>,
     pub network_statistics: NetworkStatistics,
@@ -95,7 +101,7 @@ impl Tab {
             // waiting_for_page_attach: HashSet::new(),
             waiting_for_page_attach_tasks: Vec::new(),
             activating: false,
-            closing: false,
+            closing: ClosingState{issued_at: None},
             explicitly_close: false,
             life_cycles: Vec::new(),
             event_statistics: EventStatistics::new(),
@@ -180,10 +186,8 @@ impl Tab {
     }
 
     pub fn page_close(&mut self) {
-        if self.closing {
-            return;
-        } else {
-            self.closing = true;
+        let b =  self.closing.continue_sending();
+        if b {
             let task = page_tasks::PageCloseTaskBuilder::default()
                 .common_fields(self.get_common_field(None))
                 .build()
@@ -193,10 +197,8 @@ impl Tab {
     }
 
     pub fn close(&mut self) {
-        if self.closing {
-            return;
-        } else {
-            self.closing = true;
+        let b = self.closing.continue_sending();
+        if b {
             let task = target_tasks::CloseTargetTaskBuilder::default()
                 .common_fields(self.get_common_field(None))
                 .build()

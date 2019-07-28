@@ -27,6 +27,18 @@ impl HasCallId for BrowserCallMethodTask {
             BrowserCallMethodTask::ActivateTarget(task) => task.get_call_id(),
         }
     }
+
+    fn renew_call_id(&mut self) {
+        match self {
+            BrowserCallMethodTask::CreateTarget(task) => task.renew_call_id(),
+            BrowserCallMethodTask::SetDiscoverTargets(task) => task.renew_call_id(),
+            BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.renew_call_id(),
+            BrowserCallMethodTask::SecurityEnable(task) => task.renew_call_id(),
+            BrowserCallMethodTask::AttachedToTarget(task) => task.renew_call_id(),
+            BrowserCallMethodTask::CloseTarget(task) => task.renew_call_id(),
+            BrowserCallMethodTask::ActivateTarget(task) => task.renew_call_id(),
+        }
+    }
 }
 
 impl std::convert::From<BrowserCallMethodTask> for TaskDescribe {

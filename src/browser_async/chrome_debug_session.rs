@@ -50,7 +50,8 @@ impl ChromeDebugSession {
         }
     }
 
-    fn execute_next_and_return_remains(&mut self, task_group: task_manager::TaskGroup) {
+    fn execute_next_and_return_remains(&mut self, mut task_group: task_manager::TaskGroup) {
+        task_group.renew_first_task_call_id();
         let next_task = task_group.get_first_task_ref();
         if let Ok(method_str) = String::try_from(next_task) {
             self.task_manager.push_task_group(task_group);

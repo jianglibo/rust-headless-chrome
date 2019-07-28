@@ -104,6 +104,35 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_call_id(),
         }
     }
+    fn renew_call_id(&mut self) {
+        match self {
+            TargetCallMethodTask::NavigateTo(task) => task.renew_call_id(),
+            TargetCallMethodTask::QuerySelector(task) => task.renew_call_id(),
+            TargetCallMethodTask::DescribeNode(task) => task.renew_call_id(),
+            TargetCallMethodTask::PrintToPDF(task) => task.renew_call_id(),
+            TargetCallMethodTask::GetBoxModel(task) => task.renew_call_id(),
+            TargetCallMethodTask::GetContentQuads(task) => task.renew_call_id(),
+            TargetCallMethodTask::GetDocument(task) => task.renew_call_id(),
+            TargetCallMethodTask::PageEnable(task) => task.renew_call_id(),
+            TargetCallMethodTask::RuntimeEnable(task) => task.renew_call_id(),
+            TargetCallMethodTask::CaptureScreenshot(task) => task.renew_call_id(),
+            TargetCallMethodTask::Evaluate(task) => task.renew_call_id(),
+            TargetCallMethodTask::GetProperties(task) => task.renew_call_id(),
+            TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.renew_call_id(),
+            TargetCallMethodTask::NetworkEnable(task) => task.renew_call_id(),
+            TargetCallMethodTask::SetRequestInterception(task) => task.renew_call_id(),
+            TargetCallMethodTask::ContinueInterceptedRequest(task) => task.renew_call_id(),
+            TargetCallMethodTask::GetResponseBodyForInterception(task) => task.renew_call_id(),
+            TargetCallMethodTask::PageReload(task) => task.renew_call_id(),
+            TargetCallMethodTask::GetLayoutMetrics(task) => task.renew_call_id(),
+            TargetCallMethodTask::BringToFront(task) => task.renew_call_id(),
+            TargetCallMethodTask::PageClose(task) => task.renew_call_id(),
+            TargetCallMethodTask::DispatchMouseEvent(task) => task.renew_call_id(),
+            TargetCallMethodTask::CanEmulate(task) => task.renew_call_id(),
+            TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.renew_call_id(),
+            TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.renew_call_id(),
+        }
+    }
 }
 
 pub fn handle_target_method_call(

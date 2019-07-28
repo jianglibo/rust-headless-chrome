@@ -1,8 +1,8 @@
 // use super::target_message_event::target_message_events;
-use crate::browser_async::{
+use super::{
     create_msg_to_send_with_session_id, create_unique_task_id, next_call_id, TaskId,
 };
-use crate::protocol::{self, target};
+use super::super::protocol::{self, target};
 use log::*;
 
 pub mod browser_call_methods;
@@ -59,6 +59,7 @@ pub trait HasSessionId {
 
 pub trait HasCallId {
     fn get_call_id(&self) -> protocol::CallId;
+    fn renew_call_id(&mut self);
 }
 
 pub trait HasTaskId {
@@ -85,7 +86,11 @@ where
     T: HasCommonField,
 {
     fn get_call_id(&self) -> protocol::CallId {
-        self.get_common_fields().call_id
+        self.get_common_fields().call_id.expect("call_id should exists when call get_call_id.")
+    }
+
+    fn renew_call_id(&mut self) {
+        self.get_common_fields_mut().call_id.replace(next_call_id());
     }
 }
 
@@ -126,7 +131,7 @@ where
         create_msg_to_send_with_session_id(
             method,
             self.get_common_fields().session_id.as_ref(),
-            self.get_common_fields().call_id,
+            self.get_common_fields().call_id.expect("call_id should exists when call create_method_str."),
         )
     }
 }
@@ -261,8 +266,10 @@ pub struct CommonDescribeFields {
     #[builder(default = "create_unique_task_id()")]
     #[builder(setter(prefix = "_abc"))]
     pub task_id: TaskId,
-    #[builder(default = "next_call_id()")]
-    pub call_id: usize,
+    // #[builder(default = "next_call_id()")]
+    // pub call_id: usize,
+    #[builder(default = "None")]
+    pub call_id: Option<usize>,
 }
 
 impl From<(Option<String>, Option<String>)> for CommonDescribeFields {

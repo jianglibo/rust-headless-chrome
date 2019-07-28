@@ -44,13 +44,22 @@ impl TaskGroup {
         if let Some(task) = self.waiting_tasks.get(0) {
             match task {
                 TaskDescribe::TargetCallMethod(target_call) => target_call.get_call_id() == call_id,
-                TaskDescribe::BrowserCallMethod(browser_call) => {
-                    browser_call.get_call_id() == call_id
-                }
+                TaskDescribe::BrowserCallMethod(browser_call) => 
+                    browser_call.get_call_id() == call_id,
+                
                 _ => false,
             }
         } else {
             false
+        }
+    }
+
+    pub fn renew_first_task_call_id(&mut self) {
+        let task = self.get_first_task_mut();
+        match task {
+                TaskDescribe::TargetCallMethod(target_call) => target_call.renew_call_id(),
+                TaskDescribe::BrowserCallMethod(browser_call) => browser_call.renew_call_id(), 
+                _ => error!("call renew_call_id on none method task: {:?}", task),
         }
     }
 

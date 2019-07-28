@@ -5,7 +5,8 @@ use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
     dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks,
-    target_tasks, CommonDescribeFields, CommonDescribeFieldsBuilder, HasSessionId, TaskDescribe, ActivateTargetTaskBuilder,
+    target_tasks, ActivateTargetTaskBuilder, CommonDescribeFields, CommonDescribeFieldsBuilder,
+    HasSessionId, TaskDescribe,
 };
 use super::{EventName, EventStatistics, TaskQueue, TaskQueueItem};
 use log::*;
@@ -101,7 +102,7 @@ impl Tab {
             // waiting_for_page_attach: HashSet::new(),
             waiting_for_page_attach_tasks: Vec::new(),
             activating: false,
-            closing: ClosingState{issued_at: None},
+            closing: ClosingState { issued_at: None },
             explicitly_close: false,
             life_cycles: Vec::new(),
             event_statistics: EventStatistics::new(),
@@ -186,14 +187,14 @@ impl Tab {
     }
 
     pub fn close_by_window_close(&mut self) {
-        let b =  self.closing.continue_sending();
+        let b = self.closing.continue_sending();
         if b {
             self.evaluate_expression("window.close();");
-        }        
+        }
     }
 
     pub fn page_close(&mut self) {
-        let b =  self.closing.continue_sending();
+        let b = self.closing.continue_sending();
         if b {
             let task = page_tasks::PageCloseTaskBuilder::default()
                 .common_fields(self.get_common_field(None))
@@ -498,7 +499,11 @@ impl Tab {
     }
 
     pub fn activate_page(&mut self) {
-        let b = ActivateTargetTaskBuilder::default().common_fields(self.get_common_field(None)).target_id(self.target_info.target_id.clone()).build().expect("ActivateTargetTaskBuilder should success.");
+        let b = ActivateTargetTaskBuilder::default()
+            .common_fields(self.get_common_field(None))
+            .target_id(self.target_info.target_id.clone())
+            .build()
+            .expect("ActivateTargetTaskBuilder should success.");
         self.execute_one_task(b.into());
     }
 
@@ -713,10 +718,12 @@ impl Tab {
     }
 
     pub fn move_mouse_random_tasks(&self) -> Vec<TaskDescribe> {
-        vec![
-            self.mouse_move_to_xy_task(100.0, 100.0),
-            self.mouse_move_to_xy_task(200.0, 200.0),
-        ]
+        if let Some(box_model) = self.box_model.as_ref() {
+            let (x, y) = box_model.content_viewport().random_point_in_viewport();
+            vec![self.mouse_move_to_xy_task(x, y)]
+        } else {
+            vec![self.mouse_move_to_xy_task(100.0, 100.0)]
+        }
     }
 
     pub fn mouse_press_at_point_task(&self, point: Option<Point>) -> TaskDescribe {

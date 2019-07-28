@@ -1,5 +1,6 @@
 use crate::protocol::network;
 use serde::{Deserialize, Serialize};
+use rand::{thread_rng, Rng};
 
 pub type FrameId = String;
 
@@ -59,6 +60,13 @@ impl Viewport {
     pub fn u64_width_height(&self) -> (u64, u64) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         (self.width as u64, self.height as u64)
+    }
+
+    pub fn random_point_in_viewport(&self) -> (f64, f64) {
+        let mut rnd = thread_rng();
+        let x = rnd.gen_range(self.x, self.x + self.width);
+        let y = rnd.gen_range(self.y, self.y + self.height);
+        (x, y)
     }
 }
 

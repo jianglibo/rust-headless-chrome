@@ -45,7 +45,7 @@ impl ChromeDebugSession {
 
     pub fn check_stalled_tasks(&mut self) {
         if let Some(tg) = self.task_manager.get_stalled_task_group(45) {
-            warn!("rerun stalled task group: {:?}", tg);
+            warn!("rerun stalled task group: {}", tg);
             self.execute_next_and_return_remains(tg);
         }
     }
@@ -111,15 +111,12 @@ impl ChromeDebugSession {
             EmbeddedEvent::DataReceived(embedded_event) => {
                 let event = network_events::DataReceived::new(embedded_event);
                 return TaskDescribe::from(event).into();
-                // warn!("ignore DataReceived inner event.");
             }
             EmbeddedEvent::LoadingFinished(embedded_event) => {
                 let event = network_events::LoadingFinished::new(embedded_event);
                 return TaskDescribe::from(event).into();
-                // warn!("ignore LoadingFinished inner event.");
             }
             EmbeddedEvent::RequestWillBeSent(embedded_event) => {
-                // trace!("RequestWillBeSent: {:?}", embedded_event);
                 let event = network_events::RequestWillBeSent::new(embedded_event);
                 return TaskDescribe::from(event).into();
             }
@@ -180,53 +177,23 @@ impl ChromeDebugSession {
             }
 
             let cloned_task: TaskDescribe = match &current_task {
-                TaskDescribe::TargetCallMethod(target_task) => {
-                    target_task.clone().into()
-                }
-                TaskDescribe::BrowserCallMethod(browser_task) => {
-                    browser_task.clone().into()
-                }
+                TaskDescribe::TargetCallMethod(target_task) => target_task.clone().into(),
+                TaskDescribe::BrowserCallMethod(browser_task) => browser_task.clone().into(),
                 _ => {
                     error!("got impossible task type: {:?}", &current_task);
                     panic!("got impossible response.");
                 }
             };
 
-            // // some task we should always return to user.
-            // let mut return_task = false;
-            // match &current_task {
-            //     TaskDescribe::TargetCallMethod(TargetCallMethodTask::PageEnable(_task)) => {
-            //         return_task = true;
-            //     }
-            //     TaskDescribe::TargetCallMethod(TargetCallMethodTask::RuntimeEnable(_task)) => {
-            //         return_task = true;
-            //     }
-            //     TaskDescribe::TargetCallMethod(TargetCallMethodTask::NetworkEnable(_task)) => {
-            //         return_task = true;
-            //     }
-            //     // TaskDescribe::TargetCallMethod(TargetCallMethodTask::GetBoxModel(task)) => {
-            //     //     if task.request_full_page {
-            //     //         return_task = true;
-            //     //     }
-            //     // }
-            //     _ => {}
-            // }
-
-            // if return_task {
-            //     self.execute_next_and_return_remains(task_group);
-            //     return Some(current_task);
-            // } else {
-                task_group.push_completed_task(current_task);
-                task_group.full_fill_next_task();
-                self.execute_next_and_return_remains(task_group);
-                return Some(cloned_task);
-            // }
+            task_group.push_completed_task(current_task);
+            task_group.full_fill_next_task();
+            self.execute_next_and_return_remains(task_group);
+            return Some(cloned_task);
         } else {
-            error!("no matching task for call_id: {:?}", resp);
+            info!("no matching task for call_id: {:?}", resp);
         }
         None
     }
-
 
     fn full_fill_current_task(
         &self,
@@ -360,7 +327,10 @@ impl ChromeDebugSession {
                     info!("nothing to full fill SetDiscoverTargets:: {:?}", task);
                 }
                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => {
-                    info!("nothing to full fill SetIgnoreCertificateErrors:: {:?}", task);
+                    info!(
+                        "nothing to full fill SetIgnoreCertificateErrors:: {:?}",
+                        task
+                    );
                 }
                 BrowserCallMethodTask::SecurityEnable(task) => {
                     info!("nothing to full fill SecurityEnable:: {:?}", task);

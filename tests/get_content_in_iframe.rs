@@ -41,7 +41,7 @@ impl Future for GetContentInIframe {
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
 
                     if seconds % 30 == 0 {
-                        self.debug_session.close_tab_by_close_target_old_than(600);
+                        self.debug_session.close_tab_by_window_close_old_than(390);
                         if self.debug_session.tab_count() < 2 {
                             info!("************** tab_count: {:?}", self.debug_session.tab_count());
                             self.debug_session.run_manually_tasks();
@@ -54,11 +54,13 @@ impl Future for GetContentInIframe {
                         for t in self.debug_session.tabs.iter_mut() {
                             // t.move_mouse_random_after_secs(1);
                             let rs = t.network_statistics.list_request_urls();
+                            let pclogs = t.network_statistics.list_request_urls_end_with("/pclog");
                             // if !rs.is_empty() {
-                                info!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
-                                info!("requested urls {:?}: {:?}",rs.len(), rs);
+                                info!("main frame: {:?}, frame_count: {:?}", t.main_frame(), t.changing_frames.len());
+                                info!("{}, context_id: {:?}, target_id: {:?}, session_id: {:?}", t.get_url(), t.target_info.browser_context_id, t.target_info.target_id, t.session_id);
+                                info!("requested urls {:?}: {:?}",rs.len(), pclogs);
                                 info!("box_model: {:?}", t.box_model.as_ref().and_then(|_|Some("exists.")));
-                                info!("task queue {:?}, {:?}: {:?}", t.task_queue.vec_len(), t.task_queue.item_len(), t.task_queue);
+                                info!("task queue {:?}, {:?}: {:?}", t.task_queue.vec_len(), t.task_queue.item_len(), t.task_queue.to_task_names());
                             // }
                         }
                         // self.debug_session.browser_contexts().deduplicate();
@@ -194,6 +196,7 @@ fn t_get_content_in_iframe() {
     tutil::setup_logger(vec!["browser_async::task_queue", "browser_async::chrome_browser"]).expect("fern log should work.");
 
     let my_page = GetContentInIframe::default();
+    // let my_page = GetContentInIframe::new_visible();
 
     let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
     runtime

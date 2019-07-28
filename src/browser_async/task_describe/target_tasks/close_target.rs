@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, HasCallId, BrowserCallMethodTask, HasCommonField,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, HasCallId, BrowserCallMethodTask, HasCommonField, };
 use crate::protocol::{target};
 use failure;
 
@@ -11,7 +11,7 @@ pub struct CloseTargetTask {
     pub task_result: Option<bool>,
 }
 
-impl_has_common_fields!(CloseTargetTask);
+impl_has_common_fields!(CloseTargetTask, "CloseTargetTask");
 
 impl AsMethodCallString for CloseTargetTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

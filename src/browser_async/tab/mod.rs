@@ -185,6 +185,13 @@ impl Tab {
         urls.contains(&self.get_url())
     }
 
+    pub fn close_by_window_close(&mut self) {
+        let b =  self.closing.continue_sending();
+        if b {
+            self.evaluate_expression("window.close();");
+        }        
+    }
+
     pub fn page_close(&mut self) {
         let b =  self.closing.continue_sending();
         if b {
@@ -1054,7 +1061,6 @@ impl Tab {
             let tasks: Vec<TaskDescribe> = self
                 .waiting_for_page_attach_tasks
                 .drain(..)
-                .into_iter()
                 .filter_map(|td| {
                     if let TaskDescribe::TargetCallMethod(mut task) = td {
                         task.set_session_id(session_id_cloned.clone());

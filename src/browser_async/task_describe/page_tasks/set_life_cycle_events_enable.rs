@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{page};
 use failure;
 
@@ -9,7 +9,7 @@ pub struct SetLifecycleEventsEnabledTask {
     pub enabled: bool,
 }
 
-impl_has_common_fields!(SetLifecycleEventsEnabledTask);
+impl_has_common_fields!(SetLifecycleEventsEnabledTask, "SetLifecycleEventsEnabledTask");
 
 impl AsMethodCallString for SetLifecycleEventsEnabledTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

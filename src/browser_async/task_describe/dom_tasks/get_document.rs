@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{dom};
 use failure;
 
@@ -14,7 +14,7 @@ pub struct GetDocumentTask {
     pub task_result: Option<dom::Node>,
 }
 
-impl_has_common_fields!(GetDocumentTask);
+impl_has_common_fields!(GetDocumentTask, "GetDocumentTask");
 
 impl AsMethodCallString for GetDocumentTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

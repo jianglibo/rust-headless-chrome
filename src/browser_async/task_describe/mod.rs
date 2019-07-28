@@ -1,56 +1,59 @@
 // use super::target_message_event::target_message_events;
 use crate::browser_async::{
-    create_msg_to_send_with_session_id, next_call_id, TaskId, create_unique_task_id,
+    create_msg_to_send_with_session_id, create_unique_task_id, next_call_id, TaskId,
 };
 use crate::protocol::{self, target};
 use log::*;
 
+pub mod browser_call_methods;
 pub mod dom_tasks;
+pub mod emulation_tasks;
+pub mod input_tasks;
+pub mod network_tasks;
 pub mod other_tasks;
 pub mod page_tasks;
 pub mod runtime_tasks;
-pub mod target_tasks;
 pub mod security_tasks;
 pub mod target_call_methods;
-pub mod browser_call_methods;
-pub mod network_tasks;
-pub mod input_tasks;
-pub mod emulation_tasks;
-
+pub mod target_tasks;
 
 pub use dom_tasks::{
-    DescribeNodeTask, DescribeNodeTaskBuilder, GetBoxModelTask, GetBoxModelTaskBuilder,
-    GetDocumentTask, GetDocumentTaskBuilder, QuerySelectorTask, QuerySelectorTaskBuilder, dom_events, DomEvent, handle_dom_event,
+    dom_events, handle_dom_event, DescribeNodeTask, DescribeNodeTaskBuilder, DomEvent,
+    GetBoxModelTask, GetBoxModelTaskBuilder, GetDocumentTask, GetDocumentTaskBuilder,
+    QuerySelectorTask, QuerySelectorTaskBuilder,
 };
 pub use page_tasks::{
-    CaptureScreenshotTask, CaptureScreenshotTaskBuilder, NavigateToTask, NavigateToTaskBuilder, PageReloadTask, PageReloadTaskBuilder,
-    PageEnableTask, PrintToPdfTask, PrintToPdfTaskBuilder, page_events, PageEvent, handle_page_event,
+    handle_page_event, page_events, CaptureScreenshotTask, CaptureScreenshotTaskBuilder,
+    NavigateToTask, NavigateToTaskBuilder, PageEnableTask, PageEvent, PageReloadTask,
+    PageReloadTaskBuilder, PrintToPdfTask, PrintToPdfTaskBuilder,
 };
 pub use runtime_tasks::{
-    CallFunctionOnTask, CallFunctionOnTaskBuilder, RuntimeEnableTask,
-    RuntimeEnableTaskBuilder, EvaluateTask, EvaluateTaskBuilder,
-    GetPropertiesTask, GetPropertiesTaskBuilder, runtime_events, RuntimeEvent, handle_runtime_event,
+    handle_runtime_event, runtime_events, CallFunctionOnTask, CallFunctionOnTaskBuilder,
+    EvaluateTask, EvaluateTaskBuilder, GetPropertiesTask, GetPropertiesTaskBuilder,
+    RuntimeEnableTask, RuntimeEnableTaskBuilder, RuntimeEvent,
 };
 pub use security_tasks::{
-    SecurityEnableTask, SecurityEnableTaskBuilder,
-    SetIgnoreCertificateErrorsTask, SetIgnoreCertificateErrorsTaskBuilder,
+    SecurityEnableTask, SecurityEnableTaskBuilder, SetIgnoreCertificateErrorsTask,
+    SetIgnoreCertificateErrorsTaskBuilder,
 };
 
 pub use target_tasks::{
-    CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask, ActivateTargetTask, ActivateTargetTaskBuilder,
-    SetDiscoverTargetsTaskBuilder, target_events, TargetEvent, handle_target_event,
+    handle_target_event, target_events, ActivateTargetTask, ActivateTargetTaskBuilder,
+    CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
+    SetDiscoverTargetsTaskBuilder, TargetEvent,
 };
 
-pub use network_tasks::{NetworkEnableTask, NetworkEnableTaskBuilder, network_events,
-NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder, handle_network_event,
- ContinueInterceptedRequestTask, ContinueInterceptedRequestTaskBuilder, GetResponseBodyForInterceptionTask, GetResponseBodyForInterceptionTaskBuilder,};
+pub use network_tasks::{
+    handle_network_event, network_events, ContinueInterceptedRequestTask,
+    ContinueInterceptedRequestTaskBuilder, GetResponseBodyForInterceptionTask,
+    GetResponseBodyForInterceptionTaskBuilder, NetworkEnableTask, NetworkEnableTaskBuilder,
+    NetworkEvent, SetRequestInterceptionTask, SetRequestInterceptionTaskBuilder,
+};
 
-pub use target_call_methods::{TargetCallMethodTask, handle_target_method_call};
-pub use browser_call_methods::{BrowserCallMethodTask, handle_browser_method_call};
-
+pub use browser_call_methods::{handle_browser_method_call, BrowserCallMethodTask};
+pub use target_call_methods::{handle_target_method_call, TargetCallMethodTask};
 
 pub trait HasSessionId {
-    // fn get_session_id(&self) -> target::SessionID;
     fn set_session_id(&mut self, session_id: target::SessionID);
 }
 
@@ -64,18 +67,32 @@ pub trait HasTaskId {
     fn task_id_starts_with(&self, pattern: &str) -> bool;
 }
 
-pub trait HasCommonField {
-    fn get_common_fields(&self) -> &CommonDescribeFields;
-    fn get_common_fields_mut(&mut self) -> &mut CommonDescribeFields;
+pub trait HasTaskName {
+    fn get_task_name(&self) -> &str;
 }
 
-impl<T> HasCallId for T where T: HasCommonField {
+pub trait HasCommonField {
+    const TASK_NAME: &'static str;
+    fn get_common_fields(&self) -> &CommonDescribeFields;
+    fn get_common_fields_mut(&mut self) -> &mut CommonDescribeFields;
+    fn get_task_name(&self) -> &str {
+        Self::TASK_NAME
+    }
+}
+
+impl<T> HasCallId for T
+where
+    T: HasCommonField,
+{
     fn get_call_id(&self) -> protocol::CallId {
         self.get_common_fields().call_id
     }
 }
 
-impl<T> HasTaskId for T where T: HasCommonField {
+impl<T> HasTaskId for T
+where
+    T: HasCommonField,
+{
     fn get_task_id(&self) -> TaskId {
         self.get_common_fields().task_id.clone()
     }
@@ -92,18 +109,26 @@ impl<T> HasTaskId for T where T: HasCommonField {
     // }
 }
 
-
-
 pub trait CanCreateMethodString {
-    fn create_method_str<C>(&self, method: C) -> String where
-        C: protocol::Method + serde::Serialize,;
+    fn create_method_str<C>(&self, method: C) -> String
+    where
+        C: protocol::Method + serde::Serialize;
 }
 
-impl<T> CanCreateMethodString for T where T: HasCommonField {
-    fn create_method_str<C>(&self, method: C) -> String where
-        C: protocol::Method + serde::Serialize, {
-            create_msg_to_send_with_session_id(method, self.get_common_fields().session_id.as_ref(), self.get_common_fields().call_id)
-        }
+impl<T> CanCreateMethodString for T
+where
+    T: HasCommonField,
+{
+    fn create_method_str<C>(&self, method: C) -> String
+    where
+        C: protocol::Method + serde::Serialize,
+    {
+        create_msg_to_send_with_session_id(
+            method,
+            self.get_common_fields().session_id.as_ref(),
+            self.get_common_fields().call_id,
+        )
+    }
 }
 
 pub trait AsMethodCallString {
@@ -112,7 +137,7 @@ pub trait AsMethodCallString {
     fn _empty_method_str(&self, tip: &str) -> String {
         warn!("be called unexpectedly. {:?}", tip);
         String::from("")
-    }    
+    }
 }
 
 #[derive(Debug)]
@@ -128,13 +153,51 @@ pub enum TaskDescribe {
     ChromeConnected,
 }
 
+impl_has_common_fields_for_task_describe!(
+    [
+        TargetCallMethodTask::QuerySelector,
+        TargetCallMethodTask::DescribeNode,
+        TargetCallMethodTask::PrintToPDF,
+        TargetCallMethodTask::GetBoxModel,
+        TargetCallMethodTask::GetContentQuads,
+        TargetCallMethodTask::CaptureScreenshot,
+        TargetCallMethodTask::GetDocument,
+        TargetCallMethodTask::NavigateTo,
+        TargetCallMethodTask::PageEnable,
+        TargetCallMethodTask::RuntimeEnable,
+        TargetCallMethodTask::Evaluate,
+        TargetCallMethodTask::GetProperties,
+        TargetCallMethodTask::RuntimeCallFunctionOn,
+        TargetCallMethodTask::NetworkEnable,
+        TargetCallMethodTask::SetRequestInterception,
+        TargetCallMethodTask::GetResponseBodyForInterception,
+        TargetCallMethodTask::ContinueInterceptedRequest,
+        TargetCallMethodTask::PageReload,
+        TargetCallMethodTask::GetLayoutMetrics,
+        TargetCallMethodTask::BringToFront,
+        TargetCallMethodTask::PageClose,
+        TargetCallMethodTask::DispatchMouseEvent,
+        TargetCallMethodTask::CanEmulate,
+        TargetCallMethodTask::SetDeviceMetricsOverride,
+        TargetCallMethodTask::SetLifecycleEventsEnabled
+    ],
+    [
+        BrowserCallMethodTask::CreateTarget,
+        BrowserCallMethodTask::SetDiscoverTargets,
+        BrowserCallMethodTask::SetIgnoreCertificateErrors,
+        BrowserCallMethodTask::SecurityEnable,
+        BrowserCallMethodTask::AttachedToTarget,
+        BrowserCallMethodTask::CloseTarget,
+        BrowserCallMethodTask::ActivateTarget
+    ]
+);
+
 impl std::convert::TryFrom<&TaskDescribe> for String {
     type Error = failure::Error;
 
     fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
         match task_describe {
-            TaskDescribe::TargetCallMethod(target_call) => 
-                match target_call {
+            TaskDescribe::TargetCallMethod(target_call) => match target_call {
                 TargetCallMethodTask::QuerySelector(task) => task.get_method_str(),
                 TargetCallMethodTask::DescribeNode(task) => task.get_method_str(),
                 TargetCallMethodTask::PrintToPDF(task) => task.get_method_str(),
@@ -160,7 +223,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::CanEmulate(task) => task.get_method_str(),
                 TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_method_str(),
                 TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_method_str(),
-            }
+            },
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
@@ -169,7 +232,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 BrowserCallMethodTask::AttachedToTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::CloseTarget(task) => task.get_method_str(),
                 BrowserCallMethodTask::ActivateTarget(task) => task.get_method_str(),
-            }
+            },
             _ => {
                 error!("task describe to string failed. {:?}", task_describe);
                 failure::bail!("should not be called.")
@@ -222,7 +285,6 @@ impl CommonDescribeFieldsBuilder {
     }
 }
 
-
 // https://doc.rust-lang.org/reference/macros-by-example.html
 // macro_rules! example {
 //     ($(I $i:ident)* E $e:expr) => { ($($i)-*) * $e };
@@ -234,7 +296,7 @@ impl CommonDescribeFieldsBuilder {
 
 #[cfg(test)]
 mod tests {
-    trait TraitOne { 
+    trait TraitOne {
         fn get_one(&self) -> usize;
     }
 
@@ -263,16 +325,18 @@ mod tests {
         }
     }
 
-    impl<T> TraitSum for T where T : TraitOne + TraitTwo {
+    impl<T> TraitSum for T
+    where
+        T: TraitOne + TraitTwo,
+    {
         fn sum(&self) -> usize {
             self.get_one() + self.get_two()
         }
     }
 
-
     #[test]
     fn enum_and_trait() {
-        let v = WithOneTwo{one: 5, two: 10};
+        let v = WithOneTwo { one: 5, two: 10 };
         assert_eq!(v.sum(), 15);
     }
 

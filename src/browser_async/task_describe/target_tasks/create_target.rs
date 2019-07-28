@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask,  HasCommonField, HasCallId};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask,  HasCommonField, HasCallId, };
 use crate::protocol::target;
 use failure;
 
@@ -20,7 +20,7 @@ pub struct CreateTargetTask {
     pub task_result: Option<target::TargetId>,
 }
 
-impl_has_common_fields!(CreateTargetTask);
+impl_has_common_fields!(CreateTargetTask, "CreateTargetTask");
 
 impl AsMethodCallString for CreateTargetTask {
     fn get_method_str(&self) ->  Result<String, failure::Error> {

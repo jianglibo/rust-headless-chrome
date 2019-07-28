@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, AsMethodCallString, TargetCallMethodTask, CommonDescribeFields, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, AsMethodCallString, TargetCallMethodTask, CommonDescribeFields, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{page};
 use failure;
 
@@ -17,7 +17,7 @@ pub struct NavigateToTask {
     pub task_result: Option<page::methods::NavigateReturnObject>,
 }
 
-impl_has_common_fields!(NavigateToTask);
+impl_has_common_fields!(NavigateToTask, "NavigateToTask");
 
 impl AsMethodCallString for NavigateToTask{
     fn get_method_str(&self) -> Result<String, failure::Error>{

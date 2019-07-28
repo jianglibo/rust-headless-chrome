@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId, };
 use crate::protocol::target;
 use failure;
 
@@ -10,7 +10,7 @@ pub struct SetDiscoverTargetsTask {
     pub discover: bool,
 }
 
-impl_has_common_fields!(SetDiscoverTargetsTask);
+impl_has_common_fields!(SetDiscoverTargetsTask, "SetDiscoverTargetsTask");
 
 impl AsMethodCallString for SetDiscoverTargetsTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

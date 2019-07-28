@@ -44,7 +44,7 @@ impl GetContentInIframe {
                             info!("got lifecycleEvent: {:?}", tab.last_life_cycle_event());
                         }
                     } else {
-                        warn!("at state: {:?}", PageState::WaitingForQrcodeScan);
+                        info!("at state: {:?}", PageState::WaitingForQrcodeScan);
                     }
                 }
                 ReceivedEvent::ResponseReceived(_event) => {}

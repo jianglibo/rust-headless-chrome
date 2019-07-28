@@ -15,7 +15,7 @@ pub struct GetResponseBodyForInterceptionTask {
     pub task_result: Option<network::methods::GetResponseBodyForInterceptionReturnObject>,
 }
 
-impl_has_common_fields!(GetResponseBodyForInterceptionTask);
+impl_has_common_fields!(GetResponseBodyForInterceptionTask, "GetResponseBodyForInterceptionTask");
 
 impl AsMethodCallString for GetResponseBodyForInterceptionTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

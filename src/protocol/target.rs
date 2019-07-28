@@ -23,6 +23,9 @@ impl TargetType {
     }
 }
 
+// [headless_chrome::browser_async::chrome_browser][TRACE] got message (***every message***): "{\"method\":\"Target.targetInfoChanged\",\"params\":{\"targetInfo\":{\"targetId\":\"700E35AE434DFBC4120E2B3310B8F6D0\",\"type\":\"iframe\",\"title\":\"https://g.alicdn.com/alilog/oneplus/blk.html#coid=I57CFcc%2FbiICAXHW0CKQbNdT&noid=\",\"url\":\"https://g.alicdn.com/alilog/oneplus/blk.html#coid=I57CFcc%2FbiICAXHW0CKQbNdT&noid=\",\"attached\":false,\"browserContextId\":\"1994C41DF253D6505D3BF2B4A328B0BC\"}}}"
+// [headless_chrome::browser_async::chrome_browser][ERROR] parse message failed: Error("data did not match any variant of untagged enum Message", line: 0, column: 0)
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetInfo {

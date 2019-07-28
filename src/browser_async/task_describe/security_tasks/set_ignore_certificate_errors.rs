@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId, };
 use crate::protocol::{security};
 use failure;
 
@@ -10,7 +10,7 @@ pub struct SetIgnoreCertificateErrorsTask {
     pub ignore: bool,
 }
 
-impl_has_common_fields!(SetIgnoreCertificateErrorsTask);
+impl_has_common_fields!(SetIgnoreCertificateErrorsTask, "SetIgnoreCertificateErrorsTask");
 
 impl AsMethodCallString for SetIgnoreCertificateErrorsTask  {
     fn get_method_str(&self) -> Result<String, failure::Error> {

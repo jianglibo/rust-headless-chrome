@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{runtime};
 use failure;
 
@@ -8,7 +8,7 @@ pub struct RuntimeEnableTask {
     pub common_fields: CommonDescribeFields,
 }
 
-impl_has_common_fields!(RuntimeEnableTask);
+impl_has_common_fields!(RuntimeEnableTask, "RuntimeEnableTask");
 
 impl AsMethodCallString for RuntimeEnableTask {
     fn get_method_str(&self) ->  Result<String, failure::Error>{

@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{runtime};
 use failure;
 
@@ -18,7 +18,7 @@ pub struct GetPropertiesTask {
     pub task_result: Option<runtime::methods::GetPropertiesReturnObject>,
 }
 
-impl_has_common_fields!(GetPropertiesTask);
+impl_has_common_fields!(GetPropertiesTask, "GetPropertiesTask");
 
 impl GetPropertiesTask {
     /// GetPropertiesReturnObject may contains fields other than array items. The array item's name property is a number. for example name: "0" etc.

@@ -1,5 +1,5 @@
 use super::super::{
-    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,
+    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, 
 };
 use crate::protocol::{emulation, page};
 use failure;
@@ -36,7 +36,7 @@ pub struct SetDeviceMetricsOverrideTask {
     pub task_result: Option<bool>,
 }
 
-impl_has_common_fields!(SetDeviceMetricsOverrideTask);
+impl_has_common_fields!(SetDeviceMetricsOverrideTask, "SetDeviceMetricsOverrideTask");
 
 impl AsMethodCallString for SetDeviceMetricsOverrideTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

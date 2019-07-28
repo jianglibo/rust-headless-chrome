@@ -1,6 +1,6 @@
-use std::time::{Instant};
-use super::task_describe::TaskDescribe;
+use super::task_describe::{HasTaskName, TaskDescribe};
 use log::*;
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct TaskQueueItem {
@@ -16,6 +16,10 @@ impl TaskQueueItem {
             delay_secs: Some(delay_secs),
             tasks,
         }
+    }
+
+    pub fn to_task_names(&self) -> Vec<&str> {
+        self.tasks.iter().map(HasTaskName::get_task_name).collect()
     }
 
     pub fn len(&self) -> usize {
@@ -66,6 +70,13 @@ impl TaskQueue {
         }
     }
 
+    pub fn to_task_names(&self) -> Vec<Vec<&str>> {
+        self.task_items
+            .iter()
+            .map(TaskQueueItem::to_task_names)
+            .collect()
+    }
+
     pub fn vec_len(&self) -> usize {
         self.task_items.len()
     }
@@ -87,24 +98,29 @@ impl TaskQueue {
     }
 
     pub fn add_delayed_many(&mut self, tasks: Vec<TaskDescribe>, delay_secs: u64) {
-        self.task_items.push(TaskQueueItem::new_delayed(delay_secs, tasks));
+        self.task_items
+            .push(TaskQueueItem::new_delayed(delay_secs, tasks));
     }
 
     pub fn retrieve_delayed_task_to_run(&mut self) -> Vec<Vec<TaskDescribe>> {
         // self.task_items.drain_filter(|ti| ti.issued_at.elapsed().as_secs() > ti.delay_secs).map(|ti|ti.task).collect()
         let mut to_run = Vec::<TaskQueueItem>::new();
-        self.task_items = self.task_items.drain(..).filter_map(|ti| {
-            if ti.is_time_out() {
-                to_run.push(ti);
-                None
-            } else {
-                Some(ti)
-            }
-        }).collect();
+        self.task_items = self
+            .task_items
+            .drain(..)
+            .filter_map(|ti| {
+                if ti.is_time_out() {
+                    to_run.push(ti);
+                    None
+                } else {
+                    Some(ti)
+                }
+            })
+            .collect();
         if !to_run.is_empty() {
             trace!("got delayed to run: {:?}", to_run);
         }
-        to_run.into_iter().map(|it|it.tasks).collect()
+        to_run.into_iter().map(|it| it.tasks).collect()
     }
 
     pub fn retrieve_manually_task_to_run(&mut self) -> Option<Vec<TaskDescribe>> {
@@ -120,7 +136,6 @@ impl TaskQueue {
 // mod tests {
 //     use super::*;
 //     use log::*;
-
 
 //     #[test]
 //     fn test_task_queue() {

@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{runtime};
 use failure;
 use log::*;
@@ -74,7 +74,7 @@ impl EvaluateTask {
     }
 }
 
-impl_has_common_fields!(EvaluateTask);
+impl_has_common_fields!(EvaluateTask, "EvaluateTask");
 
 impl AsMethodCallString for EvaluateTask {
     fn get_method_str(&self) ->  Result<String, failure::Error>{

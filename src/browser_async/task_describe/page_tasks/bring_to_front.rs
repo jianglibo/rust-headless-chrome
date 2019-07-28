@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{page};
 use failure;
 
@@ -8,7 +8,7 @@ pub struct BringToFrontTask {
     pub common_fields: CommonDescribeFields,
 }
 
-impl_has_common_fields!(BringToFrontTask);
+impl_has_common_fields!(BringToFrontTask, "BringToFrontTask");
 
 impl AsMethodCallString for BringToFrontTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

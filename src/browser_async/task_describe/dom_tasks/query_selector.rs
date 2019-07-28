@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields,TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{dom};
 use failure;
 
@@ -13,7 +13,7 @@ pub struct QuerySelectorTask {
     pub task_result: Option<dom::NodeId>,
 }
 
-impl_has_common_fields!(QuerySelectorTask);
+impl_has_common_fields!(QuerySelectorTask, "QuerySelectorTask");
 
 impl AsMethodCallString for QuerySelectorTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

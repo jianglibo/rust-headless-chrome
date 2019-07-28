@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{page};
 use failure;
 
@@ -10,7 +10,7 @@ pub struct GetLayoutMetricsTask {
     pub task_result: Option<page::methods::GetLayoutMetricsReturnObject>,
 }
 
-impl_has_common_fields!(GetLayoutMetricsTask);
+impl_has_common_fields!(GetLayoutMetricsTask, "GetLayoutMetricsTask");
 
 impl AsMethodCallString for GetLayoutMetricsTask {
     fn get_method_str(&self) ->  Result<String, failure::Error>{

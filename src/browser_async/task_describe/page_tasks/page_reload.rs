@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{page};
 use failure;
 
@@ -11,7 +11,7 @@ pub struct PageReloadTask {
     pub script_to_evaluate: Option<String>,
 }
 
-impl_has_common_fields!(PageReloadTask);
+impl_has_common_fields!(PageReloadTask, "PageReloadTask");
 
 impl AsMethodCallString for PageReloadTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

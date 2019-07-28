@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{input, network};
 use failure;
 
@@ -90,7 +90,7 @@ pub struct DispatchMouseEventTask {
     pub pointer_type: Option<PointerType>,
 }
 
-impl_has_common_fields!(DispatchMouseEventTask);
+impl_has_common_fields!(DispatchMouseEventTask, "DispatchMouseEventTask");
 
 impl AsMethodCallString for DispatchMouseEventTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

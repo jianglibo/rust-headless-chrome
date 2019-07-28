@@ -1,5 +1,5 @@
 use super::super::{
-    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,
+    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, 
 };
 use crate::protocol::{dom, runtime};
 use failure;
@@ -24,7 +24,7 @@ pub struct DescribeNodeTask {
     pub task_result: Option<dom::Node>,
 }
 
-impl_has_common_fields!(DescribeNodeTask);
+impl_has_common_fields!(DescribeNodeTask, "DescribeNodeTask");
 
 impl AsMethodCallString for DescribeNodeTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

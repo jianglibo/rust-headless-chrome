@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{network};
 use failure;
 
@@ -20,7 +20,7 @@ impl SetRequestInterceptionTask {
     }
 }
 
-impl_has_common_fields!(SetRequestInterceptionTask);
+impl_has_common_fields!(SetRequestInterceptionTask, "SetRequestInterceptionTask");
 
 impl AsMethodCallString for SetRequestInterceptionTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

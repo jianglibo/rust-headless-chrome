@@ -7,7 +7,7 @@ use std::fmt;
 
 pub use crate::protocol::browser::methods::VersionInformationReturnObject;
 
-pub use crate::browser::process::LaunchOptionsBuilder;
+pub use crate::browser::process::{LaunchOptionsBuilder, LaunchOptions};
 use crate::browser::process::Process;
 pub use crate::browser::tab::Tab;
 use futures::AsyncSink;
@@ -60,18 +60,26 @@ impl std::fmt::Debug for ChromeBrowser {
     }
 }
 
-impl Default for ChromeBrowser {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ChromeBrowser {
-    pub fn new() -> Self {
+    pub fn new_visible() -> Self {
+        let options = LaunchOptionsBuilder::default().headless(false).build().expect("LaunchOptionsBuilder should success.");
+        Self::new(options)
+    }
+    pub fn new(launch_options: LaunchOptions) -> Self {
+        let chrome_process = Process::new(launch_options).expect("process should created.");
+        let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
+        let process = Some(chrome_process);
+        let state = BrowserState::Connecting(
+            ClientBuilder::new(&web_socket_debugger_url)
+                .expect("client build should work.")
+                .add_protocol("rust-websocket")
+                .async_connect_insecure(),
+        );
+
         Self {
-            state: BrowserState::Unconnected,
+            state,
             ws_client: None,
-            process: None,
+            process,
             last_be_polled: Instant::now(),
             waiting_to_send: VecDeque::new(),
         }
@@ -108,18 +116,18 @@ impl Stream for ChromeBrowser {
             match &mut self.state {
                 BrowserState::Unconnected => {
                     trace!("enter unconnected state.");
-                    let options = LaunchOptionsBuilder::default()
-                        .build()
-                        .expect("Failed to find chrome");
-                    let chrome_process = Process::new(options).expect("process should created.");
-                    let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
-                    self.process = Some(chrome_process);
-                    self.state = BrowserState::Connecting(
-                        ClientBuilder::new(&web_socket_debugger_url)
-                            .expect("client build should work.")
-                            .add_protocol("rust-websocket")
-                            .async_connect_insecure(),
-                    );
+                    // let options = LaunchOptionsBuilder::default()
+                    //     .build()
+                    //     .expect("Failed to find chrome");
+                    // let chrome_process = Process::new(self.launch_options).expect("process should created.");
+                    // let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
+                    // self.process = Some(chrome_process);
+                    // self.state = BrowserState::Connecting(
+                    //     ClientBuilder::new(&web_socket_debugger_url)
+                    //         .expect("client build should work.")
+                    //         .add_protocol("rust-websocket")
+                    //         .async_connect_insecure(),
+                    // );
                 }
                 BrowserState::Connecting(client_new) => {
                     trace!("enter connecting state.");

@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{network};
 use failure;
 
@@ -31,7 +31,7 @@ pub struct ContinueInterceptedRequestTask {
         pub auth_challenge_response: Option<AuthChallengeResponse>,
 }
 
-impl_has_common_fields!(ContinueInterceptedRequestTask);
+impl_has_common_fields!(ContinueInterceptedRequestTask, "ContinueInterceptedRequestTask");
 
 impl AsMethodCallString for ContinueInterceptedRequestTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

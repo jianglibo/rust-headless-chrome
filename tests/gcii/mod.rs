@@ -1,5 +1,6 @@
 use headless_chrome::browser_async::DebugSession;
-use headless_chrome::protocol::target;
+use headless_chrome::protocol::{target};
+use headless_chrome::browser::process;
 use headless_chrome::browser_async::{Tab};
 
 use std::default::Default;
@@ -37,7 +38,15 @@ pub struct GetContentInIframe {
     pub state: PageState,
 }
 
+
+
 impl GetContentInIframe {
+    pub fn new_visible() -> Self {
+        Self {
+            debug_session: DebugSession::new_visible(),
+            ..Default::default()
+        }
+    }
     pub fn get_tab(&mut self, target_id: Option<&target::TargetId>) -> Option<&mut Tab> {
         self.debug_session.find_tab_by_id_mut(target_id).ok()
     }

@@ -1,5 +1,5 @@
 use super::super::{
-    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString,
+    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, 
 };
 use crate::protocol::{emulation};
 use failure;
@@ -12,7 +12,7 @@ pub struct CanEmulateTask {
     pub task_result: Option<bool>,
 }
 
-impl_has_common_fields!(CanEmulateTask);
+impl_has_common_fields!(CanEmulateTask, "CanEmulateTask");
 
 impl AsMethodCallString for CanEmulateTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

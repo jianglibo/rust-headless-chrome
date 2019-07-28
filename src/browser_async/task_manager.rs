@@ -1,9 +1,10 @@
 use super::super::protocol::CallId;
 use super::task_describe::{
-    dom_tasks, input_tasks, runtime_tasks, HasCallId, TargetCallMethodTask, TaskDescribe,
+    dom_tasks, input_tasks, runtime_tasks, HasCallId, TargetCallMethodTask, TaskDescribe, HasTaskName,
 };
 use log::*;
 use std::time::Instant;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct TaskGroup {
@@ -11,6 +12,16 @@ pub struct TaskGroup {
     waiting_tasks: Vec<TaskDescribe>,
     completed_tasks: Vec<TaskDescribe>,
     retried: u64,
+}
+
+impl fmt::Display for TaskGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "issued_at: {:?}, retried: {}, waiting_tasks: {:?}, completed_tasks: {:?})", 
+            self.issued_at, 
+            self.retried, 
+            self.waiting_tasks.iter().map(HasTaskName::get_task_name).collect::<Vec<&str>>(),
+            self.completed_tasks.iter().map(HasTaskName::get_task_name).collect::<Vec<&str>>())
+    }
 }
 
 impl std::default::Default for TaskGroup {
@@ -289,7 +300,7 @@ impl TaskGroup {
                     let viewport = mb.content_viewport();
                     screen_shot.clip = Some(viewport);
                 } else {
-                    error!("found_box is None!");
+                    trace!("clip parameter didn't be provided.");
                 }
                 self.waiting_tasks.insert(0, screen_shot.into());
             }

@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use crate::protocol::{page};
 use failure;
 
@@ -8,7 +8,7 @@ pub struct PageCloseTask {
     pub common_fields: CommonDescribeFields,
 }
 
-impl_has_common_fields!(PageCloseTask);
+impl_has_common_fields!(PageCloseTask, "PageCloseTask");
 
 impl AsMethodCallString for PageCloseTask {
     fn get_method_str(&self) -> Result<String, failure::Error>{

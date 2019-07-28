@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString, };
 use crate::protocol::{dom, runtime};
 use crate::browser::tab::point::Point;
 use crate::browser::tab::element::{ElementQuad};
@@ -21,7 +21,7 @@ pub struct GetContentQuadsTask {
     pub task_result: Option<Vec<[f64; 8]>>,
 }
 
-impl_has_common_fields!(GetContentQuadsTask);
+impl_has_common_fields!(GetContentQuadsTask, "GetContentQuadsTask");
 
 impl AsMethodCallString for GetContentQuadsTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

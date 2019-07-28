@@ -1,4 +1,4 @@
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString,};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, TargetCallMethodTask,  HasCommonField, CanCreateMethodString, };
 use super::super::protocol::{page};
 use super::super::super::page_message::{write_base64_str_to};
 use std::fs;
@@ -22,7 +22,7 @@ pub struct CaptureScreenshotTask {
     pub task_result: Option<String>,
 }
 
-impl_has_common_fields!(CaptureScreenshotTask);
+impl_has_common_fields!(CaptureScreenshotTask, "CaptureScreenshotTask");
 
 impl CaptureScreenshotTask {
     pub fn save(&self) -> Result<&str, failure::Error> {

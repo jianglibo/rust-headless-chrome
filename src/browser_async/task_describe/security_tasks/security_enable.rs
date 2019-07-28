@@ -1,5 +1,5 @@
 use crate::browser_async::{create_msg_to_send, MethodDestination};
-use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId};
+use super::super::{TaskDescribe, CommonDescribeFields, AsMethodCallString, BrowserCallMethodTask, HasCommonField, HasCallId, };
 use crate::protocol::{security};
 use failure;
 
@@ -9,7 +9,7 @@ pub struct SecurityEnableTask {
     pub common_fields: CommonDescribeFields,
 }
 
-impl_has_common_fields!(SecurityEnableTask);
+impl_has_common_fields!(SecurityEnableTask, "SecurityEnableTask");
 
 impl AsMethodCallString for SecurityEnableTask  {
     fn get_method_str(&self) -> Result<String, failure::Error> {

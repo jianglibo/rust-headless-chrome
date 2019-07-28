@@ -147,7 +147,8 @@ pub fn next_call_id() -> protocol::CallId {
                     session_id: Some(session_id.as_str()),
                     message: &message_text,
                 };
-                create_msg_to_send(target_method, MethodDestination::Browser, GLOBAL_METHOD_CALL_COUNT.fetch_add(1, Ordering::SeqCst))
+                let nid = next_call_id();
+                create_msg_to_send(target_method, MethodDestination::Browser, nid)
             }
             MethodDestination::Browser => {
                 let call = method.to_method_call(call_id);

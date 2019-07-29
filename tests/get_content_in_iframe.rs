@@ -86,6 +86,9 @@ impl Future for GetContentInIframe {
                         if tab.bring_to_front() {
                             info!("activating {:?}", tab);
                         }
+                        if seconds % 30 == 0 {
+                            // tab.evaluate_expression("1+1;");
+                        }
 
                         // if seconds % 100 == 0 {
                         //     info!("detail page: {:?}", tab);

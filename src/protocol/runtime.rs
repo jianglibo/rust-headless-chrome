@@ -5,6 +5,8 @@
     pub type TimeDelta = u32;
     pub type ScriptId = String;
     pub type RemoteObjectId = String;
+    pub type Timestamp = u64;
+    
 
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]

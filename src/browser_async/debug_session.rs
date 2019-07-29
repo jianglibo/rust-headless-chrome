@@ -4,7 +4,7 @@ use super::interval_page_message::IntervalPageMessage;
 use super::page_message::{PageResponse, PageResponseWrapper};
 use super::task_describe::{
     handle_browser_method_call, handle_dom_event, handle_network_event, handle_page_event,
-    handle_runtime_event, handle_target_event, handle_target_method_call, target_tasks,
+    handle_runtime_event, handle_target_event, handle_target_method_call, target_tasks, handle_log_event,
     CommonDescribeFieldsBuilder, RuntimeEnableTask, SecurityEnableTask, SetDiscoverTargetsTask,
     SetIgnoreCertificateErrorsTask, TaskDescribe,
 };
@@ -479,6 +479,11 @@ impl DebugSession {
                 Ok(handle_dom_event(self, dom_event, session_id, target_id)
                     .ok()
                     .into())
+            }
+            TaskDescribe::LogEvent(log_event) => {
+                Ok(handle_log_event(self, log_event, session_id, target_id)
+                    .ok()
+                    .into())                
             }
             TaskDescribe::ChromeConnected => {
                 let resp = Some(PageResponseWrapper::new(PageResponse::ChromeConnected));

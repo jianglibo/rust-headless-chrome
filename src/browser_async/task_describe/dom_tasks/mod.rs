@@ -29,7 +29,7 @@ pub enum DomEvent {
     SetChildNodes(dom_events::SetChildNodes),
 }
 
-pub    fn handle_dom_event(
+pub fn handle_dom_event(
         debug_session: &mut DebugSession,
         dom_event: DomEvent,
         _maybe_session_id: Option<target::SessionID>,

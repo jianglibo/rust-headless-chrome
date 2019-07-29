@@ -66,7 +66,7 @@ macro_rules! impl_has_common_fields {
 }
 
 #[macro_export]
-macro_rules! impl_has_common_fields_for_task_describe {
+macro_rules! impl_has_task_name_for_task_describe {
     ([$($target_task:path),*], [$($browser_task:path),*]) => {
         impl HasTaskName for TaskDescribe {
             fn get_task_name(&self) -> &str {

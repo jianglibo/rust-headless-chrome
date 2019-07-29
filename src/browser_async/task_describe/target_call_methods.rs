@@ -1,4 +1,4 @@
-use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks, emulation_tasks, TaskDescribe, HasCallId, HasTaskId, HasSessionId, HasCommonField};
+use super::{dom_tasks, network_tasks, page_tasks,runtime_tasks, input_tasks, log_tasks, emulation_tasks, TaskDescribe, HasCallId, HasTaskId, HasSessionId, HasCommonField};
 
 use super::super::debug_session::DebugSession;
 use super::super::page_message::{PageResponse, PageResponseWrapper, MethodCallDone};
@@ -16,6 +16,7 @@ pub enum TargetCallMethodTask {
     GetContentQuads(dom_tasks::GetContentQuadsTask),
     GetDocument(dom_tasks::GetDocumentTask),
     PageEnable(page_tasks::PageEnableTask),
+    LogEnable(log_tasks::LogEnableTask),
     SetLifecycleEventsEnabled(page_tasks::SetLifecycleEventsEnabledTask),
     PageClose(page_tasks::PageCloseTask),
     GetLayoutMetrics(page_tasks::GetLayoutMetricsTask),
@@ -69,6 +70,7 @@ impl HasSessionId for TargetCallMethodTask {
             TargetCallMethodTask::CanEmulate(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
             TargetCallMethodTask::SetDeviceMetricsOverride(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
             TargetCallMethodTask::SetLifecycleEventsEnabled(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
+            TargetCallMethodTask::LogEnable(task) => {task.get_common_fields_mut().session_id.replace(session_id);}
         }
     }
 }
@@ -102,6 +104,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::CanEmulate(task) => task.get_call_id(),
             TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_call_id(),
             TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_call_id(),
+            TargetCallMethodTask::LogEnable(task) => task.get_call_id(),
         }
     }
     fn renew_call_id(&mut self) {
@@ -131,6 +134,7 @@ impl HasCallId for TargetCallMethodTask {
             TargetCallMethodTask::CanEmulate(task) => task.renew_call_id(),
             TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.renew_call_id(),
             TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.renew_call_id(),
+            TargetCallMethodTask::LogEnable(task) => task.renew_call_id(),
         }
     }
 }
@@ -255,6 +259,10 @@ pub fn handle_target_method_call(
         }
         TargetCallMethodTask::NetworkEnable(_task) => {
             trace!("ignored method return. NetworkEnable");
+            Ok(PageResponseWrapper::default())
+        }
+        TargetCallMethodTask::LogEnable(_task) => {
+            trace!("ignored method return. LogEnable");
             Ok(PageResponseWrapper::default())
         }
         TargetCallMethodTask::ContinueInterceptedRequest(_task) => {

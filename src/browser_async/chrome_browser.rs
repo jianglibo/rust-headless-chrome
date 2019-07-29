@@ -85,11 +85,7 @@ impl ChromeBrowser {
         }
     }
     pub fn send_message(&mut self, method_str: String) {
-        if method_str.len() > 400 {
-            info!("**sending** : {:?} ..............", method_str.split_at(400).0);
-        } else {
-            info!("**sending** : {:?}", method_str);
-        }
+        // info!("**sending** : {:?}", method_str);
         match self.state {
             BrowserState::StartSend(_) | BrowserState::Sending => {
                 self.waiting_to_send.push_back(method_str);
@@ -138,7 +134,7 @@ impl Stream for ChromeBrowser {
                     return Ok(Some(protocol::Message::Connected).into());
                 }
                 BrowserState::Receiving => {
-                    // info!("try receiving..........");
+                    info!("try receiving..........");
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {
@@ -177,8 +173,7 @@ impl Stream for ChromeBrowser {
                     }
                 }
                 BrowserState::StartSend(message_to_send) => {
-                    trace!("enter start send");
-                    // trace!("enter start send. {:?}", message_to_send);
+                    info!("try start_send..........");
                     match self
                         .ws_client
                         .as_mut()
@@ -186,24 +181,28 @@ impl Stream for ChromeBrowser {
                         .start_send(OwnedMessage::Text(message_to_send.clone()))
                     {
                         Ok(AsyncSink::Ready) => {
+                            trace!("entered start send. switching to **sending: {:?}", message_to_send);
                             self.state = BrowserState::Sending;
                         }
                         Ok(AsyncSink::NotReady(_)) => {
+                            error!("StartSend doesn't ready yet.");
                             return Ok(Async::NotReady);
                         }
                         Err(e) => {
+                            error!("StartSend error: {:?}", e);
                             return Err(e.into());
                         }
                     }
                 }
                 BrowserState::Sending => {
-                    trace!("enter sending.");
+                    info!("try sending..........");
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll_complete() {
                         Ok(Async::Ready(_)) => {
-                            trace!("switch to receiving state.");
                             if let Some(first) = self.waiting_to_send.pop_front() {
+                                trace!("take from waiting_to_send: {:?}", first);
                                 self.state = BrowserState::StartSend(first);
                             } else {
+                                trace!("switch to receiving state.");
                                 self.state = BrowserState::Receiving;
                             }
                         }

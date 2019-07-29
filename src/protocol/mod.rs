@@ -17,6 +17,7 @@ pub mod runtime;
 pub mod target;
 pub mod security;
 pub mod emulation;
+pub mod chrome_log;
 
 pub type CallId = usize;
 

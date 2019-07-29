@@ -16,6 +16,9 @@ pub mod runtime_tasks;
 pub mod security_tasks;
 pub mod target_call_methods;
 pub mod target_tasks;
+pub mod log_tasks;
+
+pub use log_tasks::{LogEvent, LogEnableTask, LogEnableTaskBuilder, handle_log_event};
 
 pub use dom_tasks::{
     dom_events, handle_dom_event, DescribeNodeTask, DescribeNodeTaskBuilder, DomEvent,
@@ -153,12 +156,13 @@ pub enum TaskDescribe {
     RuntimeEvent(RuntimeEvent),
     TargetEvent(TargetEvent),
     DomEvent(DomEvent),
+    LogEvent(LogEvent),
     NetworkEvent(NetworkEvent),
     Interval,
     ChromeConnected,
 }
 
-impl_has_common_fields_for_task_describe!(
+impl_has_task_name_for_task_describe!(
     [
         TargetCallMethodTask::QuerySelector,
         TargetCallMethodTask::DescribeNode,
@@ -184,7 +188,8 @@ impl_has_common_fields_for_task_describe!(
         TargetCallMethodTask::DispatchMouseEvent,
         TargetCallMethodTask::CanEmulate,
         TargetCallMethodTask::SetDeviceMetricsOverride,
-        TargetCallMethodTask::SetLifecycleEventsEnabled
+        TargetCallMethodTask::SetLifecycleEventsEnabled,
+        TargetCallMethodTask::LogEnable
     ],
     [
         BrowserCallMethodTask::CreateTarget,
@@ -228,6 +233,7 @@ impl std::convert::TryFrom<&TaskDescribe> for String {
                 TargetCallMethodTask::CanEmulate(task) => task.get_method_str(),
                 TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_method_str(),
                 TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_method_str(),
+                TargetCallMethodTask::LogEnable(task) => task.get_method_str(),
             },
             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),

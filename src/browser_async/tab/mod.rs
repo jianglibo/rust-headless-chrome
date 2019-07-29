@@ -4,7 +4,7 @@ use super::super::browser_async::{embedded_events, ChromeDebugSession, NetworkSt
 use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
-    dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks,
+    dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks, log_tasks,
     target_tasks, ActivateTargetTaskBuilder, CommonDescribeFields, CommonDescribeFieldsBuilder,
     HasSessionId, TaskDescribe,
 };
@@ -700,10 +700,10 @@ impl Tab {
                         .next_mouse_move_task
                         .take()
                         .expect("I have check exists first.");
-                    if self.activated_at.is_some() {
+                    // if self.activated_at.is_some() {
                         self.execute_tasks(ti.tasks);
                         self.generate_new_mouse_move_task();
-                    }
+                    // }
                 }
             } else {
                 self.generate_new_mouse_move_task();
@@ -890,6 +890,21 @@ impl Tab {
         } else {
             self.execute_one_task(task);
         }
+    }
+
+    pub fn log_enable(&mut self) {
+        let task = self.log_enable_task();
+        if self.session_id.is_none() {
+            self.waiting_for_page_attach_tasks.push(task);
+        } else {
+            self.execute_one_task(task);
+        }
+    }
+    fn log_enable_task(&self) -> TaskDescribe {
+        log_tasks::LogEnableTask {
+            common_fields: self.get_common_field(None),
+        }
+        .into()
     }
 
     fn page_enable_task(&self) -> TaskDescribe {

@@ -97,7 +97,6 @@ pub struct ConsoleAPICalledParams {
 }
 
 
-
 // https://serde.rs/enum-representations.html
 
 #[derive(Deserialize, Debug, Clone)]

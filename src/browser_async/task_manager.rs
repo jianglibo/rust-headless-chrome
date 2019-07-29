@@ -226,7 +226,7 @@ impl TaskGroup {
                     }
                 }
                 input_tasks::MouseEventType::Released => {
-                    // The most possile task before Released is a Pressed task.
+                    // The most possible task before Released is a Pressed task.
                     if let Some(press_task) = self.find_dispatch_mouse_event_task_by_type(
                         input_tasks::MouseEventType::Pressed,
                     ) {
@@ -410,7 +410,7 @@ impl TaskManager {
     }
 
     /// When push the task_group, the first task of the group is already send to chrome.
-    /// If the task does't get responesed, this group of task will hang on, and the process will stop going.
+    /// If the task doesn't get responded, this group of task will hang on, and the process will stop going.
     pub fn push_task_group(&mut self, mut task_group: TaskGroup) {
         task_group.issued_at = Instant::now();
         self.task_groups_waiting_for_response.push(task_group);

@@ -38,7 +38,7 @@ impl ChromeDebugSession {
     }
 
     /// execute_task causes sending a message to the chrome. This drive the program to run.
-    /// invoking multiple times cause sending message in parrallel.
+    /// invoking multiple times cause sending message in parallel.
     pub fn execute_task(&mut self, task_vec: Vec<TaskDescribe>) {
         self.execute_next_and_return_remains(task_manager::TaskGroup::new(task_vec));
     }
@@ -289,6 +289,9 @@ impl ChromeDebugSession {
                 TargetCallMethodTask::PageClose(_task) => {
                     info!("page closed.");
                 }
+                TargetCallMethodTask::LogEnable(_task) => {
+                    info!("log enabled.");
+                }
                 TargetCallMethodTask::SetLifecycleEventsEnabled(_task) => {
                     info!("set lifecycle event enabled.");
                 }
@@ -532,12 +535,8 @@ impl Stream for ChromeDebugSession {
                 if let Some(task_describe) = self.process_message(value) {
                     break Ok(Some(task_describe).into());
                 } else {
-                    info!("discard intermedia tasks.");
+                    info!("discard intermediate tasks.");
                 }
-            // trace!("receive message: {:?}", value);
-            // return Ok(Some(PageMessage::MessageAvailable(value)).into());
-            // }
-            // }
             } else {
                 error!("got None, was stream ended?");
             }

@@ -26,6 +26,7 @@ impl CaptureScreenShotTest {
                     tab.network_enable();
                     tab.page_enable();
                     tab.runtime_enable();
+                    tab.log_enable();
                     tab.lifecycle_events_enable();
                     tab.attach_to_page();
                 }

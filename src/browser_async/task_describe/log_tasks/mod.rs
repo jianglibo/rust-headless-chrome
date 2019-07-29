@@ -2,7 +2,7 @@ pub mod log_events;
 pub mod log_enable;
 
 use super::super::{DebugSession};
-use super::super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
+use super::super::page_message::{PageResponseWrapper};
 use super::super::protocol::{target};
 pub use log_enable::{LogEnableTask, LogEnableTaskBuilder};
 use log::*;

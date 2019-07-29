@@ -1,9 +1,14 @@
 use serde::Deserialize;
-use crate::protocol::{dom as protocol_dom, runtime, network};
+use super::super::protocol::{dom as protocol_dom, runtime, network, chrome_log};
+
+pub use chrome_log::events::{LogEntryAdded};
 
 mod network_raw_event;
 
-pub use network_raw_event::{RequestWillBeSent, RequestWillBeSentParams, ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
+pub use network_raw_event::{RequestWillBeSent, RequestWillBeSentParams,
+ ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
+
+
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -129,7 +134,8 @@ pub enum EmbeddedEvent {
     LoadingFailed(LoadingFailed),
     #[serde(rename = "Network.requestServedFromCache")]
     RequestServedFromCache(RequestServedFromCache),
-    
+    #[serde(rename = "Log.entryAdded")]
+    LogEntryAdded(LogEntryAdded),
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -18,7 +18,7 @@ pub mod target_call_methods;
 pub mod target_tasks;
 pub mod log_tasks;
 
-pub use log_tasks::{LogEvent, LogEnableTask, LogEnableTaskBuilder, handle_log_event};
+pub use log_tasks::{log_events, LogEvent, LogEnableTask, LogEnableTaskBuilder, handle_log_event};
 
 pub use dom_tasks::{
     dom_events, handle_dom_event, DescribeNodeTask, DescribeNodeTaskBuilder, DomEvent,

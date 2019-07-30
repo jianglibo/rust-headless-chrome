@@ -82,7 +82,7 @@ impl CaptureScreenShotTest {
                     //     tab.capture_screenshot_surface_jpeg(Some(100));
                     // }
                     _ => {
-                        error!("got other method_call_done. {:?}", method_call_done);
+                        trace!("got other method_call_done. {:?}", method_call_done);
                     }
                 };
             }

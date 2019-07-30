@@ -5,7 +5,7 @@
     pub type TimeDelta = u32;
     pub type ScriptId = String;
     pub type RemoteObjectId = String;
-    pub type Timestamp = u64;
+    pub type Timestamp = f64;
     
 
     #[derive(Deserialize, Debug, Clone)]

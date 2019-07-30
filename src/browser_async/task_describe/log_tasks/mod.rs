@@ -10,7 +10,7 @@ use log::*;
 
 #[derive(Debug)]
 pub enum LogEvent {
-    EntryAdded(log_events::EntryAdded),
+    EntryAdded(log_events::LogEntryAdded),
 }
 
 pub fn handle_log_event(

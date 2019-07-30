@@ -63,14 +63,14 @@ pub mod events {
     #[derive(Deserialize, Debug, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct LogEntryAddedParams {
-        pub entry: String,
+        pub entry: LogEntry,
     }
 
 }
 
 pub mod methods {
     use super::super::{EmptyReturnObject, Method};
-    use serde::{Deserialize, Serialize};
+    use serde::{Serialize};
 
     #[derive(Serialize, Debug)]
     #[serde(rename_all = "camelCase")]

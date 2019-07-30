@@ -1,14 +1,15 @@
 use super::task_describe::{
     dom_events, network_events, page_events, runtime_events, target_events, BrowserCallMethodTask,
-    TargetCallMethodTask, TaskDescribe,
+    TargetCallMethodTask, TaskDescribe, log_events,
 };
 
 use super::embedded_events::{self, EmbeddedEvent};
 use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId};
 
 use super::task_manager;
-use crate::browser::tab::element::{BoxModel, ElementQuad};
-use crate::protocol::{self, dom, emulation, network, page, runtime, target};
+use super::super::browser::tab::element::{BoxModel, ElementQuad};
+use super::super::protocol::{self, dom, emulation, network, page, runtime, target};
+
 use failure::Error;
 use log::*;
 use std::convert::TryFrom;
@@ -123,6 +124,10 @@ impl ChromeDebugSession {
             }
             EmbeddedEvent::ChildNodeCountUpdated(embedded_event) => {
                 let event = dom_events::ChildNodeCountUpdated::new(embedded_event);
+                return TaskDescribe::from(event).into();
+            }
+            EmbeddedEvent::LogEntryAdded(embedded_event) => {
+                let event = log_events::LogEntryAdded::new(embedded_event);
                 return TaskDescribe::from(event).into();
             }
             _ => {

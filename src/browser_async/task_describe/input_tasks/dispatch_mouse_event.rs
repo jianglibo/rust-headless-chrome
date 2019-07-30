@@ -1,5 +1,8 @@
-use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString, };
-use crate::protocol::{input, network};
+use super::super::super::protocol::{input, network};
+use super::super::{
+    AsMethodCallString, CanCreateMethodString, CommonDescribeFields, HasCommonField,
+    TargetCallMethodTask, TaskDescribe,
+};
 use failure;
 
 #[derive(Debug, Clone)]
@@ -105,4 +108,8 @@ impl AsMethodCallString for DispatchMouseEventTask {
     }
 }
 
-impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::DispatchMouseEvent, DispatchMouseEventTask);
+impl_into_task_describe!(
+    TaskDescribe::TargetCallMethod,
+    TargetCallMethodTask::DispatchMouseEvent,
+    DispatchMouseEventTask
+);

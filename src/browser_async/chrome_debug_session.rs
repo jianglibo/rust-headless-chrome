@@ -8,7 +8,7 @@ use crate::browser_async::{chrome_browser::ChromeBrowser, TaskId};
 
 use super::task_manager;
 use super::super::browser::tab::element::{BoxModel, ElementQuad};
-use super::super::protocol::{self, dom, emulation, network, page, runtime, target};
+use super::super::protocol::{self, dom, emulation, network, page, runtime, target, browser};
 
 use failure::Error;
 use log::*;
@@ -350,20 +350,22 @@ impl ChromeDebugSession {
                 BrowserCallMethodTask::ActivateTarget(task) => {
                     info!("nothing to full fill ActivateTarget:: {:?}", task);
                 }
+                BrowserCallMethodTask::GetTargets(task) => {
+                    let task_return_object = protocol::parse_response::<
+                        target::methods::GetTargetsReturnObject,
+                    >(resp)?;
+                    task.task_result.replace(task_return_object.target_infos);                    
+                }
+                BrowserCallMethodTask::GetBrowserCommandLine(task) => {
+                    let task_return_object = protocol::parse_response::<
+                        browser::methods::GetBrowserCommandLineReturnObject,
+                    >(resp)?;
+                    task.task_result.replace(task_return_object);
+                }
                 BrowserCallMethodTask::CloseTarget(task) => {
                     let task_return_object =
                         protocol::parse_response::<target::methods::CloseTargetReturnObject>(resp)?;
                     task.task_result = Some(task_return_object.success);
-                    // if let Some(r) = task.task_result {
-                    //     if r {
-                    //         info!("tab close method call returned. close successfully.");
-                    //     } else {
-                    //         error!("tab close method call returned. close failed.");
-                    //     }
-                    // } else {
-                    //     error!("tab close method call returned. close failed. {:?}", task);
-                    // }
-                    // debug_session.tab_closed(maybe_target_id.as_ref(), task.task_result);
                 }
             },
             task_describe => {

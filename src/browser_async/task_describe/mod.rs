@@ -1,14 +1,14 @@
 // use super::target_message_event::target_message_events;
-use super::{
-    create_msg_to_send_with_session_id, create_unique_task_id, next_call_id, TaskId,
-};
 use super::super::protocol::{self, target};
+use super::{create_msg_to_send_with_session_id, create_unique_task_id, next_call_id, TaskId};
 use log::*;
 
 pub mod browser_call_methods;
+pub mod browser_tasks;
 pub mod dom_tasks;
 pub mod emulation_tasks;
 pub mod input_tasks;
+pub mod log_tasks;
 pub mod network_tasks;
 pub mod other_tasks;
 pub mod page_tasks;
@@ -16,9 +16,10 @@ pub mod runtime_tasks;
 pub mod security_tasks;
 pub mod target_call_methods;
 pub mod target_tasks;
-pub mod log_tasks;
 
-pub use log_tasks::{log_events, LogEvent, LogEnableTask, LogEnableTaskBuilder, handle_log_event};
+pub use log_tasks::{handle_log_event, log_events, LogEnableTask, LogEnableTaskBuilder, LogEvent};
+
+pub use browser_tasks::{GetBrowserCommandLineTask, GetBrowserCommandLineTaskBuilder};
 
 pub use dom_tasks::{
     dom_events, handle_dom_event, DescribeNodeTask, DescribeNodeTaskBuilder, DomEvent,
@@ -42,7 +43,7 @@ pub use security_tasks::{
 
 pub use target_tasks::{
     handle_target_event, target_events, ActivateTargetTask, ActivateTargetTaskBuilder,
-    CreateTargetTask, CreateTargetTaskBuilder, SetDiscoverTargetsTask,
+    CreateTargetTask, CreateTargetTaskBuilder, GetTargetsTask, SetDiscoverTargetsTask,
     SetDiscoverTargetsTaskBuilder, TargetEvent,
 };
 
@@ -89,7 +90,9 @@ where
     T: HasCommonField,
 {
     fn get_call_id(&self) -> protocol::CallId {
-        self.get_common_fields().call_id.expect("call_id should exists when call get_call_id.")
+        self.get_common_fields()
+            .call_id
+            .expect("call_id should exists when call get_call_id.")
     }
 
     fn renew_call_id(&mut self) {
@@ -134,7 +137,9 @@ where
         create_msg_to_send_with_session_id(
             method,
             self.get_common_fields().session_id.as_ref(),
-            self.get_common_fields().call_id.expect("call_id should exists when call create_method_str."),
+            self.get_common_fields()
+                .call_id
+                .expect("call_id should exists when call create_method_str."),
         )
     }
 }
@@ -162,7 +167,7 @@ pub enum TaskDescribe {
     ChromeConnected,
 }
 
-impl_has_task_name_for_task_describe!(
+impl_iro_iro_for_task_describe!(
     [
         TargetCallMethodTask::QuerySelector,
         TargetCallMethodTask::DescribeNode,
@@ -198,59 +203,63 @@ impl_has_task_name_for_task_describe!(
         BrowserCallMethodTask::SecurityEnable,
         BrowserCallMethodTask::AttachedToTarget,
         BrowserCallMethodTask::CloseTarget,
-        BrowserCallMethodTask::ActivateTarget
+        BrowserCallMethodTask::ActivateTarget,
+        BrowserCallMethodTask::GetTargets,
+        BrowserCallMethodTask::GetBrowserCommandLine
     ]
 );
 
-impl std::convert::TryFrom<&TaskDescribe> for String {
-    type Error = failure::Error;
+// impl std::convert::TryFrom<&TaskDescribe> for String {
+//     type Error = failure::Error;
 
-    fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
-        match task_describe {
-            TaskDescribe::TargetCallMethod(target_call) => match target_call {
-                TargetCallMethodTask::QuerySelector(task) => task.get_method_str(),
-                TargetCallMethodTask::DescribeNode(task) => task.get_method_str(),
-                TargetCallMethodTask::PrintToPDF(task) => task.get_method_str(),
-                TargetCallMethodTask::GetBoxModel(task) => task.get_method_str(),
-                TargetCallMethodTask::GetContentQuads(task) => task.get_method_str(),
-                TargetCallMethodTask::CaptureScreenshot(task) => task.get_method_str(),
-                TargetCallMethodTask::GetDocument(task) => task.get_method_str(),
-                TargetCallMethodTask::NavigateTo(task) => task.get_method_str(),
-                TargetCallMethodTask::PageEnable(task) => task.get_method_str(),
-                TargetCallMethodTask::RuntimeEnable(task) => task.get_method_str(),
-                TargetCallMethodTask::Evaluate(task) => task.get_method_str(),
-                TargetCallMethodTask::GetProperties(task) => task.get_method_str(),
-                TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
-                TargetCallMethodTask::NetworkEnable(task) => task.get_method_str(),
-                TargetCallMethodTask::SetRequestInterception(task) => task.get_method_str(),
-                TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_method_str(),
-                TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_method_str(),
-                TargetCallMethodTask::PageReload(task) => task.get_method_str(),
-                TargetCallMethodTask::GetLayoutMetrics(task) => task.get_method_str(),
-                TargetCallMethodTask::BringToFront(task) => task.get_method_str(),
-                TargetCallMethodTask::PageClose(task) => task.get_method_str(),
-                TargetCallMethodTask::DispatchMouseEvent(task) => task.get_method_str(),
-                TargetCallMethodTask::CanEmulate(task) => task.get_method_str(),
-                TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_method_str(),
-                TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_method_str(),
-                TargetCallMethodTask::LogEnable(task) => task.get_method_str(),
-            },
-            TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
-                BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
-                BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
-                BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
-                BrowserCallMethodTask::SecurityEnable(task) => task.get_method_str(),
-                BrowserCallMethodTask::AttachedToTarget(task) => task.get_method_str(),
-                BrowserCallMethodTask::CloseTarget(task) => task.get_method_str(),
-                BrowserCallMethodTask::ActivateTarget(task) => task.get_method_str(),
-            },
-            _ => {
-                error!("task describe to string failed. {:?}", task_describe);
-                failure::bail!("should not be called.")
-            }
-        }
-    }
-}
+//     fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
+//         match task_describe {
+//             TaskDescribe::TargetCallMethod(target_call) => match target_call {
+//                 TargetCallMethodTask::QuerySelector(task) => task.get_method_str(),
+//                 TargetCallMethodTask::DescribeNode(task) => task.get_method_str(),
+//                 TargetCallMethodTask::PrintToPDF(task) => task.get_method_str(),
+//                 TargetCallMethodTask::GetBoxModel(task) => task.get_method_str(),
+//                 TargetCallMethodTask::GetContentQuads(task) => task.get_method_str(),
+//                 TargetCallMethodTask::CaptureScreenshot(task) => task.get_method_str(),
+//                 TargetCallMethodTask::GetDocument(task) => task.get_method_str(),
+//                 TargetCallMethodTask::NavigateTo(task) => task.get_method_str(),
+//                 TargetCallMethodTask::PageEnable(task) => task.get_method_str(),
+//                 TargetCallMethodTask::RuntimeEnable(task) => task.get_method_str(),
+//                 TargetCallMethodTask::Evaluate(task) => task.get_method_str(),
+//                 TargetCallMethodTask::GetProperties(task) => task.get_method_str(),
+//                 TargetCallMethodTask::RuntimeCallFunctionOn(task) => task.get_method_str(),
+//                 TargetCallMethodTask::NetworkEnable(task) => task.get_method_str(),
+//                 TargetCallMethodTask::SetRequestInterception(task) => task.get_method_str(),
+//                 TargetCallMethodTask::GetResponseBodyForInterception(task) => task.get_method_str(),
+//                 TargetCallMethodTask::ContinueInterceptedRequest(task) => task.get_method_str(),
+//                 TargetCallMethodTask::PageReload(task) => task.get_method_str(),
+//                 TargetCallMethodTask::GetLayoutMetrics(task) => task.get_method_str(),
+//                 TargetCallMethodTask::BringToFront(task) => task.get_method_str(),
+//                 TargetCallMethodTask::PageClose(task) => task.get_method_str(),
+//                 TargetCallMethodTask::DispatchMouseEvent(task) => task.get_method_str(),
+//                 TargetCallMethodTask::CanEmulate(task) => task.get_method_str(),
+//                 TargetCallMethodTask::SetDeviceMetricsOverride(task) => task.get_method_str(),
+//                 TargetCallMethodTask::SetLifecycleEventsEnabled(task) => task.get_method_str(),
+//                 TargetCallMethodTask::LogEnable(task) => task.get_method_str(),
+//             },
+//             TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
+//                 BrowserCallMethodTask::CreateTarget(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::SetDiscoverTargets(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::SetIgnoreCertificateErrors(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::SecurityEnable(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::AttachedToTarget(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::CloseTarget(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::ActivateTarget(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::GetTargets(task) => task.get_method_str(),
+//                 BrowserCallMethodTask::GetBrowserCommandLine(task) => task.get_method_str(),
+//             },
+//             _ => {
+//                 error!("task describe to string failed. {:?}", task_describe);
+//                 failure::bail!("should not be called.")
+//             }
+//         }
+//     }
+// }
 
 // #[derive(Debug)]
 // pub struct ResolveNode {

@@ -3,15 +3,17 @@ pub mod set_discover_target_task;
 pub mod target_events;
 pub mod close_target;
 pub mod activate_target;
+pub mod get_targets;
 
 pub use create_target::{CreateTargetTask, CreateTargetTaskBuilder};
 pub use close_target::{CloseTargetTask, CloseTargetTaskBuilder};
 pub use set_discover_target_task::{SetDiscoverTargetsTask, SetDiscoverTargetsTaskBuilder};
 pub use activate_target::{ActivateTargetTask, ActivateTargetTaskBuilder};
+pub use get_targets::{GetTargetsTask, GetTargetsTaskBuilder};
 
-use crate::browser_async::{DebugSession, Tab};
-use crate::browser_async::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
-use crate::protocol::{target};
+use super::super::{DebugSession, Tab};
+use super::super::page_message::{PageResponse, PageResponseWrapper, ReceivedEvent};
+use super::super::super::protocol::{target};
 use log::*;
 use std::sync::Arc;
 

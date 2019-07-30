@@ -1,7 +1,8 @@
+use super::super::super::protocol::{emulation, page};
 use super::super::{
-    CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, 
+    AsMethodCallString, CanCreateMethodString, CommonDescribeFields, HasCommonField,
+    TargetCallMethodTask, TaskDescribe,
 };
-use crate::protocol::{emulation, page};
 use failure;
 
 #[derive(Debug, Builder, Default, Clone)]
@@ -39,10 +40,14 @@ pub struct SetDeviceMetricsOverrideTask {
 impl_has_common_fields!(SetDeviceMetricsOverrideTask, "SetDeviceMetricsOverrideTask");
 
 impl AsMethodCallString for SetDeviceMetricsOverrideTask {
-    fn get_method_str(&self) -> Result<String, failure::Error>{
+    fn get_method_str(&self) -> Result<String, failure::Error> {
         let method = emulation::methods::SetDeviceMetricsOverride {
-            width: self.width.expect("set_device_metrics_override width parameter is mandatory."),
-            height: self.height.expect("set_device_metrics_override height parameter is mandatory."),
+            width: self
+                .width
+                .expect("set_device_metrics_override width parameter is mandatory."),
+            height: self
+                .height
+                .expect("set_device_metrics_override height parameter is mandatory."),
             device_scale_factor: self.device_scale_factor,
             mobile: self.mobile,
             scale: self.scale,
@@ -58,5 +63,8 @@ impl AsMethodCallString for SetDeviceMetricsOverrideTask {
     }
 }
 
-impl_into_task_describe!(TaskDescribe::TargetCallMethod, TargetCallMethodTask::SetDeviceMetricsOverride, SetDeviceMetricsOverrideTask);
-
+impl_into_task_describe!(
+    TaskDescribe::TargetCallMethod,
+    TargetCallMethodTask::SetDeviceMetricsOverride,
+    SetDeviceMetricsOverrideTask
+);

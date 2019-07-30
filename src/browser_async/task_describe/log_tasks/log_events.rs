@@ -1,6 +1,6 @@
-use super::LogEvent;
+use super::super::super::protocol::chrome_log;
 use super::super::TaskDescribe;
-use super::super::super::protocol::{chrome_log};
+use super::LogEvent;
 
 wrapper_raw_event!(
     TaskDescribe::LogEvent,

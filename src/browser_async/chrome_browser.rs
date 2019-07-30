@@ -134,7 +134,7 @@ impl Stream for ChromeBrowser {
                     return Ok(Some(protocol::Message::Connected).into());
                 }
                 BrowserState::Receiving => {
-                    info!("try receiving..........");
+                    // info!("try receiving..........");
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll() {
                         Ok(Async::Ready(Some(message))) => {
                             if let OwnedMessage::Text(msg) = message {

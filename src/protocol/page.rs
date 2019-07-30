@@ -201,6 +201,19 @@ pub mod events {
     pub struct FrameStoppedLoadingParams {
         pub frame_id: String,
     }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct WindowOpen {
+        pub params: WindowOpenParams,
+    }
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct WindowOpenParams {
+        pub url: String,
+        pub window_name: String,
+        pub window_features: Vec<String>,
+        pub user_gesture: bool,
+    }
 }
 
 pub mod methods {

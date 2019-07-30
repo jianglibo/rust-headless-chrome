@@ -5,8 +5,8 @@ use super::page_message::{PageResponse, PageResponseWrapper};
 use super::task_describe::{
     handle_browser_method_call, handle_dom_event, handle_network_event, handle_page_event,
     handle_runtime_event, handle_target_event, handle_target_method_call, target_tasks, handle_log_event,
-    CommonDescribeFieldsBuilder, RuntimeEnableTask, SecurityEnableTask, SetDiscoverTargetsTask,
-    SetIgnoreCertificateErrorsTask, TaskDescribe,
+    CommonDescribeFieldsBuilder, RuntimeEnableTask, SecurityEnableTask, SetDiscoverTargetsTask, GetTargetsTask,
+    SetIgnoreCertificateErrorsTask, TaskDescribe, GetBrowserCommandLineTask,
 };
 use super::{BrowserContexts, Tab};
 
@@ -419,11 +419,41 @@ impl DebugSession {
             .execute_task(vec![task]);
     }
 
-    pub fn security_enable_task(&mut self) -> TaskDescribe {
+    pub fn security_enable_task(&self) -> TaskDescribe {
         let common_fields = CommonDescribeFieldsBuilder::default()
             .build()
             .expect("build common_fields should success.");
         SecurityEnableTask { common_fields }.into()
+    }
+
+    pub fn get_browser_command_line(&mut self) {
+        let task = self.get_browser_command_line_task();
+        self.chrome_debug_session
+            .lock()
+            .expect("obtain chrome_debug_session should success.")
+            .execute_task(vec![task]);
+    }
+
+    pub fn get_browser_command_line_task(&self) -> TaskDescribe {
+         let common_fields = CommonDescribeFieldsBuilder::default()
+            .build()
+            .expect("build common_fields should success.");
+        GetBrowserCommandLineTask { common_fields, task_result: None }.into()
+    }
+
+    pub fn get_targets(&mut self) {
+        let task = self.get_targets_task();
+        self.chrome_debug_session
+            .lock()
+            .expect("obtain chrome_debug_session should success.")
+            .execute_task(vec![task]);
+    }
+
+    pub fn get_targets_task(&self) -> TaskDescribe {
+         let common_fields = CommonDescribeFieldsBuilder::default()
+            .build()
+            .expect("build common_fields should success.");
+        GetTargetsTask { common_fields, task_result: None }.into()
     }
 
     pub fn send_page_message(

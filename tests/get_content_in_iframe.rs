@@ -41,45 +41,44 @@ impl Future for GetContentInIframe {
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
 
                     if seconds % 30 == 0 {
-                        self.debug_session.close_tab_by_window_close_old_than(390);
-                        if self.debug_session.tab_count() < 2 {
-                            info!("************** tab_count: {:?}", self.debug_session.tab_count());
-                            self.debug_session.run_manually_tasks();
-                        } else {
-                            info!("************** tab_count: {:?}", self.debug_session.tab_count());
-                        }
+                        // self.debug_session.close_tab_by_window_close_old_than(390);
+                        // if self.debug_session.tab_count() < 2 {
+                        //     info!("************** tab_count: {:?}", self.debug_session.tab_count());
+                        //     self.debug_session.run_manually_tasks();
+                        // } else {
+                        //     info!("************** tab_count: {:?}", self.debug_session.tab_count());
+                        // }
                     }
                     if seconds % 30 == 0 {
-                        info!("{:?}", self.state);
-                        for t in self.debug_session.tabs.iter_mut() {
-                            // t.move_mouse_random_after_secs(1);
-                            let rs = t.network_statistics.list_request_urls();
-                            let pclogs = t.network_statistics.list_request_urls_end_with("/pclog");
-                            // if !rs.is_empty() {
-                                info!("main frame: {:?}, frame_count: {:?}", t.main_frame(), t.changing_frames.len());
-                                info!("{}, context_id: {:?}, target_id: {:?}, session_id: {:?}", t.get_url(), t.target_info.browser_context_id, t.target_info.target_id, t.session_id);
-                                info!("requested urls {:?}: {:?}",rs.len(), pclogs);
-                                info!("box_model: {:?}", t.box_model.as_ref().and_then(|_|Some("exists.")));
-                                info!("task queue {:?}, {:?}: {:?}", t.task_queue.vec_len(), t.task_queue.item_len(), t.task_queue.to_task_names());
-                            // }
-                        }
+                        // info!("{:?}", self.state);
+                        // self.debug_session.get_targets();
+                        // self.debug_session.get_browser_command_line();
+                        // for t in self.debug_session.tabs.iter_mut() {
+                        //     let rs = t.network_statistics.list_request_urls();
+                        //     let pclogs = t.network_statistics.list_request_urls_end_with("/pclog");
+                        //     info!("main frame: {:?}, frame_count: {:?}", t.main_frame(), t.changing_frames.len());
+                        //     info!("{}, context_id: {:?}, target_id: {:?}, session_id: {:?}", t.get_url(), t.target_info.browser_context_id, t.target_info.target_id, t.session_id);
+                        //     info!("requested urls: {:?}, /pclogs: {:?}",rs.len(), pclogs.len());
+                        //     info!("box_model: {:?}", t.box_model.as_ref().and_then(|_|Some("exists.")));
+                        //     info!("task queue {:?}, {:?}: {:?}", t.task_queue.vec_len(), t.task_queue.item_len(), t.task_queue.to_task_names());
+                        // }
                         // self.debug_session.browser_contexts().deduplicate();
                         // self.debug_session.activates_next_in_interval(10);
                         // self.debug_session.activate_last_opened_tab();
-                        let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
-                        if popup_count > 0 { //when popup_count > 0, home tab should exist.
-                            let run_task_queue_manually = popup_count < 1;
-                            let tab = self
-                                .debug_session
-                                .find_tab_by_name_mut(HOME_URL)
-                                .expect("home page should exists.");
-                            if run_task_queue_manually {
-                                tab.run_task_queue_manually();
-                            }
-                        }
-                        if popup_count > 0 {
-                            info!("popup_count is {}", popup_count);
-                        }
+                        // let  popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
+                        // if popup_count > 0 { //when popup_count > 0, home tab should exist.
+                        //     let run_task_queue_manually = popup_count < 1;
+                        //     let tab = self
+                        //         .debug_session
+                        //         .find_tab_by_name_mut(HOME_URL)
+                        //         .expect("home page should exists.");
+                        //     if run_task_queue_manually {
+                        //         tab.run_task_queue_manually();
+                        //     }
+                        // }
+                        // if popup_count > 0 {
+                        //     info!("popup_count is {}", popup_count);
+                        // }
                     }
 
                     if let Ok(tab) = self.debug_session.find_tab_by_name_mut(DETAIL_PAGE) {

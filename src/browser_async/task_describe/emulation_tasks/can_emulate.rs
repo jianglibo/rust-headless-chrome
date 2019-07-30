@@ -1,7 +1,7 @@
 use super::super::{
     CommonDescribeFields, TaskDescribe, AsMethodCallString, TargetCallMethodTask, HasCommonField, CanCreateMethodString, 
 };
-use crate::protocol::{emulation};
+use super::super::super::protocol::{emulation};
 use failure;
 
 #[derive(Debug, Builder, Default, Clone)]

@@ -36,7 +36,8 @@ impl CaptureScreenShotTest {
                         tab.execute_tasks_after_secs(tasks, 6);
                         // tab.evaluate_expression_named(r##"document.hidden"##, "document.hidden");
                         // tab.evaluate_expression_named(r##"document.visibilityState"##, "document.visibilityState");
-                        tab.move_mouse_random_after_secs(2);
+                        // tab.move_mouse_random_after_secs(2);
+                        tab.set_move_mouse_random_interval(8, 20);
                     }
                     ReceivedEvent::ResponseReceived(_event) => {}
                     ReceivedEvent::RequestWillBeSent(_event) => {}

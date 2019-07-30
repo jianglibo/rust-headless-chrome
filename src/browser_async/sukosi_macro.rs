@@ -22,7 +22,7 @@ macro_rules! impl_new_for_event {
     ($target_event:path, $raw_event:path) => {
         impl $target_event {
             pub fn new(raw_event: $raw_event) -> Self {
-                Self{raw_event}
+                Self { raw_event }
             }
         }
     };
@@ -38,7 +38,7 @@ macro_rules! wrapper_raw_event {
 
         impl $struct_name {
             pub fn new(raw_event: $raw_event) -> Self {
-                Self{raw_event}
+                Self { raw_event }
             }
         }
         impl std::convert::From<$struct_name> for TaskDescribe {
@@ -66,21 +66,75 @@ macro_rules! impl_has_common_fields {
 }
 
 #[macro_export]
-macro_rules! impl_has_task_name_for_task_describe {
+macro_rules! impl_iro_iro_for_task_describe {
     ([$($target_task:path),*], [$($browser_task:path),*]) => {
         impl HasTaskName for TaskDescribe {
             fn get_task_name(&self) -> &str {
                  match self {
-                    TaskDescribe::TargetCallMethod(target_call) => 
+                    TaskDescribe::TargetCallMethod(target_call) =>
                         match target_call {
                             $($target_task(task) => task.get_task_name(),)*
                         }
-                    TaskDescribe::BrowserCallMethod(browser_call) => 
+                    TaskDescribe::BrowserCallMethod(browser_call) =>
                         match browser_call {
                             $($browser_task(task) => task.get_task_name(),)*
                         }
                     _ => ""
                  }
+            }
+        }
+
+        impl std::convert::TryFrom<&TaskDescribe> for String {
+            type Error = failure::Error;
+
+            fn try_from(task_describe: &TaskDescribe) -> Result<Self, Self::Error> {
+                match task_describe {
+                    TaskDescribe::TargetCallMethod(target_call) => match target_call {
+                        $($target_task(task) => task.get_method_str(),)*
+                    },
+                    TaskDescribe::BrowserCallMethod(browser_call) => match browser_call {
+                        $($browser_task(task) => task.get_method_str(),)*
+                    },
+                    _ => {
+                        error!("task describe to string failed. {:?}", task_describe);
+                        failure::bail!("should not be called.")
+                    }
+                }
+            }
+        }
+
+        impl HasCallId for BrowserCallMethodTask {
+            fn get_call_id(&self) -> usize {
+                match self {
+                    $($browser_task(task) => task.get_call_id(),)*
+                }
+            }
+
+            fn renew_call_id(&mut self) {
+                match self {
+                    $($browser_task(task) => task.renew_call_id(),)*
+                }
+            }
+        }
+
+        impl HasCallId for TargetCallMethodTask {
+            fn get_call_id(&self) -> usize {
+                match self {
+                    $($target_task(task) => task.get_call_id(),)*
+                }
+            }
+            fn renew_call_id(&mut self) {
+                match self {
+                    $($target_task(task) => task.renew_call_id(),)*
+                }
+            }
+        }
+
+        impl HasSessionId for TargetCallMethodTask {
+            fn set_session_id(&mut self, session_id: target::SessionID) {
+                match self {
+                    $($target_task(task) => {task.get_common_fields_mut().session_id.replace(session_id);})*
+                }
             }
         }
     };
@@ -89,7 +143,7 @@ macro_rules! impl_has_task_name_for_task_describe {
 // impl HasCommonField for TaskDescribe {
 //     fn get_task_name(&self) -> &str {
 //          match self {
-//             TaskDescribe::TargetCallMethod(target_call) => 
+//             TaskDescribe::TargetCallMethod(target_call) =>
 //                 match target_call {
 //                 TargetCallMethodTask::QuerySelector(task) => task.get_task_name(),
 //                 TargetCallMethodTask::DescribeNode(task) => task.get_task_name(),
@@ -128,7 +182,7 @@ macro_rules! impl_has_task_name_for_task_describe {
 //             }
 //             _ => {
 //                 ""
-//             }   
+//             }
 //          }
 // }
 // }

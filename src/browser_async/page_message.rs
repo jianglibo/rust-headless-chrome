@@ -1,10 +1,13 @@
-use crate::protocol::{dom, page, target, network};
-use super::super::browser_async::{TaskId};
-use super::super::browser_async::task_describe::{network_tasks, network_events, runtime_tasks, runtime_events, dom_tasks, page_tasks, page_events, emulation_tasks};
-use std::path::Path;
-use std::fs::OpenOptions;
+use super::task_describe::{
+    browser_tasks, dom_tasks, emulation_tasks, network_events, network_tasks, page_events,
+    page_tasks, runtime_events, runtime_tasks, target_tasks,
+};
+use super::TaskId;
+use crate::protocol::{dom, network, page, target};
 use log::*;
-use std::io::{Write};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
@@ -13,7 +16,6 @@ pub enum ChangingFrame {
     Navigated(page::Frame),
     StoppedLoading(page::Frame),
 }
-
 
 #[derive(Debug)]
 pub struct PageResponseWrapper {
@@ -33,7 +35,7 @@ impl PageResponseWrapper {
 }
 
 impl std::default::Default for PageResponseWrapper {
-    fn default() -> Self { 
+    fn default() -> Self {
         Self {
             target_id: None,
             task_id: None,
@@ -52,6 +54,7 @@ pub enum ReceivedEvent {
     FrameAttached(page::FrameId),
     FrameStartedLoading(page::FrameId),
     FrameNavigated(page_events::FrameNavigated),
+    WindowOpen(page_events::WindowOpen),
     FrameStoppedLoading(page::FrameId),
     LoadEventFired(network::MonotonicTime),
     SetChildNodesOccurred(dom::NodeId),
@@ -86,6 +89,8 @@ pub enum MethodCallDone {
     TargetAttached(page_tasks::AttachToTargetTask),
     CanEmulate(emulation_tasks::CanEmulateTask),
     SetDeviceMetricsOverride(emulation_tasks::SetDeviceMetricsOverrideTask),
+    GetTargets(target_tasks::GetTargetsTask),
+    GetBrowserCommandLine(browser_tasks::GetBrowserCommandLineTask),
 }
 
 // just wait for things happen. don't care who caused happen.
@@ -98,14 +103,15 @@ pub enum PageResponse {
     Fail,
 }
 
-pub fn write_base64_str_to<P: AsRef<Path>, C: AsRef<str>>(path: P, base64_str: Option<C>) -> std::io::Result<()> {
+pub fn write_base64_str_to<P: AsRef<Path>, C: AsRef<str>>(
+    path: P,
+    base64_str: Option<C>,
+) -> std::io::Result<()> {
     if let Some(c) = base64_str {
-        let slice = c.as_ref();   
+        let slice = c.as_ref();
         match base64::decode(slice) {
             Ok(vu8) => {
-                let mut file = OpenOptions::new().write(true)
-                            .create_new(true)
-                            .open(path)?;
+                let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
                 file.write_all(&vu8)?;
             }
             Err(error) => {
@@ -118,10 +124,9 @@ pub fn write_base64_str_to<P: AsRef<Path>, C: AsRef<str>>(path: P, base64_str: O
     Ok(())
 }
 
-
 pub mod response_object {
-    use std::path::Path;
     use super::*;
+    use std::path::Path;
 
     #[derive(Debug)]
     pub struct CaptureScreenshot {

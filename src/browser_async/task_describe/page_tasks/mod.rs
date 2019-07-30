@@ -38,6 +38,7 @@ pub enum PageEvent {
     FrameStoppedLoading(page_events::FrameStoppedLoading),
     LoadEventFired(page_events::LoadEventFired),
     LifeCycle(page_events::LifeCycle),
+    WindowOpen(page_events::WindowOpen),
 }
 
 fn handle_event_return(
@@ -135,6 +136,10 @@ pub fn handle_page_event(
                 tab.life_cycle_happened(event);
                 handle_event_return(maybe_target_id, 
                 PageResponse::ReceivedEvent(ReceivedEvent::LifeCycle))
+            }
+            PageEvent::WindowOpen(event) => {
+                handle_event_return(maybe_target_id,
+                 PageResponse::ReceivedEvent(ReceivedEvent::WindowOpen(event)))
             }
         }
 }

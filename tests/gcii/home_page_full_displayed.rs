@@ -98,7 +98,9 @@ impl GetContentInIframe {
                         tab.name_the_page(DETAIL_PAGE);
                         tab.page_enable();
                         tab.runtime_enable();
-                        tab.network_enable();
+                        // tab.network_enable();
+                        tab.log_enable();
+                        tab.set_move_mouse_random_interval(8, 20);
                         tab.attach_to_page();
                     }
                     _evv => {
@@ -166,6 +168,9 @@ impl GetContentInIframe {
                             // .cloned()
                             // .expect("object_id should exists.");
                         // tab.mouse_click_on_remote_object(object_id);
+                    }
+                    MethodCallDone::GetTargets(task) => {
+                        info!("**GetTargets: {:?}", task.task_result);
                     }
                     MethodCallDone::GetContentQuads(task) => {
                         info!("-------------{:?}", task);

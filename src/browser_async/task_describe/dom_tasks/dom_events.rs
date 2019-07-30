@@ -1,7 +1,7 @@
 use super::DomEvent;
-use super::super::TaskDescribe;
-use crate::browser_async::{embedded_events};
-use crate::protocol::{dom};
+use super::super::{TaskDescribe};
+use super::super::super::{embedded_events};
+use super::super::super::protocol::{dom};
 
 #[derive(Debug)]
 pub struct AttributeModified {}

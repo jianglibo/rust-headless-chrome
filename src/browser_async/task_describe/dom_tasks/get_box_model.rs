@@ -1,5 +1,5 @@
 use super::super::{TaskDescribe, CommonDescribeFields, TargetCallMethodTask, AsMethodCallString, HasCommonField, CanCreateMethodString, };
-use crate::protocol::{dom, runtime};
+use super::super::super::protocol::{dom, runtime};
 use crate::browser::tab::element::BoxModel;
 use failure;
 
@@ -23,7 +23,6 @@ pub struct GetBoxModelTask {
 }
 
 impl_has_common_fields!(GetBoxModelTask, "GetBoxModelTask");
-
 
 impl AsMethodCallString for GetBoxModelTask {
     fn get_method_str(&self) -> Result<String, failure::Error> {

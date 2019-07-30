@@ -23,16 +23,29 @@ impl Future for CaptureScreenShotTest {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
-                info!("{:?}", self.state);
+                // info!("{:?}", self.state);
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
-                    for t in &self.debug_session.tabs {
-                        trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
+
+                    if seconds % 30 == 0 {
+                        for t in &self.debug_session.tabs {
+                            trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
+                        }
                     }
+
+                    // if seconds > 120 && seconds % 30 == 0 {
+                    //     if let Ok(tab) = self.debug_session.find_tab_by_name_mut(HOME_URL) {
+                    //         tab.move_mouse_random_interval(8, 20);
+                    //     }
+                    // }
                     self.debug_session.browser_contexts().deduplicate();
+
                     if let Ok(tab) = self.debug_session.find_tab_by_name(HOME_URL) {
-                        info!("requested urls: {:?}", tab.network_statistics.list_request_urls_end_with("/pclog"));
+                        if seconds % 30 == 0 {
+                            info!("requested /pclogs urls: {:?}", tab.network_statistics.list_request_urls_end_with("/pclog").len());
+                        }
                     }
+
                     let popup_count = self.debug_session.loaded_by_this_tab_name_count(HOME_URL);
                     if popup_count > 0 {
                         let run_task_queue_manually = popup_count < 2;

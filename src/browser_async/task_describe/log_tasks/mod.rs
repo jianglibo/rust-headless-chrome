@@ -1,12 +1,11 @@
-pub mod log_events;
 pub mod log_enable;
+pub mod log_events;
 
-use super::super::{DebugSession};
-use super::super::page_message::{PageResponseWrapper};
-use super::super::protocol::{target};
-pub use log_enable::{LogEnableTask, LogEnableTaskBuilder};
+use super::super::page_message::PageResponseWrapper;
+use super::super::protocol::target;
+use super::super::DebugSession;
 use log::*;
-
+pub use log_enable::{LogEnableTask, LogEnableTaskBuilder};
 
 #[derive(Debug)]
 pub enum LogEvent {
@@ -14,15 +13,14 @@ pub enum LogEvent {
 }
 
 pub fn handle_log_event(
-        debug_session: &mut DebugSession,
-        log_event: LogEvent,
-        _maybe_session_id: Option<target::SessionID>,
-        maybe_target_id: Option<target::TargetId>,
-    ) -> Result<PageResponseWrapper, failure::Error> {
-        match log_event {
-            LogEvent::EntryAdded(_event) => {
-                trace!("EntryAdded event.");
-                Ok(PageResponseWrapper::default())
-            }
+    debug_session: &mut DebugSession,
+    log_event: LogEvent,
+    _maybe_session_id: Option<target::SessionID>,
+    maybe_target_id: Option<target::TargetId>,
+) -> Result<PageResponseWrapper, failure::Error> {
+    match log_event {
+        LogEvent::EntryAdded(_event) => {
+            trace!("EntryAdded event.");
+            Ok(PageResponseWrapper::default())
         }
-    }
+    }}

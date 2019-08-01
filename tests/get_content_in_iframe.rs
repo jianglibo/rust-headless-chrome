@@ -81,11 +81,11 @@ impl Future for GetContentInIframe {
                     }
 
                     if let Ok(tab) = self.debug_session.find_tab_by_name_mut(DETAIL_PAGE) {
-                        if tab.bring_to_front() {
-                            info!("activating {:?}", tab);
-                        }
+                        // if tab.bring_to_front() {
+                        //     info!("activating {:?}", tab);
+                        // }
                         if seconds % 30 == 0 {
-                            // tab.evaluate_expression("1+1;");
+                            tab.evaluate_expression("1+1;");
                         }
 
                         // if seconds % 100 == 0 {

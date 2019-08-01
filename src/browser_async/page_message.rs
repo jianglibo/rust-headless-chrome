@@ -9,6 +9,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 
+// TODO main frame may not fire FrameAttached.
 #[derive(Debug, Clone)]
 pub enum ChangingFrame {
     Attached(page::events::FrameAttachedParams),

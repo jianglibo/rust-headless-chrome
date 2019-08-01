@@ -225,8 +225,6 @@ impl Tab {
             self.execute_one_task(task);
         } else {
             self.waiting_for_page_attach_tasks.push(task);
-            // .insert(WaitingForPageAttachTaskName::BringToFront);
-            // self.attach_to_page();
         }
         true
     }

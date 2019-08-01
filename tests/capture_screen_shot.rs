@@ -4,8 +4,8 @@ extern crate log;
 extern crate futures;
 extern crate tokio_timer;
 
+use headless_chrome::browser_async::page_message::PageResponse;
 use headless_chrome::browser_async::{EventName, Tab};
-use headless_chrome::browser_async::page_message::{PageResponse};
 use log::*;
 use std::default::Default;
 mod tutil;
@@ -14,7 +14,6 @@ use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
 mod capture_screen_shot_mod;
 use capture_screen_shot_mod::{CaptureScreenShotTest, PageState, HOME_URL};
-
 
 impl Future for CaptureScreenShotTest {
     type Item = ();
@@ -26,7 +25,6 @@ impl Future for CaptureScreenShotTest {
                 // info!("{:?}", self.state);
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
-
                     if seconds % 30 == 0 {
                         for t in &self.debug_session.tabs {
                             trace!("{}, {:?}", t.get_url(), t.target_info.browser_context_id);
@@ -42,7 +40,12 @@ impl Future for CaptureScreenShotTest {
 
                     if let Ok(tab) = self.debug_session.find_tab_by_name(HOME_URL) {
                         if seconds % 30 == 0 {
-                            info!("requested /pclogs urls: {:?}", tab.network_statistics.list_request_urls_end_with("/pclog").len());
+                            info!(
+                                "requested /pclogs urls: {:?}",
+                                tab.network_statistics
+                                    .list_request_urls_end_with("/pclog")
+                                    .len()
+                            );
                         }
                     }
 
@@ -131,5 +134,4 @@ fn t_take_screen_shot() {
     runtime
         .block_on(my_page.into_future())
         .expect("tokio should success.");
-
 }

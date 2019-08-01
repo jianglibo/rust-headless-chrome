@@ -1,6 +1,5 @@
 #![warn(clippy::all)]
 
-
 extern crate chrono;
 extern crate fern;
 extern crate log;
@@ -21,7 +20,7 @@ use std::default::Default;
 
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
-use gcii::{GetContentInIframe, PageState, HOME_URL, SHENBIAN_GANDONG_URL, DETAIL_PAGE};
+use gcii::{GetContentInIframe, PageState, DETAIL_PAGE, HOME_URL, SHENBIAN_GANDONG_URL};
 
 impl GetContentInIframe {
     fn assert_result(&self) {
@@ -39,15 +38,15 @@ impl Future for GetContentInIframe {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
-
                     if seconds % 30 == 0 {
-                        // self.debug_session.close_tab_by_window_close_old_than(390);
-                        // if self.debug_session.tab_count() < 2 {
-                        //     info!("************** tab_count: {:?}", self.debug_session.tab_count());
-                        //     self.debug_session.run_manually_tasks();
-                        // } else {
-                        //     info!("************** tab_count: {:?}", self.debug_session.tab_count());
-                        // }
+                        self.debug_session.close_tab_by_window_close_old_than(390);
+                        info!(
+                            "************** tab_count: {:?}",
+                            self.debug_session.tab_count()
+                        );
+                        if self.debug_session.tab_count() < 2 {
+                            self.debug_session.run_manually_tasks();
+                        }
                     }
                     if seconds % 30 == 0 {
                         // info!("{:?}", self.state);
@@ -195,7 +194,12 @@ impl Future for GetContentInIframe {
 // post to: https://iflow-api.xuexi.cn/logflow/api/v1/pclog
 #[test]
 fn t_get_content_in_iframe() {
-    tutil::setup_logger(vec!["browser_async::task_queue", "browser_async::chrome_browser"]).expect("fern log should work.");
+    tutil::setup_logger(vec![
+        "browser_async::task_queue",
+        "browser_async::chrome_browser",
+        "browser_async::tab",
+    ])
+    .expect("fern log should work.");
 
     let my_page = GetContentInIframe::default();
     // let my_page = GetContentInIframe::new_visible();

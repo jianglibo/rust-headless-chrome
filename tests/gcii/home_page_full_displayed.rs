@@ -100,7 +100,7 @@ impl GetContentInIframe {
                         tab.runtime_enable();
                         // tab.network_enable();
                         tab.log_enable();
-                        tab.set_move_mouse_random_interval(8, 20);
+                        // tab.set_move_mouse_random_interval(8, 20);
                         tab.attach_to_page();
                     }
                     _evv => {

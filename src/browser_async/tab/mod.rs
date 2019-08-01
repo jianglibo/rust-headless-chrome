@@ -4,9 +4,9 @@ use super::super::browser_async::{embedded_events, ChromeDebugSession, NetworkSt
 use super::super::protocol::{self, dom, network, page, runtime, target};
 use super::page_message::ChangingFrame;
 use super::task_describe::{
-    dom_tasks, input_tasks, network_events, network_tasks, page_events, page_tasks, runtime_tasks, log_tasks,
-    target_tasks, ActivateTargetTaskBuilder, CommonDescribeFields, CommonDescribeFieldsBuilder,
-    HasSessionId, TaskDescribe,
+    dom_tasks, input_tasks, log_tasks, network_events, network_tasks, page_events, page_tasks,
+    runtime_tasks, target_tasks, ActivateTargetTaskBuilder, CommonDescribeFields,
+    CommonDescribeFieldsBuilder, HasSessionId, TaskDescribe,
 };
 use super::{EventName, EventStatistics, TaskQueue, TaskQueueItem};
 use log::*;
@@ -693,6 +693,7 @@ impl Tab {
     }
 
     pub fn move_mouse_random_interval(&mut self) {
+        // trace!("enter move_mouse_random_interval function: {:?}", self.page_name);
         if self.mouse_random_move_limit.is_some() {
             if let Some(task_item) = self.next_mouse_move_task.as_ref() {
                 if task_item.is_time_out() {
@@ -700,10 +701,9 @@ impl Tab {
                         .next_mouse_move_task
                         .take()
                         .expect("I have check exists first.");
-                    // if self.activated_at.is_some() {
-                        self.execute_tasks(ti.tasks);
-                        self.generate_new_mouse_move_task();
-                    // }
+                    trace!("start mouse random move: {:?}", self.page_name);
+                    self.execute_tasks(ti.tasks);
+                    self.generate_new_mouse_move_task();
                 }
             } else {
                 self.generate_new_mouse_move_task();
@@ -1069,6 +1069,9 @@ impl Tab {
     }
 
     pub fn name_the_page(&mut self, page_name: &'static str) {
+        if self.page_name.is_some() {
+            panic!("name already named tab.");
+        }
         self.page_name = Some(page_name);
     }
 

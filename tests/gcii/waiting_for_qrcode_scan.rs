@@ -36,8 +36,8 @@ impl GetContentInIframe {
                         if tab.last_life_cycle_event().is_network_almost_idle() {
                             tab.network_enable();
                             tab.activated_at.replace(std::time::Instant::now());
-                            // tab.move_mouse_random_after_secs(10);
-                            tab.set_move_mouse_random_interval(8, 20);
+                            tab.move_mouse_random_after_secs(10);
+                            // tab.set_move_mouse_random_interval(8, 20);
                             tab.display_full_page_after_secs(16);
                             self.state = PageState::HomePageFullDisplayed;
                         } else {

@@ -5,27 +5,27 @@ use super::super::super::protocol::{runtime};
 use log::*;
 
 impl Tab {
-    pub fn evaluate_expression(&mut self, expression: &str) {
+    pub fn evaluate_expression<T: AsRef<str>>(&mut self, expression: T) {
         let task = self.evaluate_expression_task(expression);
         self.execute_one_task(task);
     }
 
-    pub fn evaluate_expression_prefixed(&mut self, expression: &str, prefix: &str) {
+    pub fn evaluate_expression_prefixed<T: AsRef<str>>(&mut self, expression: T, prefix: &str) {
         let name = create_unique_prefixed_id(prefix);
         self.evaluate_expression_named(expression, name.as_str());
     }
 
-    pub fn evaluate_expression_named(&mut self, expression: &str, name: &str) {
+    pub fn evaluate_expression_named<T: AsRef<str>>(&mut self, expression: T, name: &str) {
         let task = self.evaluate_expression_task_named(expression, name);
         self.execute_one_task(task);
     }
 
-    pub fn evaluate_expression_task_named(
+    pub fn evaluate_expression_task_named<T: AsRef<str>>(
         &mut self,
-        expression: &str,
+        expression: T,
         task_id: &str,
     ) -> TaskDescribe {
-        self.evaluate_expression_task_impl(expression, Some(task_id.to_owned()))
+        self.evaluate_expression_task_impl(expression, Some(task_id))
     }
 
     pub fn evaluate_expression_task_prefixed(
@@ -37,18 +37,18 @@ impl Tab {
         self.evaluate_expression_task_named(expression, name.as_str())
     }
 
-    pub fn evaluate_expression_task(&self, expression: &str) -> TaskDescribe {
+    pub fn evaluate_expression_task<T: AsRef<str>>(&self, expression: T) -> TaskDescribe {
         self.evaluate_expression_task_impl(expression, None)
     }
 
-    fn evaluate_expression_task_impl(
+    fn evaluate_expression_task_impl<T: AsRef<str>>(
         &self,
-        expression: &str,
-        manual_task_id: Option<TaskId>,
+        expression: T,
+        manual_task_id: Option<&str>,
     ) -> TaskDescribe {
         runtime_tasks::EvaluateTaskBuilder::default()
-            .expression(expression.to_string())
-            .common_fields(self.get_common_field(manual_task_id))
+            .expression(expression.as_ref().to_string())
+            .common_fields(self.get_common_field(manual_task_id.map(Into::into)))
             .build()
             .expect("build EvaluateTaskBuilder should success.")
             .into()

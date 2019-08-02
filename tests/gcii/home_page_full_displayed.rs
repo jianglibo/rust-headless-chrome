@@ -72,6 +72,12 @@ impl GetContentInIframe {
         match page_response {
             PageResponse::ReceivedEvent(received_event) => {
                 match received_event {
+                    ReceivedEvent::FrameStoppedLoading(frame_id) => {
+                        let tab = self
+                            .get_tab(maybe_target_id)
+                            .expect("tab should exists. FrameStoppedLoading");
+                        info!("************frames: {:?}, tab: {:?}, frams: {:?}", tab.changing_frames.len(), tab.get_url(), tab.changing_frames);
+                    }
                     ReceivedEvent::LoadEventFired(_task) => {
                         let tab = self
                             .get_tab(maybe_target_id)
@@ -87,7 +93,8 @@ impl GetContentInIframe {
                         tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg")));
                         tab.execute_tasks_after_secs(tasks, 6);
                         tab.activate_page();
-                        tab.set_move_mouse_random_interval(8, 20);
+                        // tab.set_move_mouse_random_interval(8, 20);
+                        tab.move_mouse_random_after_secs(100);
                     }
                     ReceivedEvent::PageCreated => {
                         let tab = self

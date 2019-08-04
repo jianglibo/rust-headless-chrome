@@ -39,7 +39,8 @@ impl Future for GetContentInIframe {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
                     if seconds % 30 == 0 {
-                        self.debug_session.close_tab_by_window_close_old_than(390);
+                        // self.debug_session.close_tab_by_window_close_old_than(390);
+                        self.debug_session.close_tab_old_than(390);
                         info!(
                             "************** tab_count: {:?}",
                             self.debug_session.tab_count()

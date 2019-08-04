@@ -23,28 +23,26 @@ use std::collections::VecDeque;
 type WsClient = Client<TcpStream>;
 
 enum BrowserState {
-    Unconnected,
     Connecting(ClientNew<TcpStream>),
     Receiving,
     StartSend(String),
     Sending,
-    CheckPendingTask,
+    // CheckPendingTask,
 }
 
 impl fmt::Debug for BrowserState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BrowserState::Connecting(_) => write!(f, "connecting"),
-            BrowserState::Unconnected => write!(f, "Unconnected"),
             BrowserState::Receiving => write!(f, "Receiving"),
             BrowserState::StartSend(content) => write!(f, "start sending: {}", content),
             BrowserState::Sending => write!(f, "Sending"),
-            BrowserState::CheckPendingTask => write!(f, "CheckPendingTask"),
         }
     }
 }
 
 pub struct ChromeBrowser {
+    // connected: bool,
     state: BrowserState,
     ws_client: Option<WsClient>,
     process: Option<Process>,
@@ -79,6 +77,7 @@ impl ChromeBrowser {
         );
 
         Self {
+            // connected: false,
             state,
             ws_client: None,
             process,
@@ -87,15 +86,25 @@ impl ChromeBrowser {
         }
     }
     pub fn send_message(&mut self, method_str: String) {
-        // info!("**sending** : {:?}", method_str);
         self.waiting_to_send.push_back(method_str);
-        // match self.state {
-        //     BrowserState::StartSend(_) | BrowserState::Sending => {
-        //         self.waiting_to_send.push_back(method_str);
-        //     }
-        //     _ => {
-        //         self.state = BrowserState::StartSend(method_str);
-        //     }
+    }
+
+    pub fn check_pending_task(&mut self) {
+        if let BrowserState::Receiving = self.state {
+            trace!("enter check_pending_task state..........");
+            if let Some(first) = self.waiting_to_send.pop_front() {
+                trace!("take from waiting_to_send: {:?}", first);
+                self.state = BrowserState::StartSend(first);
+            } else {
+                trace!("no pending task.");
+            }
+        }
+        // if let Some(first) = self.waiting_to_send.pop_front() {
+        //     trace!("take from waiting_to_send: {:?}", first);
+        //     self.state = BrowserState::StartSend(first);
+        // } else {
+        //     trace!("no waiting task, switch to receiving state.");
+        //     self.state = BrowserState::Receiving;
         // }
     }
 
@@ -108,32 +117,22 @@ impl Stream for ChromeBrowser {
     type Item = protocol::Message;
     type Error = failure::Error;
 
+    // this poll will be polled by out loop until not_ready fired.
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.last_be_polled = Instant::now();
+        // if self.connected {
+            self.check_pending_task();
+        // }
         loop {
             // trace!("browser loop {:?}", self.state);
             match &mut self.state {
-                BrowserState::Unconnected => {
-                    trace!("enter unconnected state.");
-                    // let options = LaunchOptionsBuilder::default()
-                    //     .build()
-                    //     .expect("Failed to find chrome");
-                    // let chrome_process = Process::new(self.launch_options).expect("process should created.");
-                    // let web_socket_debugger_url = chrome_process.debug_ws_url.clone();
-                    // self.process = Some(chrome_process);
-                    // self.state = BrowserState::Connecting(
-                    //     ClientBuilder::new(&web_socket_debugger_url)
-                    //         .expect("client build should work.")
-                    //         .add_protocol("rust-websocket")
-                    //         .async_connect_insecure(),
-                    // );
-                }
                 BrowserState::Connecting(client_new) => {
                     trace!("enter connecting state.");
                     let framed = try_ready!(client_new.poll());
                     info!("connected.");
                     self.ws_client = Some(framed.0);
                     self.state = BrowserState::Receiving;
+                    // self.connected = true;
                     return Ok(Some(protocol::Message::Connected).into());
                 }
                 BrowserState::Receiving => {
@@ -166,23 +165,12 @@ impl Stream for ChromeBrowser {
                         Ok(Async::NotReady) => {
                             // if return not ready, when to pull again is job of underlying. is out of our controls.
                             trace!("enter receiving not NotReady, the control hand over to tokio system. ");
-                            self.state = BrowserState::CheckPendingTask;
                             return Ok(Async::NotReady);
                         }
                         Err(e) => {
                             trace!("enter receiving err");
                             return Err(e.into());
                         }
-                    }
-                }
-                BrowserState::CheckPendingTask => {
-                    trace!("enter check_pending_task state..........");
-                    if let Some(first) = self.waiting_to_send.pop_front() {
-                        trace!("take from waiting_to_send: {:?}", first);
-                        self.state = BrowserState::StartSend(first);
-                    } else {
-                        trace!("no waiting task, switch to receiving state.");
-                        self.state = BrowserState::Receiving;
                     }
                 }
                 BrowserState::StartSend(message_to_send) => {
@@ -210,16 +198,9 @@ impl Stream for ChromeBrowser {
                 BrowserState::Sending => {
                     trace!("enter sending state..........");
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll_complete() {
-                        Ok(Async::Ready(_)) => {
-                            trace!("sending completed. switch to receiving state.");
+                        Ok(Async::Ready(v)) => {
+                            trace!("sending {:?} completed. switch from sending to receiving state.", v);
                             self.state = BrowserState::Receiving;
-                            // if let Some(first) = self.waiting_to_send.pop_front() {
-                            //     trace!("take from waiting_to_send: {:?}", first);
-                            //     self.state = BrowserState::StartSend(first);
-                            // } else {
-                            //     trace!("switch to receiving state.");
-                            //     self.state = BrowserState::Receiving;
-                            // }
                         }
                         Ok(Async::NotReady) => {
                             trace!("sending is not completed.");

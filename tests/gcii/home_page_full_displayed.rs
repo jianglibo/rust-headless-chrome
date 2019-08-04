@@ -93,7 +93,7 @@ impl GetContentInIframe {
                         tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg")));
                         tab.execute_tasks_after_secs(tasks, 6);
                         tab.activate_page();
-                        // tab.set_move_mouse_random_interval(8, 20);
+                        // tab.set_move_mouse_random_interval(20, 40);
                         tab.move_mouse_random_after_secs(100);
                     }
                     ReceivedEvent::PageCreated => {

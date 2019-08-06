@@ -5,7 +5,7 @@ pub use chrome_log::events::{LogEntryAdded};
 use page::events::{WindowOpen, FrameRequestedNavigation, FrameResized};
 
 pub mod network_raw_event;
-pub use network_raw_event::{RequestWillBeSent, RequestWillBeSentParams,
+pub use network_raw_event::{RequestWillBeSent, RequestWillBeSentParams, ResourceChangedPriority,
  ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
 
 
@@ -142,6 +142,8 @@ pub enum EmbeddedEvent {
     FrameRequestedNavigation(FrameRequestedNavigation),
     #[serde(rename = "Page.frameResized")]
     FrameResized(FrameResized),
+    #[serde(rename = "Network.resourceChangedPriority")]
+    ResourceChangedPriority(ResourceChangedPriority),
 }
 
 #[derive(Deserialize, Debug, Clone)]

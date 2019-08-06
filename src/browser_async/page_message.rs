@@ -69,6 +69,8 @@ pub enum ReceivedEvent {
     LoadingFinished(network_events::LoadingFinished),
     DataReceived(network_events::DataReceived),
     LoadingFailed(network::RequestId),
+    ResourceChangedPriority(network_events::ResourceChangedPriority),
+    RequestServedFromCache(network_events::RequestServedFromCache),
 }
 
 #[derive(Debug)]

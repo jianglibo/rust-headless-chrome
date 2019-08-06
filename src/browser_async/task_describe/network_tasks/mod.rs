@@ -22,6 +22,8 @@ use crate::browser_async::page_message::{PageResponse, PageResponseWrapper, Rece
 #[derive(Debug)]
 pub enum NetworkEvent {
     RequestWillBeSent(network_events::RequestWillBeSent),
+    ResourceChangedPriority(network_events::ResourceChangedPriority),
+    RequestServedFromCache(network_events::RequestServedFromCache),
     ResponseReceived(network_events::ResponseReceived),
     DataReceived(network_events::DataReceived),
     LoadingFinished(network_events::LoadingFinished),
@@ -87,6 +89,13 @@ pub fn handle_network_event(
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::DataReceived(event)),
             })
         }
+        NetworkEvent::ResourceChangedPriority(event) => {
+            Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: None,
+                page_response: PageResponse::ReceivedEvent(ReceivedEvent::ResourceChangedPriority(event)),
+            })
+        }
         NetworkEvent::LoadingFailed(event) => {
             let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
             let request_id = event.get_request_id();
@@ -97,6 +106,13 @@ pub fn handle_network_event(
                 page_response: PageResponse::ReceivedEvent(ReceivedEvent::LoadingFailed(
                     request_id,
                 )),
+            })
+        }
+        NetworkEvent::RequestServedFromCache(event) => {
+            Ok(PageResponseWrapper {
+                target_id: maybe_target_id,
+                task_id: None,
+                page_response: PageResponse::ReceivedEvent(ReceivedEvent::RequestServedFromCache(event)),
             })
         }
     }

@@ -92,7 +92,19 @@ impl GetContentInIframe {
                         {
                             info!("*r* detail_page");
                             tab.display_full_page_after_secs(2);
-                            tab.set_move_mouse_random_interval(20, 40);
+                            tab.move_mouse_random_after_secs(20);
+                            tab.move_mouse_random_after_secs(40);
+                            // tab.set_move_mouse_random_interval(30, 60);
+                        } else if tab.is_at_url(HOME_URL) {
+                            //  && tab.changing_frames.count_stopped() == 1 {
+                            info!("*r* home_page");
+                            tab.explicitly_close = true;
+                            tab.network_enable();
+                            tab.activated_at.replace(std::time::Instant::now());
+                            // tab.set_move_mouse_random_interval(30, 60);
+                            tab.move_mouse_random_after_secs(10);
+                            tab.move_mouse_random_after_secs(30);
+                            tab.display_full_page_after_secs(2);
                         }
                     }
                     // ReceivedEvent::LifeCycle => {
@@ -133,9 +145,9 @@ impl GetContentInIframe {
             }
             PageResponse::MethodCallDone(method_call_done) => {
                 match method_call_done {
-                    MethodCallDone::Evaluate(task) => {
-                        self.handle_evaluate(task, maybe_target_id);
-                    }
+                    // MethodCallDone::Evaluate(task) => {
+                    //     self.handle_evaluate(task, maybe_target_id);
+                    // }
                     MethodCallDone::SetDeviceMetricsOverride(_task) => {
                         let tab = self
                             .get_tab(maybe_target_id)
@@ -164,7 +176,6 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
 
-                        // let object_id =
                         let mut tasks: Vec<Vec<TaskDescribe>> = task
                             .get_array_of_remote_object_id()
                             .iter()
@@ -175,12 +186,6 @@ impl GetContentInIframe {
                         let mut rng = rand::thread_rng();
                         tasks.shuffle(&mut rng);
                         tab.execute_task_vecs_manually_later(tasks);
-                        // tab.execute_task_vecs_in_interval(tasks.drain(..1).collect(), 10);
-                        // .get(0)
-                        // .cloned()
-                        // .cloned()
-                        // .expect("object_id should exists.");
-                        // tab.mouse_click_on_remote_object(object_id);
                     }
                     MethodCallDone::GetTargets(task) => {
                         info!("**GetTargets: {:?}", task.task_result);

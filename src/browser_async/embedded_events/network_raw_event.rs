@@ -115,3 +115,17 @@ pub struct RequestServedFromCache {
 pub struct RequestServedFromCacheParams {
     pub request_id: network::RequestId,
 }
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceChangedPriorityParams {
+    pub request_id: network::RequestId,
+    pub new_priority: network::ResourcePriority,
+    pub timestamp: network::MonotonicTime,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceChangedPriority {
+    pub params: ResourceChangedPriorityParams,
+}

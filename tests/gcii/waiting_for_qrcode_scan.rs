@@ -17,26 +17,32 @@ impl GetContentInIframe {
         // let shenbian_gandong_task_name = "shenbian-gandong";
         if let PageResponse::ReceivedEvent(received_event) = page_response {
             match received_event {
-                ReceivedEvent::LifeCycle => {
-                    let tab = self
-                        .get_tab(maybe_target_id)
-                        .expect("tab should exists. LoadEventFired");
-                    info!("got lifecycleEvent: {:?}", tab.life_cycles.last_life_cycle_event());
-                    if tab.is_at_url(HOME_URL) {
-                        if tab.life_cycles.last_life_cycle_event().is_network_almost_idle() {
-                            // self.switch_to_home_page_displayed();
-                            // *PAGE_STATE.lock().expect("PAGE_STATE") = PageState::HomePageFullDisplayed;
-                            tab.explicitly_close = true;
-                            tab.network_enable();
-                            tab.activated_at.replace(std::time::Instant::now());
-                            tab.set_move_mouse_random_interval(8, 20);
-                            tab.display_full_page_after_secs(2);
-                            self.state = PageState::HomePageFullDisplayed;
-                        } 
-                    } else {
-                        info!("at state: {:?}", PageState::WaitingForQrcodeScan);
-                    }
+                ReceivedEvent::FrameRequestedNavigation(event) => {
+                    info!("redirect start: {:?}", event);
+                    self.state = PageState::HomePageFullDisplayed;
                 }
+                // ReceivedEvent::LifeCycle => {
+                //     let tab = self
+                //         .get_tab(maybe_target_id)
+                //         .expect("tab should exists. LoadEventFired");
+                //     info!("got lifecycleEvent: {:?}", tab.life_cycles.last_life_cycle_event());
+                //     if tab.is_at_url(HOME_URL) {
+                //         if tab.life_cycles.last_life_cycle_event().is_network_almost_idle() {
+                //             // self.switch_to_home_page_displayed();
+                //             // *PAGE_STATE.lock().expect("PAGE_STATE") = PageState::HomePageFullDisplayed;
+                //             tab.explicitly_close = true;
+                //             tab.network_enable();
+                //             tab.activated_at.replace(std::time::Instant::now());
+                //             // tab.set_move_mouse_random_interval(30, 60);
+                //             tab.move_mouse_random_after_secs(10);
+                //             tab.move_mouse_random_after_secs(30);
+                //             tab.display_full_page_after_secs(2);
+                //             self.state = PageState::HomePageFullDisplayed;
+                //         } 
+                //     } else {
+                //         info!("at state: {:?}", PageState::WaitingForQrcodeScan);
+                //     }
+                // }
                 ReceivedEvent::ResponseReceived(_event) => {}
                 _ => {
                     // info!("got unused page event {:?}", received_event);

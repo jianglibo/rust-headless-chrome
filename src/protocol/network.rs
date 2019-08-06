@@ -14,6 +14,10 @@ use crate::protocol::{runtime, security};
         HeadersReceived,
     }
 
+#[derive(Deserialize, Debug, Clone)]
+pub enum ResourcePriority {
+    VeryLow, Low, Medium, High, VeryHigh
+}
     
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]

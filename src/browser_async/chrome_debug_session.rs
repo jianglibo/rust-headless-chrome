@@ -84,57 +84,77 @@ impl ChromeDebugSession {
         match target_message_event {
             EmbeddedEvent::SetChildNodes(embedded_event) => {
                 let event = dom_events::SetChildNodes::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::LoadEventFired(embedded_event) => {
                 let event = page_events::LoadEventFired::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::ExecutionContextCreated(embedded_event) => {
                 let event = runtime_events::ExecutionContextCreated::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::ExecutionContextDestroyed(embedded_event) => {
                 let event = runtime_events::ExecutionContextDestroyed::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::ConsoleAPICalled(embedded_event) => {
                 let event = runtime_events::ConsoleAPICalled::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::DomContentEventFired(embedded_event) => {
                 let event = page_events::DomContentEventFired::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::ResponseReceived(embedded_event) => {
                 let event = network_events::ResponseReceived::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::DataReceived(embedded_event) => {
                 let event = network_events::DataReceived::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::LoadingFinished(embedded_event) => {
                 let event = network_events::LoadingFinished::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::RequestWillBeSent(embedded_event) => {
                 let event = network_events::RequestWillBeSent::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::ChildNodeCountUpdated(embedded_event) => {
                 let event = dom_events::ChildNodeCountUpdated::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
             EmbeddedEvent::LogEntryAdded(embedded_event) => {
                 let event = log_events::LogEntryAdded::new(embedded_event);
-                return TaskDescribe::from(event).into();
+                TaskDescribe::from(event).into()
             }
-            _ => {
-                warn!("discard inner event: {:?}", target_message_event);
+            EmbeddedEvent::FrameRequestedNavigation(embedded_event) => {
+                let event = page_events::FrameRequestedNavigation::new(embedded_event);
+                TaskDescribe::from(event).into()
+            }
+            EmbeddedEvent::LoadingFailed(embedded_event) => {
+                let event = network_events::LoadingFailed::new(embedded_event);
+                TaskDescribe::from(event).into()
+            }
+            EmbeddedEvent::WindowOpen(embedded_event) => {
+                let event = page_events::WindowOpen::new(embedded_event);
+                TaskDescribe::from(event).into()
+            }
+            EmbeddedEvent::RequestServedFromCache(embedded_event) => {
+                let event = network_events::RequestServedFromCache::new(embedded_event);
+                TaskDescribe::from(event).into()
+            }
+            EmbeddedEvent::ResourceChangedPriority(embedded_event) => {
+                let event = network_events::ResourceChangedPriority::new(embedded_event);
+                TaskDescribe::from(event).into()
+            }
+            EmbeddedEvent::FrameResized(embedded_event) => {
+                let event = page_events::FrameResized::new(embedded_event);
+                TaskDescribe::from(event).into()
             }
         }
-        None
     }
 
     pub fn parse_response_error(response: protocol::Response) -> Result<protocol::Response, Error> {

@@ -998,8 +998,8 @@ impl Tab {
     }
 
     pub fn name_the_page(&mut self, page_name: &'static str) {
-        if self.page_name.is_some() {
-            panic!("name already named tab.");
+        if self.page_name.is_some() && (self.page_name != Some(page_name)) {
+            panic!("name already named tab. already named: {:?}, new name: {:?}", self.page_name, page_name);
         }
         self.page_name = Some(page_name);
     }

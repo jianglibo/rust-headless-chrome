@@ -70,32 +70,32 @@ pub fn handle_page_event(
             PageEvent::FrameAttached(event) => {
                 let raw_parameters = event.into_raw_parameters();
                 let frame_id = raw_parameters.frame_id.clone();
-                info!(
-                    "-----------------frame_attached-----------------{:?}",
-                    frame_id
-                );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                info!(
+                    "-----------------frame_attached-----------------{:?}, tab url: {:?}",
+                    frame_id, tab.get_url()
+                );
                 tab.changing_frames._frame_attached(raw_parameters);
                 handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)))
             }
             PageEvent::FrameDetached(event) => {
                 let frame_id = event.into_frame_id();
-                info!(
-                    "-----------------frame_detached-----------------{:?}",
-                    frame_id.clone()
-                );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                info!(
+                    "-----------------frame_detached-----------------{:?}, tab url: {:?}",
+                    frame_id.clone(), tab.get_url()
+                );
                 tab.changing_frames._frame_detached(&frame_id);
                 Ok(PageResponseWrapper::default())
             }
             PageEvent::FrameStartedLoading(event) => {
                 let frame_id = event.into_frame_id();
                 // started loading is first, then attached.
-                info!(
-                    "-----------------frame_started_loading-----------------{:?}",
-                    frame_id
-                );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                info!(
+                    "-----------------frame_started_loading-----------------{:?}, tab url: {:?}",
+                    frame_id, tab.get_url()
+                );
                 tab.changing_frames._frame_started_loading(frame_id.clone());
                 handle_event_return(
                     maybe_target_id,
@@ -103,24 +103,25 @@ pub fn handle_page_event(
                 )
             }
             PageEvent::FrameNavigated(event) => {
+                let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())
+                    .expect("FrameNavigated event should have target_id.");
                 info!(
-                    "-----------------frame_navigated-----------------{:?}",
-                    event
+                    "-----------------frame_navigated-----------------{:?}, tab url: {:?}",
+                    event, tab.get_url()
                 );
-                debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())
-                    .expect("FrameNavigated event should have target_id.")
-                    ._frame_navigated(event.clone_frame());
+
+                tab._frame_navigated(event.clone_frame());
                 handle_event_return(
                     maybe_target_id,
                     PageResponse::ReceivedEvent(ReceivedEvent::FrameNavigated(event)),
                 )
             }
             PageEvent::FrameStoppedLoading(event) => {
-                info!(
-                    "-----------------frame_stopped_loading-----------------{:?}",
-                    event
-                );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
+                info!(
+                    "-----------------frame_stopped_loading-----------------{:?}, tab url: {:?}",
+                    event, tab.get_url()
+                );
                 let frame_id = event.into_frame_id();
                 tab.changing_frames._frame_stopped_loading(frame_id.clone());
                 handle_event_return(

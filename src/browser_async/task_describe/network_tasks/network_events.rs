@@ -54,6 +54,20 @@ lazy_static! {
 
 wrapper_raw_event!(
     TaskDescribe::NetworkEvent,
+    NetworkEvent::RequestServedFromCache,
+    RequestServedFromCache,
+    embedded_events::RequestServedFromCache
+);
+
+wrapper_raw_event!(
+    TaskDescribe::NetworkEvent,
+    NetworkEvent::ResourceChangedPriority,
+    ResourceChangedPriority,
+    embedded_events::ResourceChangedPriority
+);
+
+wrapper_raw_event!(
+    TaskDescribe::NetworkEvent,
     NetworkEvent::RequestWillBeSent,
     RequestWillBeSent,
     embedded_events::RequestWillBeSent

@@ -22,7 +22,7 @@ pub mod chrome_log;
 pub type CallId = usize;
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EmptyReturnObject {
 }

@@ -1,6 +1,9 @@
 extern crate log;
 
 #[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
 extern crate futures;
 extern crate tokio_timer;
 
@@ -126,7 +129,7 @@ impl Future for CaptureScreenShotTest {
 
 #[test]
 fn t_take_screen_shot() {
-    tutil::setup_logger(vec!["browser_async::chrome_browser"]).expect("fern log should work.");
+    tutil::setup_logger(vec!["browser_async::chrome_browser"], vec![]).expect("fern log should work.");
 
     let my_page = CaptureScreenShotTest::default();
 

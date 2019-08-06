@@ -39,6 +39,8 @@ pub enum PageEvent {
     LoadEventFired(page_events::LoadEventFired),
     LifeCycle(page_events::LifeCycle),
     WindowOpen(page_events::WindowOpen),
+    FrameRequestedNavigation(page_events::FrameRequestedNavigation),
+    FrameResized(page_events::FrameResized),
 }
 
 fn handle_event_return(
@@ -73,7 +75,7 @@ pub fn handle_page_event(
                     frame_id
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab._frame_attached(raw_parameters);
+                tab.changing_frames._frame_attached(raw_parameters);
                 handle_event_return(maybe_target_id, PageResponse::ReceivedEvent(ReceivedEvent::FrameAttached(frame_id)))
             }
             PageEvent::FrameDetached(event) => {
@@ -83,7 +85,7 @@ pub fn handle_page_event(
                     frame_id.clone()
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab._frame_detached(&frame_id);
+                tab.changing_frames._frame_detached(&frame_id);
                 Ok(PageResponseWrapper::default())
             }
             PageEvent::FrameStartedLoading(event) => {
@@ -94,7 +96,7 @@ pub fn handle_page_event(
                     frame_id
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab._frame_started_loading(frame_id.clone());
+                tab.changing_frames._frame_started_loading(frame_id.clone());
                 handle_event_return(
                     maybe_target_id,
                     PageResponse::ReceivedEvent(ReceivedEvent::FrameStartedLoading(frame_id)),
@@ -120,7 +122,7 @@ pub fn handle_page_event(
                 );
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
                 let frame_id = event.into_frame_id();
-                tab._frame_stopped_loading(frame_id.clone());
+                tab.changing_frames._frame_stopped_loading(frame_id.clone());
                 handle_event_return(
                     maybe_target_id,
                     PageResponse::ReceivedEvent(ReceivedEvent::FrameStoppedLoading(frame_id)),
@@ -133,13 +135,21 @@ pub fn handle_page_event(
             }
             PageEvent::LifeCycle(event) => {
                 let tab = debug_session.find_tab_by_id_mut(maybe_target_id.as_ref())?;
-                tab.life_cycle_happened(event);
+                tab.life_cycles.life_cycle_happened(event);
                 handle_event_return(maybe_target_id, 
                 PageResponse::ReceivedEvent(ReceivedEvent::LifeCycle))
             }
             PageEvent::WindowOpen(event) => {
                 handle_event_return(maybe_target_id,
                  PageResponse::ReceivedEvent(ReceivedEvent::WindowOpen(event)))
+            }
+            PageEvent::FrameRequestedNavigation(event) => {
+                handle_event_return(maybe_target_id,
+                 PageResponse::ReceivedEvent(ReceivedEvent::FrameRequestedNavigation(event)))
+            }
+            PageEvent::FrameResized(event) => {
+                handle_event_return(maybe_target_id,
+                 PageResponse::ReceivedEvent(ReceivedEvent::FrameResized(event)))
             }
         }
 }

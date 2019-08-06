@@ -1,7 +1,8 @@
 use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent};
 use headless_chrome::protocol::target;
+use log::*;
 
-use super::{GetContentInIframe, PageState, LOGIN_URL};
+use super::{GetContentInIframe, PageState, LOGIN_URL, PAGE_STATE};
 
 impl GetContentInIframe {
 
@@ -26,6 +27,8 @@ impl GetContentInIframe {
             PageResponse::MethodCallDone(method_call_done) => {
                 if let MethodCallDone::PageEnabled(_task) = method_call_done {
                     self.state = PageState::LoginPageDisplayed;
+                    // *PAGE_STATE.lock().expect("PAGE_STATE") = PageState::LoginPageDisplayed;
+                    info!("xxxxxxxxx{:?}", PAGE_STATE.lock().unwrap());
                     let tab = self
                         .get_tab(maybe_target_id)
                         .expect("tab should exists. RequestIntercepted");

@@ -1,11 +1,15 @@
-use headless_chrome::browser_async::page_message::{MethodCallDone, PageResponse, ReceivedEvent, write_base64_str_to};
-use headless_chrome::browser_async::task_describe::{runtime_tasks, HasTaskId};
-use headless_chrome::protocol::{target, page};
+use headless_chrome::browser_async::page_message::{
+    write_base64_str_to, MethodCallDone, PageResponse, ReceivedEvent,
+};
+use headless_chrome::browser_async::task_describe::{runtime_tasks, HasTaskId, TaskDescribe};
+use headless_chrome::protocol::{page, target};
+use log::*;
 use std::fs;
 use std::path::Path;
-use log::*;
+use rand::prelude::*;
+use rand::seq::SliceRandom;
 
-use super::{GetContentInIframe, HOME_URL, SHENBIAN_GANDONG_URL, DETAIL_PAGE};
+use super::{GetContentInIframe, HOME_URL, SHENBIAN_GANDONG_URL};
 
 const QUERY_ARTICLE_TITLES: &str = "query-article-titles";
 const SHIPING_CHILDREN_NUM_TASK_NAME: &str = "shiping-children-num";
@@ -62,7 +66,7 @@ impl GetContentInIframe {
         }
     }
 
-    pub fn home_page_full_displayed (
+    pub fn home_page_full_displayed(
         &mut self,
         maybe_target_id: Option<&target::TargetId>,
         page_response: PageResponse,
@@ -72,37 +76,46 @@ impl GetContentInIframe {
         match page_response {
             PageResponse::ReceivedEvent(received_event) => {
                 match received_event {
-                    ReceivedEvent::FrameStoppedLoading(frame_id) => {
+                    ReceivedEvent::FrameStoppedLoading(_frame_id) => {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
-                        info!("************frames: {:?}, tab: {:?}, frams: {:?}", tab.changing_frames.len(), tab.get_url(), tab.changing_frames);
+
+                        info!(
+                            "************frames: {:?}, tab: {:?}, frams: {:?}",
+                            tab.changing_frames.len(),
+                            tab.get_url(),
+                            tab.changing_frames
+                        );
+                        if tab.get_url().contains("/lgpage/detail/")
+                            && tab.changing_frames.count_stopped() == 2
+                        {
+                            info!("*r* detail_page");
+                            tab.display_full_page_after_secs(2);
+                            tab.set_move_mouse_random_interval(20, 40);
+                        }
                     }
-                    ReceivedEvent::LoadEventFired(_task) => {
-                        let tab = self
-                            .get_tab(maybe_target_id)
-                            .expect("tab should exists. LoadEventFired");
-                        info!("---------> url: {:?}", tab.get_url());
-                        assert!(tab.get_url().contains("/lgpage/detail/"));
-                        assert_eq!(tab.page_name, Some(DETAIL_PAGE));
-                        // let tt = tab.mouse_move_to_xy_task(101.0, 101.0);
-                        // tab.execute_tasks_after_secs(vec![tt], 66);
-                        // tab.move_mouse_random_after_secs(60);
-                        // let tasks = vec![tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg"))];
-                        let mut tasks = tab.display_full_page_task();
-                        tasks.push(tab.capture_screenshot_jpeg_task(Some(100), None, Some("target/gcii.jpeg")));
-                        tab.execute_tasks_after_secs(tasks, 6);
-                        tab.activate_page();
-                        // tab.set_move_mouse_random_interval(20, 40);
-                        tab.move_mouse_random_after_secs(100);
-                    }
+                    // ReceivedEvent::LifeCycle => {
+                    //     let tab = self
+                    //         .get_tab(maybe_target_id)
+                    //         .expect("tab should exists. LoadEventFired");
+                    //     info!("kkkkkkkkkkkkkkkkkkkkkkkkkkkkk: {:?}", tab.life_cycles);
+
+                    //     if tab.get_url().contains("/lgpage/detail/")
+                    //         && tab.life_cycles.last_life_cycle_event().is_network_almost_idle()
+                    //     {
+                    //         tab.display_full_page();
+                    //         tab.set_move_mouse_random_interval(20, 40);
+                    //     }
+                    //     info!("got lifecycleEvent, home_page_full_displayed: {:?}", tab.life_cycles.last_life_cycle_event());
+                    // }
                     ReceivedEvent::PageCreated => {
                         let tab = self
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. PageCreated.");
                         assert!(tab.session_id.is_none());
                         info!("page created: {:?}", tab);
-                        tab.name_the_page(DETAIL_PAGE);
+                        // tab.name_the_page(DETAIL_PAGE);
                         tab.page_enable();
                         tab.runtime_enable();
                         // tab.network_enable();
@@ -129,7 +142,6 @@ impl GetContentInIframe {
                             .expect("tab should exists. SetDeviceMetricsOverride");
                         info!("url current: {:?}", tab.get_url());
                         if tab.is_at_url(HOME_URL) {
-                            tab.explicitly_close = true;
                             tab.name_the_page(HOME_URL);
                             let children_nodes_expression = r##"document.querySelectorAll('#\\32 31c div.grid-cell span.text')"##;
                             tab.evaluate_expression_and_get_properties_named(
@@ -142,16 +154,7 @@ impl GetContentInIframe {
                             let task = tab.evaluate_expression_task_named(r##"document.querySelectorAll("#root div.grid-cell span.text").length"##, SHIPING_CHILDREN_NUM_TASK_NAME);
                             tab.execute_one_task(task);
                             tab.evaluate_expression_named(r##"document.hidden"##, "dh");
-                            // tab.task_queue.add_delayed(task, 3);
                         }
-                    }
-
-                    MethodCallDone::CaptureScreenshot(capture_screen_shot) => {
-                        // info!("got screen shot: {:?}", capture_screen_shot.task_result);
-                        info!("got screen shot: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                        assert!(capture_screen_shot.task_result.is_some());
-                        let path = Path::new("target/gcii.jpeg");
-                        assert!(path.exists());
                     }
                     MethodCallDone::GetProperties(task) => {
                         info!("{:?}", task);
@@ -161,19 +164,22 @@ impl GetContentInIframe {
                             .get_tab(maybe_target_id)
                             .expect("tab should exists. FrameStoppedLoading");
 
-                        // let object_id = 
-                        task
+                        // let object_id =
+                        let mut tasks: Vec<Vec<TaskDescribe>> = task
                             .get_array_of_remote_object_id()
                             .iter()
-                            .map(|&oid|oid.to_string())
-                            .for_each(|oid|{
-                                let task = tab.mouse_click_on_remote_object_task(oid);
-                                tab.execute_task_manually_later(task);
-                            });
-                            // .get(0)
-                            // .cloned()
-                            // .cloned()
-                            // .expect("object_id should exists.");
+                            .map(|&oid| oid.to_string())
+                            .map(|oid| tab.mouse_click_on_remote_object_task(oid))
+                            .collect();
+                        
+                        let mut rng = rand::thread_rng();
+                        tasks.shuffle(&mut rng);
+                        tab.execute_task_vecs_manually_later(tasks);
+                        // tab.execute_task_vecs_in_interval(tasks.drain(..1).collect(), 10);
+                        // .get(0)
+                        // .cloned()
+                        // .cloned()
+                        // .expect("object_id should exists.");
                         // tab.mouse_click_on_remote_object(object_id);
                     }
                     MethodCallDone::GetTargets(task) => {

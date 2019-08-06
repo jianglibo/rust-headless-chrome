@@ -19,6 +19,11 @@ mod box_model_func;
 mod emulation_func;
 mod evaluate_func;
 mod screen_shot_func;
+mod page_life_cycles;
+mod changing_frames;
+
+pub use page_life_cycles::PageLifeCycles;
+pub use changing_frames::{ChangingFrames};
 
 #[derive(Debug)]
 pub struct ClosingState {
@@ -50,7 +55,7 @@ pub struct Tab {
     pub session_id: Option<target::SessionID>,
     pub root_node: Option<dom::Node>,
     pub page_name: Option<&'static str>,
-    pub changing_frames: HashMap<page::FrameId, ChangingFrame>,
+    pub changing_frames: ChangingFrames,
     pub temporary_node_holder: HashMap<dom::NodeId, Vec<dom::Node>>,
     pub execution_context_descriptions:
         HashMap<page::FrameId, runtime::ExecutionContextDescription>,
@@ -62,7 +67,7 @@ pub struct Tab {
     pub activating: bool,
     pub closing: ClosingState,
     pub explicitly_close: bool,
-    pub life_cycles: Vec<page_events::LifeCycle>,
+    pub life_cycles: PageLifeCycles,
     pub network_statistics: NetworkStatistics,
     pub box_model: Option<BoxModel>,
     mouse_random_move_limit: Option<(u64, u64)>,
@@ -92,7 +97,7 @@ impl Tab {
             session_id: None,
             root_node: None,
             page_name: None,
-            changing_frames: HashMap::new(),
+            changing_frames: ChangingFrames {changing_frames: HashMap::new()},
             temporary_node_holder: HashMap::new(),
             execution_context_descriptions: HashMap::new(),
             request_intercepted: HashMap::new(),
@@ -104,7 +109,7 @@ impl Tab {
             activating: false,
             closing: ClosingState { issued_at: None },
             explicitly_close: false,
-            life_cycles: Vec::new(),
+            life_cycles: PageLifeCycles{life_cycles: Vec::new()},
             event_statistics: EventStatistics::new(),
             network_statistics: NetworkStatistics::default(),
             task_queue: TaskQueue::new(),
@@ -134,6 +139,10 @@ impl Tab {
         }
     }
 
+    pub fn count_task_queue_manually(&self) -> usize {
+        self.task_queue.count_manually_task_to_run()
+    }
+
     pub fn is_blank_url(&self) -> bool {
         self.is_at_url("about:blank")
     }
@@ -150,32 +159,15 @@ impl Tab {
     /// but if failed cause of some reason, please look into the main frame's url and unreachable_url attributes,
     /// These two will give you more information.
     pub fn is_at_url(&self, url: &str) -> bool {
-        if let Some(mf) = self.main_frame() {
+        if let Some(mf) = self.changing_frames.main_frame() {
             mf.url == url
         } else {
             self.target_info.url == url
         }
     }
 
-    pub fn life_cycle_happened(&mut self, life_cycle_event: page_events::LifeCycle) {
-        self.life_cycles.push(life_cycle_event);
-    }
-
-    pub fn last_life_cycle_event(&self) -> &page_events::LifeCycle {
-        self.life_cycles
-            .last()
-            .expect("when last_life_cycle_event is called, it should already have events exists.")
-    }
-
-    pub fn life_cycle_event_count(&self, name: &str) -> usize {
-        self.life_cycles
-            .iter()
-            .filter(|lc| lc.get_name() == name)
-            .count()
-    }
-
     pub fn get_url(&self) -> &str {
-        if let Some(mf) = self.main_frame() {
+        if let Some(mf) = self.changing_frames.main_frame() {
             &mf.url
         } else {
             &self.target_info.url
@@ -284,17 +276,6 @@ impl Tab {
         task.into()
     }
 
-    pub fn main_frame(&self) -> Option<&page::Frame> {
-        self.changing_frames.values().find_map(|cf| match cf {
-            ChangingFrame::Navigated(fm) | ChangingFrame::StoppedLoading(fm)
-                if fm.parent_id.is_none() =>
-            {
-                Some(fm)
-            }
-            _ => None,
-        })
-    }
-
     pub fn get_response_body_for_interception(
         &mut self,
         interception_id: String,
@@ -359,6 +340,12 @@ impl Tab {
         }
     }
 
+    pub fn _frame_navigated(&mut self, frame: page::Frame) {
+        self.event_statistics
+            .event_happened(EventName::FrameNavigated);
+        self.changing_frames._frame_navigated(frame);
+    }
+
     pub fn find_node_by_id(&self, node_id: Option<dom::NodeId>) -> Option<&dom::Node> {
         self.temporary_node_holder
             .values()
@@ -366,40 +353,20 @@ impl Tab {
             .find(|nd| Some(nd.node_id) == node_id)
     }
 
-    pub fn find_navigated_frame<F>(&self, mut filter: F) -> Option<&page::Frame>
-    where
-        F: FnMut(&page::Frame) -> bool,
-    {
-        self.changing_frames
-            .values()
-            .filter_map(|cf| match cf {
-                ChangingFrame::Navigated(fm) | ChangingFrame::StoppedLoading(fm) => Some(fm),
-                _ => None,
-            })
-            .find(|frame| filter(frame))
-    }
-
-    pub fn find_frame_by_id(&self, frame_id: &str) -> Option<&page::Frame> {
-        match self.changing_frames.get(frame_id) {
-            Some(ChangingFrame::Navigated(fm)) | Some(ChangingFrame::StoppedLoading(fm)) => {
-                Some(fm)
-            }
-            _ => None,
-        }
-    }
 
     pub fn find_execution_context_id_by_frame_name(
         &self,
         frame_name: &'static str,
     ) -> Option<&runtime::ExecutionContextDescription> {
-        let frame = self.changing_frames.values().find_map(|cf| match cf {
-            ChangingFrame::Navigated(fr) | ChangingFrame::StoppedLoading(fr)
-                if fr.name == Some(frame_name.into()) =>
-            {
-                Some(fr)
-            }
-            _ => None,
-        });
+        // let frame = self.changing_frames.values().find_map(|cf| match cf {
+        //     ChangingFrame::Navigated(fr) | ChangingFrame::StoppedLoading(fr)
+        //         if fr.name == Some(frame_name.into()) =>
+        //     {
+        //         Some(fr)
+        //     }
+        //     _ => None,
+        // });
+        let frame = self.changing_frames.find_frame_by_name(frame_name);
         frame.and_then(|fr| self.execution_context_descriptions.get(&fr.id))
     }
 
@@ -456,46 +423,6 @@ impl Tab {
         }
     }
 
-    pub fn _frame_navigated(&mut self, frame: page::Frame) {
-        self.event_statistics
-            .event_happened(EventName::FrameNavigated);
-        if let Some(changing_frame) = self.changing_frames.get_mut(&frame.id) {
-            *changing_frame = ChangingFrame::Navigated(frame);
-        } else {
-            info!(
-                "Cannot found frame with id when got _frame_navigated, sometime chrome didn't emit other two events.: {:?}",
-                frame,
-            );
-            self.changing_frames
-                .insert(frame.id.clone(), ChangingFrame::Navigated(frame));
-        }
-    }
-
-    pub fn _frame_started_loading(&mut self, frame_id: String) {
-        if let Some(changing_frame) = self.changing_frames.get_mut(&frame_id) {
-            *changing_frame = ChangingFrame::StartedLoading(frame_id);
-        } else {
-            self.changing_frames
-                .insert(frame_id.clone(), ChangingFrame::StartedLoading(frame_id));
-        }
-    }
-
-    pub fn _frame_stopped_loading<T: AsRef<str>>(&mut self, frame_id: T) {
-        if let Some(changing_frame) = self.changing_frames.get_mut(frame_id.as_ref()) {
-            if let ChangingFrame::Navigated(fm) = changing_frame {
-                *changing_frame = ChangingFrame::StoppedLoading(fm.clone());
-            } else {
-                error!("-----------{:?}", changing_frame);
-            }
-        } else {
-            error!(
-                "Cannot found frame with id when got _frame_stopped_loading: {:?}",
-                frame_id.as_ref()
-            );
-            error!("Current changing_frames: {:?}", self.changing_frames);
-        }
-    }
-
     pub fn activate_page(&mut self) {
         let b = ActivateTargetTaskBuilder::default()
             .common_fields(self.get_common_field(None))
@@ -505,16 +432,7 @@ impl Tab {
         self.execute_one_task(b.into());
     }
 
-    pub fn _frame_attached(&mut self, frame_attached_params: page::events::FrameAttachedParams) {
-        let frame_id = frame_attached_params.frame_id.clone();
-        self.changing_frames.insert(
-            frame_id.clone(),
-            ChangingFrame::Attached(frame_attached_params),
-        );
-    }
-    pub fn _frame_detached(&mut self, frame_id: &str) {
-        self.changing_frames.remove(frame_id);
-    }
+
 
     pub fn get_document(&mut self, depth: Option<u8>) {
         let task = self.get_document_task(depth);
@@ -665,6 +583,12 @@ impl Tab {
         self.task_queue.add_manually_many(tasks);
     }
 
+    pub fn execute_task_vecs_manually_later(&mut self, tasks: Vec<Vec<TaskDescribe>>) {
+        for task_vec in tasks {
+            self.task_queue.add_manually_many(task_vec);
+        }
+    }
+
     pub fn execute_tasks_after_secs(&mut self, tasks: Vec<TaskDescribe>, delay_secs: u64) {
         self.task_queue.add_delayed_many(tasks, delay_secs);
     }
@@ -673,6 +597,13 @@ impl Tab {
         for (idx, v) in tasks.into_iter().enumerate() {
             self.task_queue
                 .add_delayed(v, delay_secs * ((idx + 1) as u64))
+        }
+    }
+
+    pub fn execute_task_vecs_in_interval(&mut self, tasks: Vec<Vec<TaskDescribe>>, delay_secs: u64) {
+        for (idx, v) in tasks.into_iter().enumerate() {
+            self.task_queue
+                .add_delayed_many(v, delay_secs * ((idx + 1) as u64))
         }
     }
 

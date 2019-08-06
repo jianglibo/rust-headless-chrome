@@ -1,10 +1,10 @@
 use serde::Deserialize;
-use super::super::protocol::{dom as protocol_dom, runtime, network, chrome_log};
+use super::super::protocol::{dom as protocol_dom, runtime, network, chrome_log, page};
 
 pub use chrome_log::events::{LogEntryAdded};
+use page::events::{WindowOpen, FrameRequestedNavigation, FrameResized};
 
-mod network_raw_event;
-
+pub mod network_raw_event;
 pub use network_raw_event::{RequestWillBeSent, RequestWillBeSentParams,
  ResponseReceived, DataReceived, LoadingFinished, ResponseReceivedParams, LoadingFailed, RequestServedFromCache};
 
@@ -136,6 +136,12 @@ pub enum EmbeddedEvent {
     RequestServedFromCache(RequestServedFromCache),
     #[serde(rename = "Log.entryAdded")]
     LogEntryAdded(LogEntryAdded),
+    #[serde(rename = "Page.windowOpen")]
+    WindowOpen(WindowOpen),
+    #[serde(rename = "Page.frameRequestedNavigation")]
+    FrameRequestedNavigation(FrameRequestedNavigation),
+    #[serde(rename = "Page.frameResized")]
+    FrameResized(FrameResized),
 }
 
 #[derive(Deserialize, Debug, Clone)]

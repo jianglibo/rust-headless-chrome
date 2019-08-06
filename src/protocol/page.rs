@@ -4,6 +4,18 @@ use rand::{thread_rng, Rng};
 
 pub type FrameId = String;
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ClientNavigationReason {
+    FormSubmissionGet,
+    FormSubmissionPost,
+    HttpHeaderRefresh,
+    ScriptInitiated,
+    MetaTagRefresh,
+    PageBlockInterstitial,
+    Reload,
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum TransitionType {
@@ -21,6 +33,7 @@ pub enum TransitionType {
     KeywordGenerated,
     Other,
 }
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Frame {
@@ -135,8 +148,10 @@ pub struct PrintToPdfOptions {
 }
 
 pub mod events {
-    use crate::protocol::runtime;
+    use super::super::{runtime, EmptyReturnObject};
     use serde::Deserialize;
+    use super::*;
+
     #[derive(Deserialize, Debug, Clone)]
     pub struct LifecycleEvent {
         pub params: LifecycleParams,
@@ -213,6 +228,24 @@ pub mod events {
         pub window_name: String,
         pub window_features: Vec<String>,
         pub user_gesture: bool,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct FrameRequestedNavigation {
+        pub params: FrameRequestedNavigationParams,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FrameRequestedNavigationParams {
+        pub frame_id: FrameId,
+        pub reason: ClientNavigationReason,
+        pub url: String,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct FrameResized {
+        pub params: EmptyReturnObject,
     }
 }
 

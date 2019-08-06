@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 // "headless_chrome=trace,get_content_in_iframe=trace",
-pub fn setup_logger<T, I>(verbose_modules: T) -> Result<(), fern::InitError> 
+pub fn setup_logger<T, I>(verbose_modules: T, other_modules: T) -> Result<(), fern::InitError> 
     where
         I: AsRef<str>,
         T: IntoIterator<Item=I>, {
@@ -14,6 +14,12 @@ pub fn setup_logger<T, I>(verbose_modules: T) -> Result<(), fern::InitError>
     for module_name in verbose_modules {
         base_config = base_config.level_for(
             format!("headless_chrome::{}", module_name.as_ref()),
+            log::LevelFilter::Trace);
+    }
+
+    for module_name in other_modules {
+        base_config = base_config.level_for(
+            format!("{}", module_name.as_ref()),
             log::LevelFilter::Trace);
     }
     // base_config.level_for("headless_chrome", log::LevelFilter::Trace);

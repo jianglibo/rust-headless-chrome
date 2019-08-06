@@ -1,5 +1,8 @@
 #![warn(clippy::all)]
 
+#[macro_use]
+extern crate lazy_static;
+
 extern crate chrono;
 extern crate fern;
 extern crate log;
@@ -20,7 +23,7 @@ use std::default::Default;
 
 use websocket::futures::{Future, IntoFuture, Poll, Stream};
 
-use gcii::{GetContentInIframe, PageState, DETAIL_PAGE, HOME_URL, SHENBIAN_GANDONG_URL};
+use gcii::{GetContentInIframe, PageState, HOME_URL, SHENBIAN_GANDONG_URL, PAGE_STATE};
 
 impl GetContentInIframe {
     fn assert_result(&self) {
@@ -38,16 +41,16 @@ impl Future for GetContentInIframe {
             if let Some(page_response_wrapper) = try_ready!(self.debug_session.poll()) {
                 let maybe_target_id = page_response_wrapper.target_id.clone();
                 if let PageResponse::SecondsElapsed(seconds) = page_response_wrapper.page_response {
+                    self.debug_session.close_tab_old_than(390);
+                    if self.debug_session.tab_count() < 2 {
+                        self.debug_session.run_manually_tasks();
+                    }
+
                     if seconds % 30 == 0 {
-                        // self.debug_session.close_tab_by_window_close_old_than(390);
-                        self.debug_session.close_tab_old_than(390);
                         info!(
                             "************** tab_count: {:?}",
                             self.debug_session.tab_count()
                         );
-                        if self.debug_session.tab_count() < 2 {
-                            self.debug_session.run_manually_tasks();
-                        }
                     }
                     if seconds % 30 == 0 {
                         // info!("{:?}", self.state);
@@ -85,9 +88,9 @@ impl Future for GetContentInIframe {
                         // if tab.bring_to_front() {
                         //     info!("activating {:?}", tab);
                         // }
-                        if seconds % 30 == 0 {
-                            tab.evaluate_expression(format!("{}+1;", seconds));
-                        }
+                        // if seconds % 30 == 0 {
+                        //     tab.evaluate_expression(format!("{}+1;", seconds));
+                        // }
 
                         // if seconds % 100 == 0 {
                         //     info!("detail page: {:?}", tab);
@@ -153,6 +156,8 @@ impl Future for GetContentInIframe {
                         break Ok(().into());
                     }
                 } else {
+                    // let c = (*PAGE_STATE.lock().unwrap()).clone();
+                    // info!("got frame: {:?}", c);
                     match self.state {
                         PageState::WaitingBlankPage => {
                             self.waiting_blank_page(
@@ -166,7 +171,7 @@ impl Future for GetContentInIframe {
                                 page_response_wrapper.page_response,
                             );
                         }
-                        PageState::WaitingForQrcodeScan => {
+                        PageState::WaitingForQrcodeScan | PageState::QrCodeScaned => {
                             self.waiting_for_qrcode_scan(
                                 maybe_target_id.as_ref(),
                                 page_response_wrapper.page_response,
@@ -197,9 +202,9 @@ impl Future for GetContentInIframe {
 fn t_get_content_in_iframe() {
     tutil::setup_logger(vec![
         "browser_async::task_queue",
-        "browser_async::chrome_browser",
+        // "browser_async::chrome_browser",
         "browser_async::tab",
-    ])
+    ], vec!["websocket"])
     .expect("fern log should work.");
 
     let my_page = GetContentInIframe::default();
@@ -210,3 +215,8 @@ fn t_get_content_in_iframe() {
         .block_on(my_page.into_future())
         .expect("tokio should success.");
 }
+
+// https://pc.xuexi.cn/points/my-points.html
+// document.querySelector("#app > div > div:nth-child(2) > div > div:nth-child(2) > div.my-points-block > span.my-points-points.my-points-red").innerHTML + ';' + document.querySelector("#app > div > div:nth-child(2) > div > div:nth-child(2) > div.my-points-block > span:nth-child(3)").innerHTML + ';' + document.querySelector("#app > div > div:nth-child(2) > div > div.my-points-section > div.my-points-content > div:nth-child(1) > div.my-points-card-footer > div.my-points-card-progress > div.my-points-card-text").innerHTML + ';' + document.querySelector("#app > div > div:nth-child(2) > div > div.my-points-section > div.my-points-content > div:nth-child(2) > div.my-points-card-footer > div.my-points-card-progress > div.my-points-card-text").innerHTML + ';' + document.querySelector("#app > div > div:nth-child(2) > div > div.my-points-section > div.my-points-content > div:nth-child(3) > div.my-points-card-footer > div.my-points-card-progress > div.my-points-card-text").innerHTML + ';' + document.querySelector("#app > div > div:nth-child(2) > div > div.my-points-section > div.my-points-content > div:nth-child(4) > div.my-points-card-footer > div.my-points-card-progress > div.my-points-card-text").innerHTML + ';' + document.querySelector("#app > div > div:nth-child(2) > div > div.my-points-section > div.my-points-content > div:nth-child(5) > div.my-points-card-footer > div.my-points-card-progress > div.my-points-card-text").innerHTML
+// 成长总积分: 今日累积积分: 每日登陆： 阅读文章： 试听学习： 文章时长： 视听时长：
+// "761;7;1分/1分;0分/6分;0分/6分;6分/6分;0分/6分"

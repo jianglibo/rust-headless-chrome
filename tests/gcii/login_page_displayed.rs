@@ -9,7 +9,7 @@ use std::default::Default;
 use std::fs;
 use std::path::Path;
 
-use super::{GetContentInIframe, PageState};
+use super::{GetContentInIframe, PageState, PAGE_STATE};
 
 impl GetContentInIframe {
     pub fn login_page_displayed(
@@ -26,7 +26,7 @@ impl GetContentInIframe {
                             .expect("tab should exists. FrameStoppedLoading");
                         tab.lifecycle_events_enable();
                         
-                        if let Some(_frame) = tab
+                        if let Some(_frame) = tab.changing_frames
                             .find_frame_by_id(&frame_id)
                             .filter(|f| f.name == Some("ddlogin-iframe".into()))
                         {
@@ -70,6 +70,7 @@ impl GetContentInIframe {
                         .expect("write_base64_str_to success.");
                     assert!(path.exists());
                     self.state = PageState::WaitingForQrcodeScan;
+                    // *PAGE_STATE.lock().expect("PAGE_STATE") = PageState::WaitingForQrcodeScan;
                     let exe = std::fs::canonicalize("./target/qrcode.png").expect("exists.");
                     std::process::Command::new("cmd")
                         .args(&[

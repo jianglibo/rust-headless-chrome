@@ -16,6 +16,7 @@ pub enum ChangingFrame {
     StartedLoading(String),
     Navigated(page::Frame),
     StoppedLoading(page::Frame),
+    StopLoadingFrameId,
 }
 
 #[derive(Debug)]
@@ -56,6 +57,8 @@ pub enum ReceivedEvent {
     FrameStartedLoading(page::FrameId),
     FrameNavigated(page_events::FrameNavigated),
     WindowOpen(page_events::WindowOpen),
+    FrameRequestedNavigation(page_events::FrameRequestedNavigation),
+    FrameResized(page_events::FrameResized),
     FrameStoppedLoading(page::FrameId),
     LoadEventFired(network::MonotonicTime),
     SetChildNodesOccurred(dom::NodeId),

@@ -13,13 +13,22 @@ mod home_page_full_displayed;
 pub const HOME_URL: &str = "https://www.xuexi.cn/";
 pub const LOGIN_URL: &str = "https://pc.xuexi.cn/points/login.html?ref=https://www.xuexi.cn/";
 pub const SHENBIAN_GANDONG_URL: &str = "https://www.xuexi.cn/2b50c77aa08a2621e69cdc7cb29e7d4b/b87d700beee2c44826a9202c75d18c85.html";
-pub const DETAIL_PAGE: &str = "detail_page";
+// pub const DETAIL_PAGE: &str = "detail_page";
 
-#[derive(Debug)]
+
+use std::sync::Mutex;
+
+lazy_static! {
+    pub static ref PAGE_STATE: Mutex<PageState> = Mutex::new(PageState::WaitingBlankPage);
+}
+
+
+#[derive(Debug, Clone)]
 pub enum PageState {
     WaitingBlankPage,
     LoginPageDisplayed,
     WaitingForQrcodeScan,
+    QrCodeScaned,
     HomePageFullDisplayed,
 }
 
@@ -50,4 +59,5 @@ impl GetContentInIframe {
     pub fn get_tab(&mut self, target_id: Option<&target::TargetId>) -> Option<&mut Tab> {
         self.debug_session.find_tab_by_id_mut(target_id).ok()
     }
+
 }

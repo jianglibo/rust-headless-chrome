@@ -48,6 +48,7 @@ pub struct ChromeBrowser {
     process: Option<Process>,
     last_be_polled: Instant,
     waiting_to_send: VecDeque<String>,
+    just_send: bool,
 }
 
 impl std::fmt::Debug for ChromeBrowser {
@@ -83,6 +84,7 @@ impl ChromeBrowser {
             process,
             last_be_polled: Instant::now(),
             waiting_to_send: VecDeque::new(),
+            just_send: false,
         }
     }
     pub fn send_message(&mut self, method_str: String) {
@@ -91,6 +93,9 @@ impl ChromeBrowser {
 
     pub fn check_pending_task(&mut self) {
         if let BrowserState::Receiving = self.state {
+            if self.just_send {
+                return;
+            }
             trace!("enter check_pending_task state..........");
             if let Some(first) = self.waiting_to_send.pop_front() {
                 trace!("take from waiting_to_send: {:?}", first);
@@ -99,13 +104,6 @@ impl ChromeBrowser {
                 trace!("no pending task.");
             }
         }
-        // if let Some(first) = self.waiting_to_send.pop_front() {
-        //     trace!("take from waiting_to_send: {:?}", first);
-        //     self.state = BrowserState::StartSend(first);
-        // } else {
-        //     trace!("no waiting task, switch to receiving state.");
-        //     self.state = BrowserState::Receiving;
-        // }
     }
 
     pub fn have_not_be_polled_for(&self, duration: Duration) -> bool {
@@ -138,6 +136,7 @@ impl Stream for ChromeBrowser {
                 BrowserState::Receiving => {
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll() {
                         Ok(Async::Ready(Some(message))) => {
+                            self.just_send = false;
                             if let OwnedMessage::Text(msg) = message {
                                 if msg.contains("Network.requestIntercepted") || msg.len() < 1000 {
                                     trace!("got message (***every message***): {:?}", msg);
@@ -200,6 +199,7 @@ impl Stream for ChromeBrowser {
                     match self.ws_client.as_mut().expect("obtain ws_client should success.").poll_complete() {
                         Ok(Async::Ready(v)) => {
                             trace!("sending {:?} completed. switch from sending to receiving state.", v);
+                            self.just_send = true;
                             self.state = BrowserState::Receiving;
                         }
                         Ok(Async::NotReady) => {

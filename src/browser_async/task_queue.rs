@@ -30,7 +30,7 @@ impl TaskQueueItem {
         self.tasks.is_empty()
     }
 
-    pub fn new_mannuly(tasks: Vec<TaskDescribe>) -> Self {
+    pub fn new_manually(tasks: Vec<TaskDescribe>) -> Self {
         Self {
             issued_at: Instant::now(),
             delay_secs: None,
@@ -38,7 +38,7 @@ impl TaskQueueItem {
         }
     }
 
-    pub fn is_mannuly(&self) -> bool {
+    pub fn is_manually(&self) -> bool {
         self.delay_secs.is_none()
     }
 
@@ -86,7 +86,7 @@ impl TaskQueue {
     }
 
     pub fn add_manually_many(&mut self, tasks: Vec<TaskDescribe>) {
-        self.task_items.push(TaskQueueItem::new_mannuly(tasks));
+        self.task_items.push(TaskQueueItem::new_manually(tasks));
     }
 
     pub fn add_manually(&mut self, task: TaskDescribe) {
@@ -124,11 +124,20 @@ impl TaskQueue {
     }
 
     pub fn retrieve_manually_task_to_run(&mut self) -> Option<Vec<TaskDescribe>> {
-        if let Some(i) = self.task_items.iter().position(TaskQueueItem::is_mannuly) {
+        if let Some(i) = self.task_items.iter().position(TaskQueueItem::is_manually) {
             Some(self.task_items.remove(i).tasks)
         } else {
             None
         }
+    }
+
+    pub fn count_manually_task_to_run(&self) -> usize {
+        self.task_items.iter().filter_map(|ti|
+            if ti.is_manually() {
+                Some(ti.len())
+            } else {
+                None
+            }).sum()
     }
 }
 

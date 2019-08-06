@@ -15,7 +15,7 @@ use super::protocol::target;
 use super::ChromePageError;
 use failure;
 use futures::{Async, Poll};
-// use log::*;
+use log::*;
 use std::sync::{Arc, Mutex};
 use websocket::futures::Stream;
 
@@ -124,6 +124,10 @@ impl DebugSession {
 
     pub fn run_manually_tasks(&mut self) {
         self.tabs.iter_mut().for_each(Tab::run_task_queue_manually);
+    }
+
+    pub fn count_manually_tasks(&self) -> usize {
+        self.tabs.iter().map(Tab::count_task_queue_manually).sum()
     }
 
     pub fn loaded_by_this_tab_name_mut(&mut self, name: &str) -> Vec<&mut Tab> {
@@ -275,7 +279,12 @@ impl DebugSession {
     }
 
     pub fn tab_closed(&mut self, target_id: &str) {
-        self.tabs.retain(|tb| tb.target_info.target_id != target_id);
+        self.tabs.retain(|tb| {
+            if tb.target_info.target_id == target_id {
+                info!("tab closed: {:?}", tb);
+            }
+            tb.target_info.target_id != target_id
+        });
     }
 
     pub fn bring_to_front_responded(

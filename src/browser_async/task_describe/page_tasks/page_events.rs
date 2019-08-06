@@ -2,6 +2,7 @@ use super::PageEvent;
 use super::super::TaskDescribe;
 use crate::browser_async::{embedded_events, page_message::{PageResponse, ReceivedEvent,}};
 use crate::protocol::{page};
+
 // {\"method\":\"Page.windowOpen\",\"params\":{\"url\":\"https://www.xuexi.cn/lgpage/detail/index.html?id=15137239656100094659\",\"windowName\":\"_blank\",\"windowFeatures\":[\"menubar\",\"toolbar\",\"status\",\"scrollbars\",\"resizable\"],\"userGesture\":true}}"
 wrapper_raw_event!(
     TaskDescribe::PageEvent,
@@ -10,6 +11,20 @@ wrapper_raw_event!(
     page::events::WindowOpen
 );
 
+// "{\"method\":\"Page.frameResized\",\"params\":{}}"
+wrapper_raw_event!(
+    TaskDescribe::PageEvent,
+    PageEvent::FrameResized,
+    FrameResized,
+    page::events::FrameResized
+);
+
+wrapper_raw_event!(
+    TaskDescribe::PageEvent,
+    PageEvent::FrameRequestedNavigation,
+    FrameRequestedNavigation,
+    page::events::FrameRequestedNavigation
+);
 
 // {\"method\":\"Target.receivedMessageFromTarget\",\"params\":{\"sessionId\":\"1B34295E2E49181EC18E08C21FD08148\",\"message\":\"{\\\"method\\\":\\\"Page.domContentEventFired\\\",\\\"params\\\":{\\\"timestamp\\\":130939.223244}}\",\"targetId\":\"74FEEFE9CACC814F52F89930129A15ED\"}}
 wrapper_raw_event!(

@@ -92,7 +92,7 @@ impl GetContentInIframe {
                         {
                             info!("*r* detail_page");
                             tab.display_full_page_after_secs(2);
-                            tab.move_mouse_random_after_secs(20);
+                            // tab.move_mouse_random_after_secs(20);
                             tab.move_mouse_random_after_secs(40);
                             // tab.set_move_mouse_random_interval(30, 60);
                         } else if tab.is_at_url(HOME_URL) {
@@ -102,7 +102,7 @@ impl GetContentInIframe {
                             tab.network_enable();
                             tab.activated_at.replace(std::time::Instant::now());
                             // tab.set_move_mouse_random_interval(30, 60);
-                            tab.move_mouse_random_after_secs(10);
+                            // tab.move_mouse_random_after_secs(10);
                             tab.move_mouse_random_after_secs(30);
                             tab.display_full_page_after_secs(2);
                         }

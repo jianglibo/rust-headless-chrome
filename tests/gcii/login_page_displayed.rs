@@ -72,6 +72,8 @@ impl GetContentInIframe {
                     self.state = PageState::WaitingForQrcodeScan;
                     // *PAGE_STATE.lock().expect("PAGE_STATE") = PageState::WaitingForQrcodeScan;
                     let exe = std::fs::canonicalize("./target/qrcode.png").expect("exists.");
+                    #[cfg(windows)]
+                    {
                     std::process::Command::new("cmd")
                         .args(&[
                             "/C",
@@ -80,6 +82,7 @@ impl GetContentInIframe {
                         ])
                         .spawn()
                         .expect("failed to execute process");
+                    }
                 }
             }
             _ => {}
